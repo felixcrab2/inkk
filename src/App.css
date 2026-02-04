@@ -111,3 +111,28 @@ body {
     border-color: #888;
   }
 }
+
+
+/* Mobile: larger side margins */
+@media (max-width: 600px) {
+  #text-container {
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+
+  #text {
+    max-width: 70vw; /* optional: loosen a bit on small screens */
+  }
+}
+
+/* Hidden mobile input that still triggers keyboard */
+#mobile-input {
+  position: fixed;
+  opacity: 0;
+  pointer-events: none;
+  height: 1px;
+  width: 1px;
+  left: -9999px;
+  top: 0;
+}
+

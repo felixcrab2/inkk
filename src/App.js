@@ -5,7 +5,6 @@ import "@fontsource/eb-garamond/400.css";
 import { jsPDF } from "jspdf";
 import garamondTTF from "./assets/EBGaramond-Regular.ttf";
 
-// Fetch the bundled TTF URL and convert to base64 for jsPDF
 async function fetchAsBase64(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to fetch font: ${res.status} ${res.statusText}`);
@@ -19,6 +18,15 @@ async function fetchAsBase64(url) {
   return btoa(binary);
 }
 
+function isMobileDevice() {
+  // simple + robust enough for this use
+  return (
+    typeof navigator !== "undefined" &&
+    (navigator.maxTouchPoints > 0 ||
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent))
+  );
+}
+
 function App() {
   const [content, setContent] = useState("");
   const [menuVisible, setMenuVisible] = useState(true);
@@ -27,12 +35,14 @@ function App() {
   const idleTimerRef = useRef(null);
   const typingRecentlyRef = useRef(false);
 
+  const mobileInputRef = useRef(null);
+  const isMobileRef = useRef(false);
+
   const IDLE_MS = 1200;
 
   async function exportToPdf() {
     const doc = new jsPDF({ unit: "pt", format: "a4" });
 
-    // Embed EB Garamond
     const base64 = await fetchAsBase64(garamondTTF);
     doc.addFileToVFS("EBGaramond-Regular.ttf", base64);
     doc.addFont("EBGaramond-Regular.ttf", "EBGaramond", "normal");
@@ -64,6 +74,8 @@ function App() {
   }
 
   useEffect(() => {
+    isMobileRef.current = isMobileDevice();
+
     function scheduleMenuReturn() {
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       idleTimerRef.current = setTimeout(() => {
@@ -73,6 +85,9 @@ function App() {
     }
 
     function onKeyDown(e) {
+      // Desktop only: keep your exact behaviour
+      if (isMobileRef.current) return;
+
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
       const key = e.key;
@@ -105,6 +120,58 @@ function App() {
     endRef.current?.scrollIntoView({ block: "center" });
   }, [content]);
 
+  function scheduleMenuReturn() {
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = setTimeout(() => {
+      typingRecentlyRef.current = false;
+      setMenuVisible(true);
+    }, IDLE_MS);
+  }
+
+  function focusMobileKeyboard() {
+    if (!isMobileRef.current) return;
+    // One clean tap should open keyboard
+    mobileInputRef.current?.focus();
+  }
+
+  function handleMobileKeyDown(e) {
+    if (!isMobileRef.current) return;
+
+    const key = e.key;
+
+    typingRecentlyRef.current = true;
+    setMenuVisible(false);
+    scheduleMenuReturn();
+
+    if (key === "Backspace") {
+      e.preventDefault();
+      setContent((prev) => prev.slice(0, -1));
+      return;
+    }
+
+    if (key === "Enter") {
+      e.preventDefault();
+      setContent((prev) => prev + "\n");
+      return;
+    }
+  }
+
+  function handleMobileChange(e) {
+    if (!isMobileRef.current) return;
+
+    // textarea value will contain the latest inserted character(s)
+    const val = e.target.value;
+    if (!val) return;
+
+    typingRecentlyRef.current = true;
+    setMenuVisible(false);
+    scheduleMenuReturn();
+
+    setContent((prev) => prev + val);
+    // clear so next keystroke is easy to detect
+    e.target.value = "";
+  }
+
   return (
     <>
       <div
@@ -117,14 +184,24 @@ function App() {
         inkk.
       </div>
 
-      <div id="text-container">
-        <div id="start-spacer" />
+      {/* Hidden mobile input to trigger keyboard */}
+      <textarea
+        id="mobile-input"
+        ref={mobileInputRef}
+        inputMode="text"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        onKeyDown={handleMobileKeyDown}
+        onChange={handleMobileChange}
+      />
+
+      <div id="text-container" onClick={focusMobileKeyboard}>
         <div id="text">
           {content}
           <span className="blinking-cursor" />
           <span ref={endRef} />
         </div>
-        <div id="end-spacer" />
       </div>
     </>
   );
