@@ -52,8 +52,12 @@ body {
 }
 
 #text {
-  width: min(900px, 92vw);
-  margin: 0 auto;
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
+
+  max-width: 36ch;        /* ← THIS is the key */
+  width: 100%;
 
   white-space: pre-wrap;
   overflow-wrap: break-word;
@@ -62,9 +66,11 @@ body {
   color: #111;
   padding: 10px;
 
+  text-align: left;       /* keep natural typing */
   cursor: text;
   outline: none;
 }
+
 
 /* Blinking cursor */
 .blinking-cursor {
