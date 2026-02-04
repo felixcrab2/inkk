@@ -42,34 +42,38 @@ body {
 /* ─────────── Typing area ─────────── */
 #text-container {
   height: 100vh;
-  overflow-y: auto;   /* scroll happens here */
+  overflow-y: auto;
   overflow-x: hidden;
   box-sizing: border-box;
 
-  /* makes the first line appear in the middle */
+  /* starts in the middle, like before */
   padding-top: 40vh;
   padding-bottom: 40vh;
 }
 
 #text {
+  /* centre the typing block exactly like your original absolute-centre version */
   position: relative;
   left: 50%;
   transform: translateX(-50%);
 
-  max-width: 36ch;        /* ← THIS is the key */
-  width: 100%;
+  /* THIS is the “fills out both sides” behaviour */
+  width: fit-content;
 
+  /* THIS is the “but never gets that wide” behaviour */
+  max-width: 70vw;
+
+  /* wrapping + appearance */
   white-space: pre-wrap;
   overflow-wrap: break-word;
-
   font-size: 1.65rem;
   color: #111;
   padding: 10px;
 
-  text-align: left;       /* keep natural typing */
   cursor: text;
   outline: none;
 }
+
 
 
 /* Blinking cursor */
