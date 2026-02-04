@@ -134,3 +134,36 @@ body {
   caret-color: #888;
 }
 
+/* --- Blinking cursor for contentEditable editor --- */
+#text {
+  position: relative; /* needed for ::after positioning */
+}
+
+/* show cursor when empty */
+#text:empty::after {
+  content: "";
+  display: inline-block;
+  width: 0;
+  height: 1em;
+  border-left: 0.07em solid #888;
+  vertical-align: -0.15em;
+  animation: blink-cursor 0.6s steps(2, start) infinite;
+}
+
+/* (optional) keep a subtle caret colour when focused */
+#text:focus {
+  caret-color: #888;
+}
+
+/* same keyframes as before */
+@keyframes blink-cursor {
+  0%,
+  100% {
+    border-color: transparent;
+  }
+  50% {
+    border-color: #888;
+  }
+}
+
+
