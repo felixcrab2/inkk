@@ -68,27 +68,25 @@ body {
 }
 
 #text {
-  /* centre the typing block exactly like your original absolute-centre version */
   position: relative;
   left: 50%;
   transform: translateX(-50%);
 
-  /* THIS is the “fills out both sides” behaviour */
   width: fit-content;
+  max-width: 70vw;
 
-  /* THIS is the “but never gets that wide” behaviour */
-  max-width: 50vw;
-
-  /* wrapping + appearance */
   white-space: pre-wrap;
   overflow-wrap: break-word;
-  font-size: 1.35rem;
+
+  font-size: 1.65rem;
   color: #111;
   padding: 10px;
 
+  text-align: center;   /* ← THIS is the key */
   cursor: text;
   outline: none;
 }
+
 
 
 
