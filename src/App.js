@@ -7,7 +7,9 @@ import garamondTTF from "./assets/EBGaramond-Regular.ttf";
 
 async function fetchAsBase64(url) {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed to fetch font: ${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch font: ${res.status} ${res.statusText}`);
+  }
   const buf = await res.arrayBuffer();
   let binary = "";
   const bytes = new Uint8Array(buf);
@@ -19,11 +21,9 @@ async function fetchAsBase64(url) {
 }
 
 function isMobileDevice() {
-  // simple + robust enough for this use
   return (
     typeof navigator !== "undefined" &&
-    (navigator.maxTouchPoints > 0 ||
-      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent))
+    (navigator.maxTouchPoints > 0 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent))
   );
 }
 
@@ -39,6 +39,20 @@ function App() {
   const isMobileRef = useRef(false);
 
   const IDLE_MS = 1200;
+
+  function scheduleMenuReturn() {
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = setTimeout(() => {
+      typingRecentlyRef.current = false;
+      setMenuVisible(true);
+    }, IDLE_MS);
+  }
+
+  function markTyping() {
+    typingRecentlyRef.current = true;
+    setMenuVisible(false);
+    scheduleMenuReturn();
+  }
 
   async function exportToPdf() {
     const doc = new jsPDF({ unit: "pt", format: "a4" });
@@ -76,14 +90,6 @@ function App() {
   useEffect(() => {
     isMobileRef.current = isMobileDevice();
 
-    function scheduleMenuReturn() {
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-      idleTimerRef.current = setTimeout(() => {
-        typingRecentlyRef.current = false;
-        setMenuVisible(true);
-      }, IDLE_MS);
-    }
-
     function onKeyDown(e) {
       // Desktop only: keep your exact behaviour
       if (isMobileRef.current) return;
@@ -98,10 +104,7 @@ function App() {
       if (!(isBackspace || isEnter || isPrintable)) return;
 
       e.preventDefault();
-
-      typingRecentlyRef.current = true;
-      setMenuVisible(false);
-      scheduleMenuReturn();
+      markTyping();
 
       if (isBackspace) return setContent((prev) => prev.slice(0, -1));
       if (isEnter) return setContent((prev) => prev + "\n");
@@ -117,31 +120,30 @@ function App() {
 
   useEffect(() => {
     if (!typingRecentlyRef.current) return;
-    endRef.current?.scrollIntoView({ block: "center" });
+    endRef.current?.scrollIntoView({ block: isMobileRef.current ? "end" : "center" });
   }, [content]);
-
-  function scheduleMenuReturn() {
-    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-    idleTimerRef.current = setTimeout(() => {
-      typingRecentlyRef.current = false;
-      setMenuVisible(true);
-    }, IDLE_MS);
-  }
 
   function focusMobileKeyboard() {
     if (!isMobileRef.current) return;
-    // One clean tap should open keyboard
-    mobileInputRef.current?.focus();
+    const el = mobileInputRef.current;
+    if (!el) return;
+
+    // don't refocus if already focused (prevents jitter)
+    if (document.activeElement === el) return;
+
+    // preventScroll reduces iOS jumpiness; harmless where unsupported
+    try {
+      el.focus({ preventScroll: true });
+    } catch {
+      el.focus();
+    }
   }
 
   function handleMobileKeyDown(e) {
     if (!isMobileRef.current) return;
 
     const key = e.key;
-
-    typingRecentlyRef.current = true;
-    setMenuVisible(false);
-    scheduleMenuReturn();
+    markTyping();
 
     if (key === "Backspace") {
       e.preventDefault();
@@ -159,15 +161,12 @@ function App() {
   function handleMobileChange(e) {
     if (!isMobileRef.current) return;
 
-    // textarea value will contain the latest inserted character(s)
     const val = e.target.value;
     if (!val) return;
 
-    typingRecentlyRef.current = true;
-    setMenuVisible(false);
-    scheduleMenuReturn();
-
+    markTyping();
     setContent((prev) => prev + val);
+
     // clear so next keystroke is easy to detect
     e.target.value = "";
   }
@@ -184,7 +183,7 @@ function App() {
         inkk.
       </div>
 
-      {/* Hidden mobile input to trigger keyboard */}
+      {/* Invisible on-screen input to trigger mobile keyboard (avoid off-screen iOS jitter) */}
       <textarea
         id="mobile-input"
         ref={mobileInputRef}
