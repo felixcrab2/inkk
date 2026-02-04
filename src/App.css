@@ -104,3 +104,14 @@ body {
   outline: none;
   width: 8ch;
 }
+
+/* Make the typing div actually focusable/clickable */
+#text {
+  cursor: text;
+}
+
+/* Optional: a subtle hint that it's focused (can remove if you hate it) */
+#text:focus {
+  outline: none;
+}
+
