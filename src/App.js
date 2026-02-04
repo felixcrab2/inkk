@@ -29,7 +29,6 @@ function isMobileDevice() {
 
 function App() {
   // NOTE: this is now just a debounced snapshot (for PDF + React)
-  const [contentSnapshot, setContentSnapshot] = useState("");
   const [menuVisible, setMenuVisible] = useState(true);
 
   const editorRef = useRef(null);
@@ -60,13 +59,7 @@ function App() {
     scheduleMenuReturn();
   }, [scheduleMenuReturn]);
 
-  // Debounce syncing DOM text → React state (prevents lag)
-  const debouncedSyncSnapshot = useCallback(() => {
-    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
-    syncTimerRef.current = setTimeout(() => {
-      setContentSnapshot(contentRef.current);
-    }, 250);
-  }, []);
+
 
   // Throttled auto-scroll (mobile especially)
   const scheduleScroll = useCallback(() => {
@@ -104,7 +97,6 @@ function App() {
     contentRef.current = el.innerText;
 
     markTyping();
-    debouncedSyncSnapshot();
     scheduleScroll();
   }, [markTyping, debouncedSyncSnapshot, scheduleScroll]);
 
