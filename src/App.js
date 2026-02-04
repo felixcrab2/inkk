@@ -5,36 +5,36 @@ function App() {
   const [content, setContent] = useState("");
   const [menuVisible, setMenuVisible] = useState(true);
 
-  // When typing stops for a moment, show the menu again
+  const endRef = useRef(null);
   const idleTimerRef = useRef(null);
+  const typingRecentlyRef = useRef(false);
+
   const IDLE_MS = 1200;
 
   useEffect(() => {
     function scheduleMenuReturn() {
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       idleTimerRef.current = setTimeout(() => {
+        typingRecentlyRef.current = false;
         setMenuVisible(true);
       }, IDLE_MS);
     }
 
     function onKeyDown(e) {
-      // Don’t interfere with normal shortcuts
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
       const key = e.key;
-
-      // Only handle keys that represent "typing"
       const isBackspace = key === "Backspace";
       const isEnter = key === "Enter";
       const isPrintable = key.length === 1;
 
       if (!(isBackspace || isEnter || isPrintable)) return;
 
-      // Prevent page scrolling / weird browser defaults
       e.preventDefault();
 
-      // Hide menu while actively typing
-      if (menuVisible) setMenuVisible(false);
+      // hide while typing
+      typingRecentlyRef.current = true;
+      setMenuVisible(false);
       scheduleMenuReturn();
 
       if (isBackspace) {
@@ -47,7 +47,6 @@ function App() {
         return;
       }
 
-      // printable character
       setContent((prev) => prev + key);
     }
 
@@ -56,7 +55,13 @@ function App() {
       window.removeEventListener("keydown", onKeyDown);
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     };
-  }, [menuVisible]);
+  }, []);
+
+  // Auto-scroll while typing: keep the cursor/end roughly centered
+  useEffect(() => {
+    if (!typingRecentlyRef.current) return;
+    endRef.current?.scrollIntoView({ block: "center" });
+  }, [content]);
 
   return (
     <>
@@ -65,10 +70,13 @@ function App() {
       </div>
 
       <div id="text-container">
+        <div id="start-spacer" />
         <div id="text">
           {content}
           <span className="blinking-cursor" />
+          <span ref={endRef} />
         </div>
+        <div id="end-spacer" />
       </div>
     </>
   );
