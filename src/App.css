@@ -65,6 +65,8 @@ body {
     black 110px,
     black 100%
   );
+  padding-left: 24px;
+  padding-right: 24px;
 }
 
 #text {
