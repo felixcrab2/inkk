@@ -41,7 +41,6 @@ function App() {
 
   // timers / throttles
   const idleTimerRef = useRef(null);
-  const syncTimerRef = useRef(null);
   const scrollRafRef = useRef(null);
   const lastScrollTsRef = useRef(0);
 
@@ -145,7 +144,6 @@ function App() {
 
     return () => {
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
       if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
     };
   }, []);
