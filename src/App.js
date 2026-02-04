@@ -1,5 +1,22 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./App.css";
+import "@fontsource/eb-garamond/400.css";
+
+import { jsPDF } from "jspdf";
+import garamondTTF from "@fontsource/eb-garamond/files/eb-garamond-latin-400-normal.ttf";
+
+// Convert the bundled TTF file to base64 so jsPDF can embed it
+async function fetchAsBase64(url) {
+  const res = await fetch(url);
+  const buf = await res.arrayBuffer();
+  let binary = "";
+  const bytes = new Uint8Array(buf);
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
 
 function App() {
   const [content, setContent] = useState("");
@@ -10,6 +27,42 @@ function App() {
   const typingRecentlyRef = useRef(false);
 
   const IDLE_MS = 1200;
+
+  async function exportToPdf() {
+    // A4, points (pt) units
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+
+    // Embed EB Garamond into the PDF
+    const base64 = await fetchAsBase64(garamondTTF);
+    doc.addFileToVFS("EBGaramond.ttf", base64);
+    doc.addFont("EBGaramond.ttf", "EBGaramond", "normal");
+    doc.setFont("EBGaramond", "normal");
+    doc.setFontSize(14);
+
+    const margin = 56; // ~0.8 inch
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const maxWidth = pageWidth - margin * 2;
+
+    const lineHeight = 18;
+    const lines = doc.splitTextToSize(content || " ", maxWidth);
+
+    let y = margin;
+
+    for (const line of lines) {
+      if (y > pageHeight - margin) {
+        doc.addPage();
+        y = margin;
+        doc.setFont("EBGaramond", "normal");
+        doc.setFontSize(14);
+      }
+      doc.text(line, margin, y);
+      y += lineHeight;
+    }
+
+    const stamp = new Date().toISOString().slice(0, 19).replaceAll(":", "-");
+    doc.save(`inkk-${stamp}.pdf`);
+  }
 
   useEffect(() => {
     function scheduleMenuReturn() {
@@ -65,7 +118,13 @@ function App() {
 
   return (
     <>
-      <div id="menu" className={menuVisible ? "menu-visible" : "menu-hidden"}>
+      <div
+        id="menu"
+        className={menuVisible ? "menu-visible" : "menu-hidden"}
+        onClick={exportToPdf}
+        style={{ cursor: "pointer" }}
+        title="Download PDF"
+      >
         inkk.
       </div>
 
