@@ -48,11 +48,12 @@ function App() {
     }, IDLE_MS);
   }
 
-  function markTyping() {
+  const markTyping = React.useCallback(() => {
     typingRecentlyRef.current = true;
     setMenuVisible(false);
     scheduleMenuReturn();
-  }
+  }, []);
+
 
   async function exportToPdf() {
     const doc = new jsPDF({ unit: "pt", format: "a4" });
