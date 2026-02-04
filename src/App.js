@@ -8,9 +8,7 @@ import garamondTTF from "./assets/EBGaramond-Regular.ttf";
 // Fetch the bundled TTF URL and convert to base64 for jsPDF
 async function fetchAsBase64(url) {
   const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`Failed to fetch font: ${res.status} ${res.statusText}`);
-  }
+  if (!res.ok) throw new Error(`Failed to fetch font: ${res.status} ${res.statusText}`);
   const buf = await res.arrayBuffer();
   let binary = "";
   const bytes = new Uint8Array(buf);
@@ -25,24 +23,11 @@ function App() {
   const [content, setContent] = useState("");
   const [menuVisible, setMenuVisible] = useState(true);
 
-  const editorRef = useRef(null);
   const endRef = useRef(null);
-
   const idleTimerRef = useRef(null);
   const typingRecentlyRef = useRef(false);
 
   const IDLE_MS = 1200;
-
-  function hideMenuWhileTyping() {
-    typingRecentlyRef.current = true;
-    setMenuVisible(false);
-
-    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-    idleTimerRef.current = setTimeout(() => {
-      typingRecentlyRef.current = false;
-      setMenuVisible(true);
-    }, IDLE_MS);
-  }
 
   async function exportToPdf() {
     const doc = new jsPDF({ unit: "pt", format: "a4" });
@@ -78,23 +63,47 @@ function App() {
     doc.save(`inkk-${stamp}.pdf`);
   }
 
-  // Keep the DOM editor content in sync if `content` changes (e.g., future load/clear)
   useEffect(() => {
-    if (!editorRef.current) return;
-    const domText = editorRef.current.innerText ?? "";
-    if (domText !== content) editorRef.current.innerText = content;
-  }, [content]);
+    function scheduleMenuReturn() {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = setTimeout(() => {
+        typingRecentlyRef.current = false;
+        setMenuVisible(true);
+      }, IDLE_MS);
+    }
 
-  // Auto-scroll while typing: keep the caret/end roughly centered
+    function onKeyDown(e) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      const key = e.key;
+      const isBackspace = key === "Backspace";
+      const isEnter = key === "Enter";
+      const isPrintable = key.length === 1;
+
+      if (!(isBackspace || isEnter || isPrintable)) return;
+
+      e.preventDefault();
+
+      typingRecentlyRef.current = true;
+      setMenuVisible(false);
+      scheduleMenuReturn();
+
+      if (isBackspace) return setContent((prev) => prev.slice(0, -1));
+      if (isEnter) return setContent((prev) => prev + "\n");
+      setContent((prev) => prev + key);
+    }
+
+    window.addEventListener("keydown", onKeyDown, { passive: false });
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  }, []);
+
   useEffect(() => {
     if (!typingRecentlyRef.current) return;
     endRef.current?.scrollIntoView({ block: "center" });
   }, [content]);
-
-  // Tap/click anywhere in the container to focus the editor (important for mobile keyboard)
-  function focusEditor() {
-    editorRef.current?.focus();
-  }
 
   return (
     <>
@@ -108,22 +117,14 @@ function App() {
         inkk.
       </div>
 
-      <div id="text-container" onMouseDown={focusEditor} onTouchStart={focusEditor}>
-        <div
-          id="text"
-          ref={editorRef}
-          contentEditable
-          suppressContentEditableWarning
-          spellCheck={false}
-          autoCorrect="off"
-          autoCapitalize="off"
-          onInput={(e) => {
-            setContent(e.currentTarget.innerText);
-            hideMenuWhileTyping();
-          }}
-          onFocus={hideMenuWhileTyping}
-        />
-        <span ref={endRef} />
+      <div id="text-container">
+        <div id="start-spacer" />
+        <div id="text">
+          {content}
+          <span className="blinking-cursor" />
+          <span ref={endRef} />
+        </div>
+        <div id="end-spacer" />
       </div>
     </>
   );

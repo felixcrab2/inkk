@@ -46,16 +46,15 @@ body {
   overflow-x: hidden;
   box-sizing: border-box;
 
-  /* starts in the middle */
+  /* starts in the middle, like before */
   padding-top: 40vh;
   padding-bottom: 40vh;
 
-  /* fade out text before it reaches the logo height */
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0px,
-    transparent 80px,
-    black 110px,
+    transparent 90px,
+    black 140px,
     black 100%
   );
   mask-image: linear-gradient(
@@ -65,41 +64,35 @@ body {
     black 110px,
     black 100%
   );
-  padding-left: 24px;
-  padding-right: 24px;
+
 }
 
 #text {
-  /* centred block that grows left/right as you type */
+  /* centre the typing block exactly like your original absolute-centre version */
   position: relative;
   left: 50%;
   transform: translateX(-50%);
 
+  /* THIS is the “fills out both sides” behaviour */
   width: fit-content;
+
+  /* THIS is the “but never gets that wide” behaviour */
   max-width: 50vw;
 
+  /* wrapping + appearance */
   white-space: pre-wrap;
   overflow-wrap: break-word;
-
   font-size: 1.5rem;
   color: #111;
   padding: 10px;
 
   cursor: text;
   outline: none;
-
-  /* helps mobile editing/caret */
-  -webkit-user-select: text;
-  user-select: text;
-  caret-color: #888;
 }
 
-/* Optional: hide scrollbars but keep scrolling (uncomment if you want)
-#text-container::-webkit-scrollbar { width: 0; height: 0; }
-#text-container { scrollbar-width: none; }
-*/
 
-/* Blinking cursor (if you keep the span) */
+
+/* Blinking cursor */
 .blinking-cursor {
   display: inline-block;
   width: 0;
