@@ -93,12 +93,11 @@ function App() {
     const el = editorRef.current;
     if (!el) return;
 
-    // Read text directly from DOM (fast)
     contentRef.current = el.innerText;
 
     markTyping();
     scheduleScroll();
-  }, [markTyping, debouncedSyncSnapshot, scheduleScroll]);
+  }, [markTyping, scheduleScroll]);
 
   async function exportToPdf() {
     // Always use the ref (most up-to-date), not the debounced snapshot
