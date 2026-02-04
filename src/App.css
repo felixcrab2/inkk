@@ -14,28 +14,31 @@ body {
   font-family: 'EB Garamond', serif;
 }
 
-/* ─────────── Menu ─────────── */
 #menu {
   position: absolute;
   top: 30px;
   left: 50%;
   transform: translateX(-50%);
   padding: 4px;
-  cursor: pointer;
   color: #111;
   font-size: 1.2rem;
   font-weight: 500;
-  opacity: 1;
-  transition:
-    opacity 0.5s ease,
-    color 0.2s,
-    transform 0.2s;
   z-index: 1000;
+  transition: opacity 0.5s ease;
 }
-#menu:hover {
-  color: #333;
-  transform: translateX(-50%) scale(1.2);
+
+.menu-visible {
+  opacity: 1;
 }
+
+.menu-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+
+
+
 
 /* ─────────── Typing area ─────────── */
 #text-container {

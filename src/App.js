@@ -2,58 +2,70 @@ import React, { useEffect, useRef, useState } from "react";
 import "./App.css";
 
 function App() {
-  const textRef = useRef(null);
-  const [menuVisible, setMenuVisible] = useState(true);
   const [content, setContent] = useState("");
+  const [menuVisible, setMenuVisible] = useState(true);
 
-  // Focus the typing area on mount so you can type immediately
+  // When typing stops for a moment, show the menu again
+  const idleTimerRef = useRef(null);
+  const IDLE_MS = 1200;
+
   useEffect(() => {
-    textRef.current?.focus();
-  }, []);
-
-  function handleKeyDown(e) {
-    // Hide menu on first interaction
-    if (menuVisible) setMenuVisible(false);
-
-    // Let browser shortcuts work (Cmd+C, Cmd+V, etc.)
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
-
-    if (e.key === "Backspace") {
-      e.preventDefault();
-      setContent((prev) => prev.slice(0, -1));
-      return;
+    function scheduleMenuReturn() {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = setTimeout(() => {
+        setMenuVisible(true);
+      }, IDLE_MS);
     }
 
-    if (e.key === "Enter") {
+    function onKeyDown(e) {
+      // Don’t interfere with normal shortcuts
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      const key = e.key;
+
+      // Only handle keys that represent "typing"
+      const isBackspace = key === "Backspace";
+      const isEnter = key === "Enter";
+      const isPrintable = key.length === 1;
+
+      if (!(isBackspace || isEnter || isPrintable)) return;
+
+      // Prevent page scrolling / weird browser defaults
       e.preventDefault();
-      setContent((prev) => prev + "\n");
-      return;
+
+      // Hide menu while actively typing
+      if (menuVisible) setMenuVisible(false);
+      scheduleMenuReturn();
+
+      if (isBackspace) {
+        setContent((prev) => prev.slice(0, -1));
+        return;
+      }
+
+      if (isEnter) {
+        setContent((prev) => prev + "\n");
+        return;
+      }
+
+      // printable character
+      setContent((prev) => prev + key);
     }
 
-    // Only append printable characters
-    if (e.key.length === 1) {
-      e.preventDefault();
-      setContent((prev) => prev + e.key);
-    }
-  }
+    window.addEventListener("keydown", onKeyDown, { passive: false });
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  }, [menuVisible]);
 
   return (
     <>
-      {menuVisible && <div id="menu">inkk.</div>}
+      <div id="menu" className={menuVisible ? "menu-visible" : "menu-hidden"}>
+        inkk.
+      </div>
 
       <div id="text-container">
-        <div
-          id="text"
-          ref={textRef}
-          tabIndex={0}
-          role="textbox"
-          aria-label="Typing area"
-          onKeyDown={handleKeyDown}
-          onMouseDown={() => {
-            // clicking back into the area refocuses it
-            setTimeout(() => textRef.current?.focus(), 0);
-          }}
-        >
+        <div id="text">
           {content}
           <span className="blinking-cursor" />
         </div>
