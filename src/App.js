@@ -6,7 +6,7 @@ const API = process.env.REACT_APP_API_URL;
 function App() {
   const menuRef     = useRef(null);
   const textRef     = useRef(null);
-  const introPlayed = useRef(false);
+
 
   // 'signup' | 'login' | null
   const [mode, setMode]     = useState('signup');
