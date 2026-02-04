@@ -113,7 +113,7 @@ body {
 }
 
 
-/* Mobile: larger side margins */
+/* Mobile tuning */
 @media (max-width: 600px) {
   #text-container {
     padding-left: 32px;
@@ -121,25 +121,16 @@ body {
   }
 
   #text {
-    max-width: 70vw; /* optional: loosen a bit on small screens */
+    font-size: 1.05rem; /* smaller on phone */
+    max-width: 78vw;    /* a bit wider than desktop constraint */
   }
 }
 
-/* Hidden mobile input that still triggers keyboard */
-#mobile-input {
-  position: fixed;
-  bottom: 8px;
-  left: 8px;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  border: 0;
-  padding: 0;
-  margin: 0;
-  background: transparent;
-  color: transparent;
-  caret-color: transparent;
-  pointer-events: none;
+/* Make editor feel like a real input */
+#text {
+  min-height: 1.2em;
+  -webkit-user-select: text;
+  user-select: text;
+  caret-color: #888;
 }
-
 

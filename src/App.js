@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
 import "@fontsource/eb-garamond/400.css";
 
@@ -28,34 +28,90 @@ function isMobileDevice() {
 }
 
 function App() {
-  const [content, setContent] = useState("");
+  // NOTE: this is now just a debounced snapshot (for PDF + React)
+  const [contentSnapshot, setContentSnapshot] = useState("");
   const [menuVisible, setMenuVisible] = useState(true);
 
-  const endRef = useRef(null);
-  const idleTimerRef = useRef(null);
-  const typingRecentlyRef = useRef(false);
+  const editorRef = useRef(null);
+  const containerRef = useRef(null);
 
-  const mobileInputRef = useRef(null);
   const isMobileRef = useRef(false);
+
+  // fast “truth”
+  const contentRef = useRef("");
+
+  // timers / throttles
+  const idleTimerRef = useRef(null);
+  const syncTimerRef = useRef(null);
+  const scrollRafRef = useRef(null);
+  const lastScrollTsRef = useRef(0);
 
   const IDLE_MS = 1200;
 
-  function scheduleMenuReturn() {
+  const scheduleMenuReturn = useCallback(() => {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     idleTimerRef.current = setTimeout(() => {
-      typingRecentlyRef.current = false;
       setMenuVisible(true);
     }, IDLE_MS);
-  }
-
-  const markTyping = React.useCallback(() => {
-    typingRecentlyRef.current = true;
-    setMenuVisible(false);
-    scheduleMenuReturn();
   }, []);
 
+  const markTyping = useCallback(() => {
+    setMenuVisible(false);
+    scheduleMenuReturn();
+  }, [scheduleMenuReturn]);
+
+  // Debounce syncing DOM text → React state (prevents lag)
+  const debouncedSyncSnapshot = useCallback(() => {
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    syncTimerRef.current = setTimeout(() => {
+      setContentSnapshot(contentRef.current);
+    }, 250);
+  }, []);
+
+  // Throttled auto-scroll (mobile especially)
+  const scheduleScroll = useCallback(() => {
+    const now = Date.now();
+    const minGap = isMobileRef.current ? 120 : 16; // mobile: less aggressive
+    if (now - lastScrollTsRef.current < minGap) return;
+
+    lastScrollTsRef.current = now;
+
+    if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
+    scrollRafRef.current = requestAnimationFrame(() => {
+      const el = containerRef.current;
+      if (!el) return;
+      // keep the caret roughly in view by nudging towards bottom
+      el.scrollTop = el.scrollHeight;
+    });
+  }, []);
+
+  const focusEditor = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    // prevent iOS jumpiness where supported
+    try {
+      el.focus({ preventScroll: true });
+    } catch {
+      el.focus();
+    }
+  }, []);
+
+  const onInput = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return;
+
+    // Read text directly from DOM (fast)
+    contentRef.current = el.innerText;
+
+    markTyping();
+    debouncedSyncSnapshot();
+    scheduleScroll();
+  }, [markTyping, debouncedSyncSnapshot, scheduleScroll]);
 
   async function exportToPdf() {
+    // Always use the ref (most up-to-date), not the debounced snapshot
+    const text = contentRef.current || "";
+
     const doc = new jsPDF({ unit: "pt", format: "a4" });
 
     const base64 = await fetchAsBase64(garamondTTF);
@@ -70,7 +126,7 @@ function App() {
     const maxWidth = pageWidth - margin * 2;
     const lineHeight = 18;
 
-    const lines = doc.splitTextToSize(content || " ", maxWidth);
+    const lines = doc.splitTextToSize(text || " ", maxWidth);
 
     let y = margin;
     for (const line of lines) {
@@ -91,86 +147,17 @@ function App() {
   useEffect(() => {
     isMobileRef.current = isMobileDevice();
 
-    function onKeyDown(e) {
-      // Desktop only: keep your exact behaviour
-      if (isMobileRef.current) return;
-
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-
-      const key = e.key;
-      const isBackspace = key === "Backspace";
-      const isEnter = key === "Enter";
-      const isPrintable = key.length === 1;
-
-      if (!(isBackspace || isEnter || isPrintable)) return;
-
-      e.preventDefault();
-      markTyping();
-
-      if (isBackspace) return setContent((prev) => prev.slice(0, -1));
-      if (isEnter) return setContent((prev) => prev + "\n");
-      setContent((prev) => prev + key);
+    // Ensure editor starts empty and ready
+    if (editorRef.current && editorRef.current.innerText !== contentRef.current) {
+      editorRef.current.innerText = contentRef.current;
     }
 
-    window.addEventListener("keydown", onKeyDown, { passive: false });
     return () => {
-      window.removeEventListener("keydown", onKeyDown);
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+      if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
     };
   }, []);
-
-  useEffect(() => {
-    if (!typingRecentlyRef.current) return;
-    endRef.current?.scrollIntoView({ block: isMobileRef.current ? "end" : "center" });
-  }, [content]);
-
-  function focusMobileKeyboard() {
-    if (!isMobileRef.current) return;
-    const el = mobileInputRef.current;
-    if (!el) return;
-
-    // don't refocus if already focused (prevents jitter)
-    if (document.activeElement === el) return;
-
-    // preventScroll reduces iOS jumpiness; harmless where unsupported
-    try {
-      el.focus({ preventScroll: true });
-    } catch {
-      el.focus();
-    }
-  }
-
-  function handleMobileKeyDown(e) {
-    if (!isMobileRef.current) return;
-
-    const key = e.key;
-    markTyping();
-
-    if (key === "Backspace") {
-      e.preventDefault();
-      setContent((prev) => prev.slice(0, -1));
-      return;
-    }
-
-    if (key === "Enter") {
-      e.preventDefault();
-      setContent((prev) => prev + "\n");
-      return;
-    }
-  }
-
-  function handleMobileChange(e) {
-    if (!isMobileRef.current) return;
-
-    const val = e.target.value;
-    if (!val) return;
-
-    markTyping();
-    setContent((prev) => prev + val);
-
-    // clear so next keystroke is easy to detect
-    e.target.value = "";
-  }
 
   return (
     <>
@@ -184,24 +171,21 @@ function App() {
         inkk.
       </div>
 
-      {/* Invisible on-screen input to trigger mobile keyboard (avoid off-screen iOS jitter) */}
-      <textarea
-        id="mobile-input"
-        ref={mobileInputRef}
-        inputMode="text"
-        autoCorrect="off"
-        autoCapitalize="off"
-        spellCheck={false}
-        onKeyDown={handleMobileKeyDown}
-        onChange={handleMobileChange}
-      />
-
-      <div id="text-container" onClick={focusMobileKeyboard}>
-        <div id="text">
-          {content}
-          <span className="blinking-cursor" />
-          <span ref={endRef} />
-        </div>
+      <div
+        id="text-container"
+        ref={containerRef}
+        onClick={focusEditor}
+      >
+        <div
+          id="text"
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          spellCheck={false}
+          autoCorrect="off"
+          autoCapitalize="off"
+          onInput={onInput}
+        />
       </div>
     </>
   );
