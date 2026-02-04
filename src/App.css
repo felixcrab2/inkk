@@ -49,6 +49,22 @@ body {
   /* starts in the middle, like before */
   padding-top: 40vh;
   padding-bottom: 40vh;
+
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 90px,
+    black 140px,
+    black 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 90px,
+    black 140px,
+    black 100%
+  );
+
 }
 
 #text {
