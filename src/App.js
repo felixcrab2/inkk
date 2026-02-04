@@ -2,13 +2,13 @@ import React, { useEffect, useRef, useState } from "react";
 import "./App.css";
 import "@fontsource/eb-garamond/400.css";
 
-
 import { jsPDF } from "jspdf";
-import garamondTTF from "@fontsource/eb-garamond/files/eb-garamond-latin-400-normal.ttf";
+import garamondTTF from "./assets/EBGaramond-Regular.ttf";
 
-// Convert the bundled TTF file to base64 so jsPDF can embed it
+// Fetch the bundled TTF URL and convert to base64 for jsPDF
 async function fetchAsBase64(url) {
   const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to fetch font: ${res.status} ${res.statusText}`);
   const buf = await res.arrayBuffer();
   let binary = "";
   const bytes = new Uint8Array(buf);
@@ -30,26 +30,24 @@ function App() {
   const IDLE_MS = 1200;
 
   async function exportToPdf() {
-    // A4, points (pt) units
     const doc = new jsPDF({ unit: "pt", format: "a4" });
 
-    // Embed EB Garamond into the PDF
+    // Embed EB Garamond
     const base64 = await fetchAsBase64(garamondTTF);
-    doc.addFileToVFS("EBGaramond.ttf", base64);
-    doc.addFont("EBGaramond.ttf", "EBGaramond", "normal");
+    doc.addFileToVFS("EBGaramond-Regular.ttf", base64);
+    doc.addFont("EBGaramond-Regular.ttf", "EBGaramond", "normal");
     doc.setFont("EBGaramond", "normal");
     doc.setFontSize(14);
 
-    const margin = 56; // ~0.8 inch
+    const margin = 56;
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const maxWidth = pageWidth - margin * 2;
-
     const lineHeight = 18;
+
     const lines = doc.splitTextToSize(content || " ", maxWidth);
 
     let y = margin;
-
     for (const line of lines) {
       if (y > pageHeight - margin) {
         doc.addPage();
@@ -86,21 +84,12 @@ function App() {
 
       e.preventDefault();
 
-      // hide while typing
       typingRecentlyRef.current = true;
       setMenuVisible(false);
       scheduleMenuReturn();
 
-      if (isBackspace) {
-        setContent((prev) => prev.slice(0, -1));
-        return;
-      }
-
-      if (isEnter) {
-        setContent((prev) => prev + "\n");
-        return;
-      }
-
+      if (isBackspace) return setContent((prev) => prev.slice(0, -1));
+      if (isEnter) return setContent((prev) => prev + "\n");
       setContent((prev) => prev + key);
     }
 
@@ -111,7 +100,6 @@ function App() {
     };
   }, []);
 
-  // Auto-scroll while typing: keep the cursor/end roughly centered
   useEffect(() => {
     if (!typingRecentlyRef.current) return;
     endRef.current?.scrollIntoView({ block: "center" });
