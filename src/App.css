@@ -16,7 +16,7 @@ body {
 }
 
 #menu {
-  position: absolute;
+  position: fixed;
   top: 30px;
   left: 50%;
   transform: translateX(-50%);
@@ -42,24 +42,32 @@ body {
 
 
 /* ─────────── Typing area ─────────── */
-#text-container {
-  position: relative;
-  width: 100%;
-  min-height: 100vh;
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  overflow: hidden; /* page itself doesn't scroll */
 }
 
+#text-container {
+  height: 100vh;
+  overflow-y: auto;     /* THIS is the scroll */
+  overflow-x: hidden;
+  padding-top: 40vh;    /* starts in the middle */
+  padding-bottom: 40vh; /* lets you scroll comfortably at the end */
+  box-sizing: border-box;
+}
+
+
 #text {
-  position: absolute;
-  left: 50%;
-  top: 40%;
-  transform: translate(-50%, -50%);
+  width: min(900px, 92vw);
+  margin: 0 auto;
   white-space: pre-wrap;
   overflow-wrap: break-word;
   font-size: 1.65rem;
   color: #111;
   padding: 10px;
-  cursor: text;          /* shows insertion cursor */
-  outline: none;         /* remove focus ring */
+  outline: none;
 }
 
 /* Blinking cursor */
