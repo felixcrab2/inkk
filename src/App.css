@@ -36,6 +36,206 @@ body {
 }
 #panel-toggle:hover { color: #555; }
 
+/* ─── Account button (top-right, mirrors hamburger) ──────────────────────── */
+#account-btn {
+  position: fixed;
+  top: 26px;
+  right: 28px;
+  z-index: 1001;
+  background: none;
+  border: none;
+  font-family: "EB Garamond", serif;
+  font-size: 0.82rem;
+  color: #c8c5c0;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  padding: 0;
+  transition: color 0.15s;
+}
+#account-btn:hover { color: #555; }
+
+/* ─── Account dropdown ────────────────────────────────────────────────────── */
+#account-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+}
+
+#account-menu {
+  position: fixed;
+  top: 50px;
+  right: 28px;
+  z-index: 1002;
+  background: #f2f1ee;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  padding: 12px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 180px;
+}
+
+#account-email {
+  font-family: "EB Garamond", serif;
+  font-size: 0.8rem;
+  color: #aaa;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+#account-menu button {
+  background: none;
+  border: none;
+  font-family: "EB Garamond", serif;
+  font-size: 0.95rem;
+  color: #555;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+  transition: color 0.15s;
+}
+#account-menu button:hover { color: #1a1a1a; }
+
+/* ─── Auth modal ──────────────────────────────────────────────────────────── */
+#auth-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(250, 249, 247, 0.88);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+#auth-modal {
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+#auth-close {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  color: #ccc;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+#auth-close:hover { color: #555; }
+
+#auth-tabs {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+
+#auth-tabs button {
+  background: none;
+  border: none;
+  font-family: "EB Garamond", serif;
+  font-size: 1.05rem;
+  color: #ccc;
+  cursor: pointer;
+  padding: 0;
+  letter-spacing: 0.01em;
+  transition: color 0.15s;
+}
+#auth-tabs button.active,
+#auth-tabs button:hover { color: #1a1a1a; }
+
+#auth-modal form {
+  display: flex;
+  flex-direction: column;
+}
+
+#auth-modal input {
+  font-family: "EB Garamond", serif;
+  font-size: 1rem;
+  border: none;
+  border-bottom: 1px solid #e0ded9;
+  background: transparent;
+  padding: 8px 0;
+  margin-bottom: 14px;
+  outline: none;
+  color: #1a1a1a;
+  transition: border-color 0.15s;
+}
+#auth-modal input::placeholder { color: #d0ceca; }
+#auth-modal input:focus { border-bottom-color: #888; }
+
+.auth-error {
+  font-family: "EB Garamond", serif;
+  font-size: 0.85rem;
+  color: #b94040;
+  margin: -6px 0 10px;
+}
+
+#auth-submit {
+  background: #1a1a1a;
+  color: #faf9f7;
+  border: none;
+  font-family: "EB Garamond", serif;
+  font-size: 1rem;
+  letter-spacing: 0.03em;
+  padding: 10px;
+  cursor: pointer;
+  margin-top: 2px;
+  transition: opacity 0.15s;
+}
+#auth-submit:hover { opacity: 0.75; }
+#auth-submit:disabled { opacity: 0.45; cursor: not-allowed; }
+
+#auth-divider {
+  text-align: center;
+  margin: 18px 0;
+  position: relative;
+}
+#auth-divider::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 50%;
+  height: 1px;
+  background: #e8e5e1;
+}
+#auth-divider span {
+  position: relative;
+  font-family: "EB Garamond", serif;
+  font-size: 0.8rem;
+  color: #ccc;
+  background: #faf9f7;
+  padding: 0 10px;
+}
+
+#google-btn {
+  background: none;
+  border: 1px solid #dedad4;
+  font-family: "EB Garamond", serif;
+  font-size: 1rem;
+  color: #555;
+  padding: 9px;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: border-color 0.15s, color 0.15s;
+}
+#google-btn:hover { border-color: #aaa; color: #1a1a1a; }
+
+#auth-message {
+  font-family: "EB Garamond", serif;
+  font-size: 1rem;
+  color: #666;
+  text-align: center;
+  padding: 24px 0;
+  line-height: 1.6;
+}
+
 /* ─── Centered brand ──────────────────────────────────────────────────────── */
 #menu {
   position: fixed;
