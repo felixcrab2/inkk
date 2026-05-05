@@ -27,10 +27,9 @@ function initState() {
     const doc = createDoc();
     return { docs: [doc], activeId: doc.id };
   }
-  const activeId = saved.docs.find(d => d.id === saved.activeId)
-    ? saved.activeId
-    : saved.docs[0].id;
-  return { docs: saved.docs, activeId };
+  const validId = saved.docs.find(d => d.id === saved.activeId)
+    ? saved.activeId : saved.docs[0].id;
+  return { docs: saved.docs, activeId: validId };
 }
 
 function docTitle(content) {
@@ -65,27 +64,27 @@ async function fetchBase64(url) {
 export default function App() {
   const { docs: initDocs, activeId: initActiveId } = initState();
 
-  const [docs, setDocs] = useState(initDocs);
-  const [activeId, setActiveId] = useState(initActiveId);
+  const [docs, setDocs]           = useState(initDocs);
+  const [activeId, setActiveId]   = useState(initActiveId);
   const [menuVisible, setMenuVisible] = useState(true);
   const [panelOpen, setPanelOpen] = useState(false);
   const [saveStatus, setSaveStatus] = useState("saved");
-  const [words, setWords] = useState(() =>
+  const [words, setWords]         = useState(() =>
     wordCount(initDocs.find(d => d.id === initActiveId)?.content)
   );
 
-  const editorRef   = useRef(null);
+  const editorRef    = useRef(null);
   const containerRef = useRef(null);
-  const contentRef  = useRef("");       // live editor content
-  const isMobileRef = useRef(false);
-  const mountedRef  = useRef(false);
+  const contentRef   = useRef("");
+  const isMobileRef  = useRef(false);
+  const mountedRef   = useRef(false);
   const idleTimerRef = useRef(null);
   const saveTimerRef = useRef(null);
   const rafRef       = useRef(null);
 
   const IDLE_MS = 1200;
 
-  // ─ load a doc into the DOM ─────────────────────────────────────────────────
+  // ─ load doc into DOM ──────────────────────────────────────────────────────
 
   const loadDocIntoEditor = useCallback((doc) => {
     const el = editorRef.current;
@@ -93,7 +92,6 @@ export default function App() {
     contentRef.current = doc.content;
     el.innerText = doc.content;
     setWords(wordCount(doc.content));
-    // move cursor to end
     const range = document.createRange();
     range.selectNodeContents(el);
     range.collapse(false);
@@ -118,7 +116,6 @@ export default function App() {
     setPanelOpen(false);
   }, [activeId]);
 
-  // load new doc whenever activeId changes (skip on initial mount)
   useEffect(() => {
     if (!mountedRef.current) return;
     const doc = docs.find(d => d.id === activeId);
@@ -126,7 +123,7 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
 
-  // ─ new / delete document ───────────────────────────────────────────────────
+  // ─ new / delete ────────────────────────────────────────────────────────────
 
   const newDoc = useCallback(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -167,7 +164,6 @@ export default function App() {
     idleTimerRef.current = setTimeout(() => setMenuVisible(true), IDLE_MS);
   }, []);
 
-  // keep cursor visible without jumping to bottom when editing mid-document
   const scrollToCursor = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(() => {
@@ -176,7 +172,7 @@ export default function App() {
       const rect = sel.getRangeAt(0).getBoundingClientRect();
       const container = containerRef.current;
       if (!container) return;
-      const { bottom: cb } = container.getBoundingClientRect();
+      const cb = container.getBoundingClientRect().bottom;
       if (rect.bottom > cb - 80) container.scrollTop += rect.bottom - cb + 100;
     });
   }, []);
@@ -191,7 +187,6 @@ export default function App() {
     scheduleMenuReturn();
     scrollToCursor();
 
-    // debounced autosave
     setSaveStatus("saving");
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     const capturedId = activeId;
@@ -225,18 +220,14 @@ export default function App() {
     const mx = 72, mt = 96, mb = 72;
     const maxW = pageW - mx * 2;
     const fs = 12, lh = 21, paraGap = 10;
-
     const paras = text.split(/\n{2,}/);
-    // treat first paragraph as a title if it's short and there's body text after
     const isTitleDoc = paras.length > 1 && paras[0].trim().length < 80 && !paras[0].includes("\n");
     let y = mt;
 
-    const ensureSpace = () => {
-      if (y > pageH - mb) {
-        doc.addPage();
-        y = mt;
-        doc.setFont("EBGaramond", "normal");
-      }
+    const newPage = () => {
+      doc.addPage();
+      y = mt;
+      doc.setFont("EBGaramond", "normal");
     };
 
     for (let pi = 0; pi < paras.length; pi++) {
@@ -246,7 +237,7 @@ export default function App() {
       if (pi === 0 && isTitleDoc) {
         doc.setFontSize(20);
         for (const line of doc.splitTextToSize(para, maxW)) {
-          ensureSpace();
+          if (y > pageH - mb) newPage();
           doc.text(line, mx, y);
           y += 30;
         }
@@ -258,7 +249,7 @@ export default function App() {
       doc.setFontSize(fs);
       for (const rawLine of para.split("\n")) {
         for (const line of doc.splitTextToSize(rawLine || " ", maxW)) {
-          ensureSpace();
+          if (y > pageH - mb) newPage();
           if (line.trim()) doc.text(line, mx, y);
           y += lh;
         }
@@ -309,6 +300,7 @@ export default function App() {
     : "";
 
   const sortedDocs = [...docs].sort((a, b) => b.updatedAt - a.updatedAt);
+  const menuClass = menuVisible ? "menu-visible" : "menu-hidden";
 
   return (
     <>
@@ -333,21 +325,19 @@ export default function App() {
         </div>
       </div>
 
-      <div id="menu" className={menuVisible ? "visible" : "hidden"}>
-        <div id="menu-left">
-          <button id="panel-toggle" onClick={() => setPanelOpen(v => !v)} title="Documents">
-            <svg width="15" height="11" viewBox="0 0 15 11" fill="none">
-              <rect y="0"   width="15" height="1.4" rx="0.7" fill="currentColor" />
-              <rect y="4.8" width="15" height="1.4" rx="0.7" fill="currentColor" />
-              <rect y="9.6" width="15" height="1.4" rx="0.7" fill="currentColor" />
-            </svg>
-          </button>
-        </div>
-        <div id="menu-center">
-          <button id="brand" onClick={exportToPdf} title="Export PDF  ⌘S">inkk.</button>
-          <div id="menu-meta">{metaText}</div>
-        </div>
-        <div id="menu-right" />
+      {/* hamburger — separate fixed element so it doesn't affect menu centering */}
+      <button id="panel-toggle" className={menuClass} onClick={() => setPanelOpen(v => !v)} title="Documents">
+        <svg width="15" height="11" viewBox="0 0 15 11" fill="none">
+          <rect y="0"   width="15" height="1.5" rx="0.75" fill="currentColor" />
+          <rect y="4.8" width="15" height="1.5" rx="0.75" fill="currentColor" />
+          <rect y="9.6" width="15" height="1.5" rx="0.75" fill="currentColor" />
+        </svg>
+      </button>
+
+      {/* centered brand — same approach as original */}
+      <div id="menu" className={menuClass}>
+        <button id="brand" onClick={exportToPdf} title="Export PDF  ⌘S">inkk.</button>
+        <div id="menu-meta">{metaText}</div>
       </div>
 
       <div id="text-container" ref={containerRef} onClick={() => editorRef.current?.focus()}>

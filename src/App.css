@@ -1,6 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=EB+Garamond&display=swap");
 
-/* ─── Reset ──────────────────────────────────────────────────────────────────*/
+/* ─── Reset ───────────────────────────────────────────────────────────────── */
 html, body, #root {
   margin: 0;
   padding: 0;
@@ -15,7 +15,67 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ─── Document panel ─────────────────────────────────────────────────────────*/
+/* ─── Shared show/hide ────────────────────────────────────────────────────── */
+.menu-visible { opacity: 1; transition: opacity 0.5s ease; }
+.menu-hidden  { opacity: 0; pointer-events: none; transition: opacity 0.5s ease; }
+
+/* ─── Hamburger ───────────────────────────────────────────────────────────── */
+#panel-toggle {
+  position: fixed;
+  top: 26px;
+  left: 28px;
+  z-index: 1001;
+  background: none;
+  border: none;
+  color: #c8c5c0;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s;
+}
+#panel-toggle:hover { color: #555; }
+
+/* ─── Centered brand ──────────────────────────────────────────────────────── */
+#menu {
+  position: fixed;
+  top: 26px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none; /* container is invisible; children re-enable */
+}
+
+#brand {
+  pointer-events: auto;
+  background: none;
+  border: none;
+  font-family: "EB Garamond", serif;
+  font-size: 1.15rem;
+  font-weight: 500;
+  color: #1a1a1a;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: opacity 0.15s;
+}
+#brand:hover { opacity: 0.5; }
+
+#menu-meta {
+  font-family: "EB Garamond", serif;
+  font-size: 0.72rem;
+  color: #c0bfbc;
+  letter-spacing: 0.05em;
+  margin-top: 5px;
+  white-space: nowrap;
+  min-height: 1em;
+}
+
+/* ─── Document panel ──────────────────────────────────────────────────────── */
 #panel-backdrop {
   position: fixed;
   inset: 0;
@@ -37,10 +97,7 @@ body {
   display: flex;
   flex-direction: column;
 }
-
-#doc-panel.open {
-  transform: translateX(0);
-}
+#doc-panel.open { transform: translateX(0); }
 
 .new-doc-btn {
   background: none;
@@ -58,11 +115,7 @@ body {
 }
 .new-doc-btn:hover { color: #1a1a1a; }
 
-#doc-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 6px 0;
-}
+#doc-list { flex: 1; overflow-y: auto; padding: 6px 0; }
 
 .doc-item {
   display: flex;
@@ -102,96 +155,32 @@ body {
   padding: 0 2px;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.12s, color 0.12s;
   flex-shrink: 0;
+  transition: opacity 0.12s, color 0.12s;
 }
 .doc-item:hover .doc-delete { opacity: 1; }
 .doc-delete:hover { color: #888; }
 
-/* ─── Top bar ────────────────────────────────────────────────────────────────*/
-#menu {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  padding: 26px 28px 0;
-  display: flex;
-  align-items: flex-start;
-  z-index: 1000;
-  transition: opacity 0.45s ease;
-}
-#menu.hidden  { opacity: 0; pointer-events: none; }
-#menu.visible { opacity: 1; pointer-events: auto; }
-
-#menu-left,
-#menu-right {
-  width: 44px;
-  flex-shrink: 0;
-}
-
-#menu-center {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-#panel-toggle {
-  background: none;
-  border: none;
-  color: #c8c6c2;
-  cursor: pointer;
-  padding: 3px 0 0;
-  display: flex;
-  align-items: center;
-  transition: color 0.15s;
-}
-#panel-toggle:hover { color: #555; }
-
-#brand {
-  background: none;
-  border: none;
-  font-family: "EB Garamond", serif;
-  font-size: 1.1rem;
-  font-weight: 500;
-  color: #1a1a1a;
-  letter-spacing: 0.01em;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0;
-  transition: opacity 0.15s;
-}
-#brand:hover { opacity: 0.5; }
-
-#menu-meta {
-  font-family: "EB Garamond", serif;
-  font-size: 0.72rem;
-  color: #c0bfbc;
-  letter-spacing: 0.05em;
-  margin-top: 4px;
-  min-height: 1em;
-}
-
-/* ─── Editor ─────────────────────────────────────────────────────────────────*/
+/* ─── Editor ──────────────────────────────────────────────────────────────── */
 #text-container {
   height: 100vh;
   overflow-y: auto;
   overflow-x: hidden;
   box-sizing: border-box;
-  padding-top: 42vh;
-  padding-bottom: 42vh;
+  padding-top: 40vh;
+  padding-bottom: 40vh;
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0px,
-    transparent 68px,
-    black 128px,
+    transparent 80px,
+    black 130px,
     black 100%
   );
   mask-image: linear-gradient(
     to bottom,
     transparent 0px,
-    transparent 68px,
-    black 128px,
+    transparent 80px,
+    black 130px,
     black 100%
   );
 }
@@ -201,12 +190,12 @@ body {
   left: 50%;
   transform: translateX(-50%);
   width: fit-content;
-  max-width: min(600px, 50vw);
-  min-width: 1px;
+  max-width: 50vw;
+  min-width: 240px;
   white-space: pre-wrap;
   overflow-wrap: break-word;
   font-family: "EB Garamond", serif;
-  font-size: 1.38rem;
+  font-size: 1.4rem;
   line-height: 1.85;
   color: #1a1a1a;
   padding: 0 8px 8px;
@@ -218,7 +207,7 @@ body {
   min-height: 2em;
 }
 
-/* blinking cursor when the editor is empty */
+/* blinking cursor when empty */
 #text:empty::after {
   content: "";
   display: inline-block;
@@ -233,18 +222,12 @@ body {
 
 @keyframes blink {
   0%, 100% { border-color: transparent; }
-  50%       { border-color: #d0ceca; }
+  50%       { border-color: #d0ceca;    }
 }
 
-/* ─── Mobile ─────────────────────────────────────────────────────────────────*/
+/* ─── Mobile ──────────────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
-  #text-container {
-    padding-left: 28px;
-    padding-right: 28px;
-  }
-  #text {
-    font-size: 1.1rem;
-    max-width: 82vw;
-  }
+  #text-container { padding-left: 28px; padding-right: 28px; }
+  #text { font-size: 1.1rem; max-width: 82vw; }
   #doc-panel { width: 220px; }
 }
