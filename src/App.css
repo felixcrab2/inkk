@@ -189,7 +189,9 @@ body {
 }
 
 #text {
-  width: 58vw;
+  width: fit-content;
+  max-width: 44vw;
+  min-width: 200px;
   white-space: pre-wrap;
   overflow-wrap: break-word;
   font-family: "EB Garamond", serif;
@@ -226,6 +228,6 @@ body {
 /* ─── Mobile ──────────────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
   #text-container { padding-left: 28px; padding-right: 28px; }
-  #text { font-size: 1.05rem; width: 84vw; }
+  #text { font-size: 1.05rem; width: fit-content; max-width: 84vw; min-width: 160px; }
   #doc-panel { width: 220px; }
 }
