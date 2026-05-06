@@ -388,17 +388,15 @@ body {
   border: none;
   font-family: "EB Garamond", serif;
   font-size: 0.72rem;
-  color: #ccc;
+  color: #c8c5c0;
   cursor: pointer;
   padding: 0 2px;
-  opacity: 0;
   flex-shrink: 0;
   letter-spacing: 0.03em;
-  transition: opacity 0.12s, color 0.12s;
+  transition: color 0.12s;
 }
-.doc-item:hover .doc-publish { opacity: 1; }
 .doc-publish:hover { color: #555; }
-.doc-publish.published { opacity: 1; color: #aaa; }
+.doc-publish.published { color: #888; }
 
 .doc-delete {
   background: none;

@@ -125,13 +125,12 @@ async function fetchMyPublications(userId) {
   return data;
 }
 
-async function doPublish(doc, user) {
+async function doPublish(doc, user, title, authorName) {
   if (!supabase || !user) return false;
-  const authorName = user.user_metadata?.full_name || user.email.split("@")[0];
   const { error } = await supabase.from("publications").upsert({
     doc_id: doc.id,
     user_id: user.id,
-    title: docTitle(doc.content),
+    title,
     content: doc.content,
     author_name: authorName,
     published_at: new Date().toISOString(),
@@ -215,6 +214,61 @@ function AuthModal({ onClose }) {
             <button id="google-btn" onClick={googleSignIn}>continue with Google</button>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ─── PublishModal ─────────────────────────────────────────────────────────────
+
+function PublishModal({ doc, user, onConfirm, onClose }) {
+  const rawTitle  = docTitle(doc.content);
+  const rawAuthor = user.user_metadata?.full_name || user.email.split("@")[0];
+
+  const [title, setTitle]   = useState(rawTitle === "Untitled" ? "" : rawTitle);
+  const [author, setAuthor] = useState(rawAuthor);
+  const [loading, setLoading] = useState(false);
+  const [error, setError]   = useState("");
+
+  const submit = async (e) => {
+    e.preventDefault();
+    const t = title.trim();
+    const a = author.trim() || rawAuthor;
+    if (!t) return;
+    setLoading(true);
+    setError("");
+    const ok = await onConfirm(t, a);
+    if (!ok) setError("Publishing failed — check your connection and try again.");
+    setLoading(false);
+  };
+
+  return (
+    <div id="auth-overlay" onClick={onClose}>
+      <div id="auth-modal" onClick={e => e.stopPropagation()}>
+        <button id="auth-close" onClick={onClose}>×</button>
+        <div id="auth-tabs">
+          <button className="active" style={{ cursor: "default" }}>publish</button>
+        </div>
+        <form onSubmit={submit}>
+          <input
+            type="text"
+            placeholder="article title"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            required
+            autoFocus
+          />
+          <input
+            type="text"
+            placeholder="author name"
+            value={author}
+            onChange={e => setAuthor(e.target.value)}
+          />
+          {error && <p className="auth-error">{error}</p>}
+          <button id="auth-submit" type="submit" disabled={loading || !title.trim()}>
+            {loading ? "publishing…" : "publish to feed"}
+          </button>
+        </form>
       </div>
     </div>
   );
@@ -330,6 +384,7 @@ export default function App() {
   const [view, setView]               = useState("editor");
   const [readingPub, setReadingPub]   = useState(null);
   const [publishedDocIds, setPublishedDocIds] = useState(new Set());
+  const [publishModalDoc, setPublishModalDoc] = useState(null);
 
   const editorRef    = useRef(null);
   const containerRef = useRef(null);
@@ -479,22 +534,30 @@ export default function App() {
 
   // ─ publish ──────────────────────────────────────────────────────────────────
 
-  const handlePublish = useCallback(async (doc, e) => {
+  const openPublishModal = useCallback((doc, e) => {
     if (e) e.stopPropagation();
-    const currentUser = userRef.current;
-    if (!currentUser) return;
+    if (!userRef.current) return;
     const content = doc.id === activeId ? contentRef.current : doc.content;
     if (!content?.trim()) return;
-
-    const isPublished = publishedDocIds.has(doc.id);
-    if (isPublished) {
-      await doUnpublish(doc.id);
-      setPublishedDocIds(prev => { const s = new Set(prev); s.delete(doc.id); return s; });
+    if (publishedDocIds.has(doc.id)) {
+      // unpublish immediately — no modal needed
+      doUnpublish(doc.id).then(() =>
+        setPublishedDocIds(prev => { const s = new Set(prev); s.delete(doc.id); return s; })
+      );
     } else {
-      const ok = await doPublish({ ...doc, content }, currentUser);
-      if (ok) setPublishedDocIds(prev => new Set([...prev, doc.id]));
+      setPublishModalDoc({ ...doc, content });
     }
   }, [activeId, publishedDocIds]);
+
+  const confirmPublish = useCallback(async (title, authorName) => {
+    if (!publishModalDoc) return false;
+    const ok = await doPublish(publishModalDoc, userRef.current, title, authorName);
+    if (ok) {
+      setPublishedDocIds(prev => new Set([...prev, publishModalDoc.id]));
+      setPublishModalDoc(null);
+    }
+    return ok;
+  }, [publishModalDoc]);
 
   // ─ sign out ─────────────────────────────────────────────────────────────────
 
@@ -694,8 +757,8 @@ export default function App() {
                 {user && (
                   <button
                     className={`doc-publish${publishedDocIds.has(d.id) ? " published" : ""}`}
-                    title={publishedDocIds.has(d.id) ? "Unpublish" : "Save to profile"}
-                    onClick={e => handlePublish(d, e)}
+                    title={publishedDocIds.has(d.id) ? "Remove from feed" : "Publish to feed"}
+                    onClick={e => openPublishModal(d, e)}
                   >
                     {publishedDocIds.has(d.id) ? "live" : "publish"}
                   </button>
@@ -752,6 +815,15 @@ export default function App() {
           <div id="account-menu">
             <span id="account-email">{user.email}</span>
             <button onClick={() => { setView("profile"); setAccountMenuOpen(false); }}>my profile</button>
+            {isEditor && (
+              <button onClick={() => {
+                setAccountMenuOpen(false);
+                const doc = docs.find(d => d.id === activeId);
+                if (doc) openPublishModal(doc);
+              }}>
+                {publishedDocIds.has(activeId) ? "unpublish" : "publish this document"}
+              </button>
+            )}
             <button onClick={signOut}>sign out</button>
           </div>
         </>
@@ -801,6 +873,16 @@ export default function App() {
       )}
 
       {view === "reading" && readingPub && <ReadingView pub={readingPub} />}
+
+      {/* ── publish modal ── */}
+      {publishModalDoc && user && (
+        <PublishModal
+          doc={publishModalDoc}
+          user={user}
+          onConfirm={confirmPublish}
+          onClose={() => setPublishModalDoc(null)}
+        />
+      )}
 
       {/* ── auth modal ── */}
       {authOpen && supabase && <AuthModal onClose={() => setAuthOpen(false)} />}
