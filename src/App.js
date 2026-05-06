@@ -91,9 +91,15 @@ function readingTime(content) {
 }
 
 function formatDate(iso) {
-  return new Date(iso).toLocaleDateString("en-GB", {
-    day: "numeric", month: "short", year: "numeric",
-  });
+  const diffDays = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays}d ago`;
+  const weeks = Math.floor(diffDays / 7);
+  if (weeks < 5) return `${weeks}w ago`;
+  const months = Math.floor(diffDays / 30);
+  if (months < 12) return `${months}mo ago`;
+  return new Date(iso).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
 }
 
 function pubPreview(content) {
@@ -393,8 +399,8 @@ function PublishModal({ doc, user, onConfirm, onClose }) {
   };
 
   return (
-    <div id="auth-overlay" onClick={onClose}>
-      <div id="auth-modal" onClick={e => e.stopPropagation()}>
+    <div id="auth-overlay">
+      <div id="auth-modal">
         <button id="auth-close" onClick={onClose}>×</button>
         <div id="auth-tabs">
           <button className="active" style={{ cursor: "default" }}>publish to feed</button>
@@ -453,7 +459,7 @@ function Feed({ onRead, onHsModal }) {
                 content={pub.content}
               />
             ) : (
-              <span className="pub-card-words">{wordCount(pub.content)}w</span>
+              <span className="pub-card-words">{wordCount(pub.content)} words</span>
             )}
           </article>
         ))}
@@ -553,7 +559,7 @@ function Profile({ user, localDocs, streak, onRead, onUnpublish, onSignIn, onSig
                 content={pub.content}
               />
             ) : (
-              <span className="pub-card-words">{wordCount(pub.content)}w</span>
+              <span className="pub-card-words">{wordCount(pub.content)} words</span>
             )}
           </article>
         ))}
@@ -958,13 +964,14 @@ export default function App() {
       if ((e.metaKey || e.ctrlKey) && e.key === ".") { e.preventDefault(); if (view === "editor") setFocusMode(v => !v); }
       if (e.key === "Escape") {
         if (focusMode) { setFocusMode(false); return; }
+        if (publishModalDoc) { setPublishModalDoc(null); return; }
         setPanelOpen(false); setAuthOpen(false); setHsModalOpen(false);
         if (view !== "editor") { setView("editor"); setReadingPub(null); }
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [exportToPdf, view, focusMode]);
+  }, [exportToPdf, view, focusMode, publishModalDoc]);
 
   // ─ mount ────────────────────────────────────────────────────────────────────
 
