@@ -1193,6 +1193,13 @@ export default function App() {
       {authOpen && supabase && <AuthModal onClose={() => setAuthOpen(false)} />}
       {hsModalOpen && <HumanSignalModal onClose={() => setHsModalOpen(false)} />}
 
+      {/* ── focus mode exit ── */}
+      {focusMode && (
+        <button id="focus-exit" onClick={() => setFocusMode(false)} title="Exit focus mode  ⌘.">
+          <Minimize2 size={14} />
+        </button>
+      )}
+
       {/* ── toasts ── */}
       <Toasts toasts={toasts} />
     </>

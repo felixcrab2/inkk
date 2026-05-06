@@ -968,6 +968,27 @@ body.focus-mode #text-container {
   white-space: nowrap;
 }
 
+/* ─── Focus mode exit button ──────────────────────────────────────────────── */
+#focus-exit {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 2000;
+  background: none;
+  border: none;
+  color: rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  padding: 7px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s, background 0.2s;
+}
+#focus-exit:hover {
+  color: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.05);
+}
+
 /* ─── Animations ──────────────────────────────────────────────────────────── */
 @keyframes toastIn {
   from { opacity: 0; transform: translateY(6px); }
