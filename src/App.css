@@ -383,6 +383,23 @@ body {
   flex-shrink: 0;
 }
 
+.doc-publish {
+  background: none;
+  border: none;
+  font-family: "EB Garamond", serif;
+  font-size: 0.72rem;
+  color: #ccc;
+  cursor: pointer;
+  padding: 0 2px;
+  opacity: 0;
+  flex-shrink: 0;
+  letter-spacing: 0.03em;
+  transition: opacity 0.12s, color 0.12s;
+}
+.doc-item:hover .doc-publish { opacity: 1; }
+.doc-publish:hover { color: #555; }
+.doc-publish.published { opacity: 1; color: #aaa; }
+
 .doc-delete {
   background: none;
   border: none;

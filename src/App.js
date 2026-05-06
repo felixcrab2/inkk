@@ -330,7 +330,6 @@ export default function App() {
   const [view, setView]               = useState("editor");
   const [readingPub, setReadingPub]   = useState(null);
   const [publishedDocIds, setPublishedDocIds] = useState(new Set());
-  const [publishStatus, setPublishStatus]     = useState("");
 
   const editorRef    = useRef(null);
   const containerRef = useRef(null);
@@ -480,25 +479,22 @@ export default function App() {
 
   // ─ publish ──────────────────────────────────────────────────────────────────
 
-  const handlePublish = useCallback(async () => {
+  const handlePublish = useCallback(async (doc, e) => {
+    if (e) e.stopPropagation();
     const currentUser = userRef.current;
     if (!currentUser) return;
-    const doc = docs.find(d => d.id === activeId);
-    if (!doc?.content?.trim()) return;
+    const content = doc.id === activeId ? contentRef.current : doc.content;
+    if (!content?.trim()) return;
 
-    const isPublished = publishedDocIds.has(activeId);
-    setPublishStatus(isPublished ? "removing…" : "publishing…");
-    setAccountMenuOpen(false);
-
+    const isPublished = publishedDocIds.has(doc.id);
     if (isPublished) {
-      await doUnpublish(activeId);
-      setPublishedDocIds(prev => { const s = new Set(prev); s.delete(activeId); return s; });
+      await doUnpublish(doc.id);
+      setPublishedDocIds(prev => { const s = new Set(prev); s.delete(doc.id); return s; });
     } else {
-      const ok = await doPublish(doc, currentUser);
-      if (ok) setPublishedDocIds(prev => new Set([...prev, activeId]));
+      const ok = await doPublish({ ...doc, content }, currentUser);
+      if (ok) setPublishedDocIds(prev => new Set([...prev, doc.id]));
     }
-    setPublishStatus("");
-  }, [activeId, docs, publishedDocIds]);
+  }, [activeId, publishedDocIds]);
 
   // ─ sign out ─────────────────────────────────────────────────────────────────
 
@@ -655,6 +651,11 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // re-focus editor when returning to editor view
+  useEffect(() => {
+    if (view === "editor" && !isMobileRef.current) editorRef.current?.focus();
+  }, [view]);
+
   // ─ render ───────────────────────────────────────────────────────────────────
 
   const metaText = words > 0
@@ -664,8 +665,6 @@ export default function App() {
   const sortedDocs = [...docs].sort((a, b) => b.updatedAt - a.updatedAt);
   const menuClass  = menuVisible ? "menu-visible" : "menu-hidden";
   const isEditor   = view === "editor";
-  const activeDoc  = docs.find(d => d.id === activeId);
-  const isPublished = publishedDocIds.has(activeId);
 
   const goToEditor = useCallback(() => { setView("editor"); setReadingPub(null); }, []);
   const openReading = useCallback((pub) => { setReadingPub(pub); setView("reading"); }, []);
@@ -692,6 +691,15 @@ export default function App() {
               >
                 <span className="doc-item-title">{docTitle(d.content)}</span>
                 <span className="doc-item-meta">{wordCount(d.content)}w</span>
+                {user && (
+                  <button
+                    className={`doc-publish${publishedDocIds.has(d.id) ? " published" : ""}`}
+                    title={publishedDocIds.has(d.id) ? "Unpublish" : "Save to profile"}
+                    onClick={e => handlePublish(d, e)}
+                  >
+                    {publishedDocIds.has(d.id) ? "live" : "publish"}
+                  </button>
+                )}
                 {docs.length > 1 && (
                   <button className="doc-delete" onClick={e => deleteDoc(d.id, e)}>×</button>
                 )}
@@ -744,11 +752,6 @@ export default function App() {
           <div id="account-menu">
             <span id="account-email">{user.email}</span>
             <button onClick={() => { setView("profile"); setAccountMenuOpen(false); }}>my profile</button>
-            {isEditor && activeDoc?.content?.trim() && (
-              <button onClick={handlePublish}>
-                {publishStatus || (isPublished ? "unpublish" : "publish")}
-              </button>
-            )}
             <button onClick={signOut}>sign out</button>
           </div>
         </>
@@ -766,21 +769,24 @@ export default function App() {
         <div id="menu-meta">{subLabel}</div>
       </div>
 
-      {/* ── main content area ── */}
-      {view === "editor" && (
-        <div id="text-container" ref={containerRef} onClick={() => editorRef.current?.focus()}>
-          <div
-            id="text"
-            ref={editorRef}
-            contentEditable
-            suppressContentEditableWarning
-            spellCheck={false}
-            autoCorrect="off"
-            autoCapitalize="off"
-            onInput={onInput}
-          />
-        </div>
-      )}
+      {/* ── editor (always mounted to preserve scroll; hidden when not active) ── */}
+      <div
+        id="text-container"
+        ref={containerRef}
+        style={{ display: isEditor ? "" : "none" }}
+        onClick={() => editorRef.current?.focus()}
+      >
+        <div
+          id="text"
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          spellCheck={false}
+          autoCorrect="off"
+          autoCapitalize="off"
+          onInput={onInput}
+        />
+      </div>
 
       {view === "feed" && <Feed onRead={openReading} />}
 
