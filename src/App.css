@@ -47,6 +47,19 @@ body {
   gap: 16px;
 }
 
+#publish-btn {
+  background: none;
+  border: none;
+  font-family: "EB Garamond", serif;
+  font-size: 0.82rem;
+  color: #1a1a1a;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  padding: 0;
+  transition: color 0.15s;
+}
+#publish-btn:hover { color: #555; }
+
 #feed-link {
   background: none;
   border: none;
@@ -312,6 +325,20 @@ body {
   min-height: 1em;
 }
 
+#font-btn {
+  background: none;
+  border: none;
+  font-family: "EB Garamond", serif;
+  font-size: 0.68rem;
+  color: #c8c5c0;
+  cursor: pointer;
+  letter-spacing: 0.06em;
+  padding: 0;
+  margin-top: 3px;
+  transition: color 0.15s;
+}
+#font-btn:hover { color: #555; }
+
 /* ─── Document panel ──────────────────────────────────────────────────────── */
 #panel-backdrop {
   position: fixed;
@@ -457,6 +484,12 @@ body {
   -webkit-user-select: text;
   user-select: text;
   min-height: 2em;
+}
+
+/* ─── Font variants ───────────────────────────────────────────────────────── */
+#text.font-arial,
+#reading-text.font-arial {
+  font-family: Arial, sans-serif;
 }
 
 /* blinking cursor when empty */

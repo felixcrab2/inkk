@@ -370,13 +370,13 @@ function Profile({ user, onRead, onUnpublish }) {
 
 // ─── ReadingView ──────────────────────────────────────────────────────────────
 
-function ReadingView({ pub }) {
+function ReadingView({ pub, font }) {
   return (
     <div id="reading-container">
       <div id="reading-byline">
         {pub.author_name} · {formatDate(pub.published_at)} · {wordCount(pub.content)}w
       </div>
-      <div id="reading-text">{pub.content}</div>
+      <div id="reading-text" className={font === "arial" ? "font-arial" : ""}>{pub.content}</div>
     </div>
   );
 }
@@ -401,6 +401,7 @@ export default function App() {
   const [readingPub, setReadingPub]   = useState(null);
   const [publishedDocIds, setPublishedDocIds] = useState(new Set());
   const [publishModalDoc, setPublishModalDoc] = useState(null);
+  const [font, setFont] = useState(() => localStorage.getItem("inkk_font") || "garamond");
 
   const editorRef    = useRef(null);
   const containerRef = useRef(null);
@@ -413,6 +414,7 @@ export default function App() {
   const userRef      = useRef(null);
 
   useEffect(() => { userRef.current = user; }, [user]);
+  useEffect(() => { localStorage.setItem("inkk_font", font); }, [font]);
 
   const IDLE_MS = 1200;
 
@@ -801,9 +803,21 @@ export default function App() {
         <button id="back-btn" onClick={goToEditor}>←</button>
       )}
 
-      {/* ── top-right: feed link + account ── */}
+      {/* ── top-right: publish + feed link + account ── */}
       {supabase && (
         <div id="top-right">
+          {isEditor && user && (
+            <button
+              id="publish-btn"
+              className={menuClass}
+              onClick={() => {
+                const doc = docs.find(d => d.id === activeId);
+                if (doc) openPublishModal(doc);
+              }}
+            >
+              {publishedDocIds.has(activeId) ? "published ✓" : "publish"}
+            </button>
+          )}
           {view !== "feed" && (
             <button
               id="feed-link"
@@ -855,6 +869,15 @@ export default function App() {
           inkk.
         </button>
         <div id="menu-meta">{subLabel}</div>
+        {isEditor && (
+          <button
+            id="font-btn"
+            onClick={() => setFont(f => f === "garamond" ? "arial" : "garamond")}
+            title="Toggle font"
+          >
+            {font === "garamond" ? "Garamond" : "Arial"}
+          </button>
+        )}
       </div>
 
       {/* ── editor (always mounted to preserve scroll; hidden when not active) ── */}
@@ -867,6 +890,7 @@ export default function App() {
         <div
           id="text"
           ref={editorRef}
+          className={font === "arial" ? "font-arial" : ""}
           contentEditable
           suppressContentEditableWarning
           spellCheck={false}
@@ -888,7 +912,7 @@ export default function App() {
         />
       )}
 
-      {view === "reading" && readingPub && <ReadingView pub={readingPub} />}
+      {view === "reading" && readingPub && <ReadingView pub={readingPub} font={font} />}
 
       {/* ── publish modal ── */}
       {publishModalDoc && user && (
