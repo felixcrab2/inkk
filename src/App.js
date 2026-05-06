@@ -126,17 +126,33 @@ async function fetchMyPublications(userId) {
 }
 
 async function doPublish(doc, user, title, authorName) {
-  if (!supabase || !user) return false;
-  const { error } = await supabase.from("publications").upsert({
-    doc_id: doc.id,
-    user_id: user.id,
+  if (!supabase || !user) return "Not signed in.";
+
+  const { data: existing, error: fetchErr } = await supabase
+    .from("publications")
+    .select("id")
+    .eq("doc_id", doc.id)
+    .maybeSingle();
+
+  if (fetchErr) return fetchErr.message;
+
+  const payload = {
     title,
     content: doc.content,
     author_name: authorName,
     published_at: new Date().toISOString(),
-  }, { onConflict: "doc_id" });
-  if (error) { console.error("Publish failed:", error.message); return false; }
-  return true;
+  };
+
+  let error;
+  if (existing) {
+    ({ error } = await supabase.from("publications").update(payload).eq("id", existing.id));
+  } else {
+    ({ error } = await supabase.from("publications").insert({
+      ...payload, doc_id: doc.id, user_id: user.id,
+    }));
+  }
+
+  return error ? error.message : null;
 }
 
 async function doUnpublish(docId) {
@@ -237,8 +253,8 @@ function PublishModal({ doc, user, onConfirm, onClose }) {
     if (!t) return;
     setLoading(true);
     setError("");
-    const ok = await onConfirm(t, a);
-    if (!ok) setError("Publishing failed — check your connection and try again.");
+    const errMsg = await onConfirm(t, a);
+    if (errMsg) setError(errMsg);
     setLoading(false);
   };
 
@@ -550,13 +566,13 @@ export default function App() {
   }, [activeId, publishedDocIds]);
 
   const confirmPublish = useCallback(async (title, authorName) => {
-    if (!publishModalDoc) return false;
-    const ok = await doPublish(publishModalDoc, userRef.current, title, authorName);
-    if (ok) {
+    if (!publishModalDoc) return "No document selected.";
+    const errMsg = await doPublish(publishModalDoc, userRef.current, title, authorName);
+    if (!errMsg) {
       setPublishedDocIds(prev => new Set([...prev, publishModalDoc.id]));
       setPublishModalDoc(null);
     }
-    return ok;
+    return errMsg; // null on success, error string on failure
   }, [publishModalDoc]);
 
   // ─ sign out ─────────────────────────────────────────────────────────────────
