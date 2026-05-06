@@ -8,7 +8,8 @@ import { supabase } from "./supabase";
 // ─── local storage ────────────────────────────────────────────────────────────
 
 function createDoc() {
-  return { id: crypto.randomUUID(), content: "", updatedAt: Date.now() };
+  const now = Date.now();
+  return { id: crypto.randomUUID(), content: "", updatedAt: now, createdAt: now, writingTimeSecs: 0, revisionCount: 0 };
 }
 
 function loadState() {
@@ -28,9 +29,14 @@ function initState() {
     const doc = createDoc();
     return { docs: [doc], activeId: doc.id };
   }
-  const validId = saved.docs.find(d => d.id === saved.activeId)
-    ? saved.activeId : saved.docs[0].id;
-  return { docs: saved.docs, activeId: validId };
+  const docs = saved.docs.map(d => ({
+    ...d,
+    createdAt: d.createdAt || d.updatedAt || Date.now(),
+    writingTimeSecs: d.writingTimeSecs || 0,
+    revisionCount: d.revisionCount || 0,
+  }));
+  const validId = docs.find(d => d.id === saved.activeId) ? saved.activeId : docs[0].id;
+  return { docs, activeId: validId };
 }
 
 function docTitle(content) {
@@ -58,6 +64,20 @@ async function fetchBase64(url) {
   for (let i = 0; i < bytes.length; i += 0x8000)
     bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(bin);
+}
+
+// ─── human signal helpers ─────────────────────────────────────────────────────
+
+function formatWritingTime(secs) {
+  if (!secs || secs < 60) return secs ? `${Math.round(secs)}s` : "0s";
+  return `${Math.round(secs / 60)} min`;
+}
+
+function humanSignalStatus(writingTimeSecs, revisionCount) {
+  if (!writingTimeSecs && !revisionCount) return "quiet";
+  if (writingTimeSecs < 90 || revisionCount < 2) return "beginning";
+  if (writingTimeSecs < 480 || revisionCount < 5) return "building";
+  return "strong";
 }
 
 // ─── cloud sync ───────────────────────────────────────────────────────────────
@@ -107,7 +127,7 @@ async function fetchFeed() {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("publications")
-    .select("id, title, content, published_at, author_name")
+    .select("id, title, content, published_at, author_name, writing_time_seconds, revision_count")
     .order("published_at", { ascending: false })
     .limit(50);
   if (error || !data) return [];
@@ -118,7 +138,7 @@ async function fetchMyPublications(userId) {
   if (!supabase || !userId) return [];
   const { data, error } = await supabase
     .from("publications")
-    .select("id, doc_id, title, content, published_at")
+    .select("id, doc_id, title, content, published_at, writing_time_seconds, revision_count")
     .eq("user_id", userId)
     .order("published_at", { ascending: false });
   if (error || !data) return [];
@@ -141,6 +161,8 @@ async function doPublish(doc, user, title, authorName) {
     content: doc.content,
     author_name: authorName,
     published_at: new Date().toISOString(),
+    writing_time_seconds: Math.round(doc.writingTimeSecs || 0),
+    revision_count: doc.revisionCount || 0,
   };
 
   let error;
@@ -172,6 +194,109 @@ function pubPreview(content) {
   const lines = (content || "").trim().split("\n").filter(l => l.trim());
   const body = lines.slice(1).join(" ").trim();
   return body.length > 130 ? body.slice(0, 130).trimEnd() + "…" : body;
+}
+
+// ─── LandingScreen ────────────────────────────────────────────────────────────
+
+function LandingScreen({ onDone }) {
+  const FULL1 = "Write Human.";
+  const FULL2 = "Write Simple.";
+  const [display, setDisplay] = useState("");
+  const [phase, setPhase] = useState(0);
+  const [showSubtitle, setShowSubtitle] = useState(false);
+  const [fading, setFading] = useState(false);
+
+  const skip = useCallback(() => {
+    localStorage.setItem("inkk_visited", "1");
+    onDone();
+  }, [onDone]);
+
+  useEffect(() => {
+    let t;
+    if (phase === 0) {
+      if (display.length < FULL1.length) {
+        t = setTimeout(() => setDisplay(FULL1.slice(0, display.length + 1)), 80);
+      } else {
+        t = setTimeout(() => setPhase(1), 800);
+      }
+    } else if (phase === 1) {
+      t = setTimeout(() => setPhase(2), 700);
+    } else if (phase === 2) {
+      const keep = "Write ";
+      if (display.length > keep.length) {
+        t = setTimeout(() => setDisplay(display.slice(0, -1)), 45);
+      } else {
+        t = setTimeout(() => setPhase(3), 150);
+      }
+    } else if (phase === 3) {
+      if (display.length < FULL2.length) {
+        t = setTimeout(() => setDisplay(FULL2.slice(0, display.length + 1)), 80);
+      } else {
+        t = setTimeout(() => setPhase(4), 800);
+      }
+    } else if (phase === 4) {
+      t = setTimeout(() => setPhase(5), 700);
+    } else if (phase === 5) {
+      setShowSubtitle(true);
+      t = setTimeout(() => setPhase(6), 3200);
+    } else if (phase === 6) {
+      setFading(true);
+      t = setTimeout(() => {
+        localStorage.setItem("inkk_visited", "1");
+        onDone();
+      }, 600);
+    }
+    return () => clearTimeout(t);
+  }, [phase, display, onDone]);
+
+  return (
+    <div id="landing" className={fading ? "fading" : ""} onClick={skip}>
+      <div id="landing-inner">
+        <div id="landing-headline">
+          {display}<span id="landing-cursor" />
+        </div>
+        <p id="landing-subtitle" style={{ opacity: showSubtitle ? 1 : 0 }}>
+          Inkk records the writing process — drafts, revisions, and time spent — so readers can see signs of real human thought.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── HumanSignalModal ─────────────────────────────────────────────────────────
+
+function HumanSignalModal({ onClose }) {
+  return (
+    <div id="auth-overlay" onClick={onClose}>
+      <div id="auth-modal" onClick={e => e.stopPropagation()}>
+        <button id="auth-close" onClick={onClose}>×</button>
+        <div id="hs-modal-title">Human Signal</div>
+        <p id="hs-modal-body">
+          Inkk does not claim to perfectly detect AI. Instead it shows the process behind a piece of writing: time spent drafting, number of revisions, and word count.
+        </p>
+        <p id="hs-modal-body" style={{ marginTop: "12px" }}>
+          This is Human Signal — a quiet record of thought in progress.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── HumanSignalBadge ─────────────────────────────────────────────────────────
+
+function HumanSignalBadge({ writingTimeSecs, revisionCount, content }) {
+  if (!writingTimeSecs && !revisionCount) return null;
+  const wc = wordCount(content);
+  const time = formatWritingTime(writingTimeSecs);
+  const status = humanSignalStatus(writingTimeSecs, revisionCount);
+  return (
+    <div className="hs-badge">
+      <span className="hs-badge-dot" data-status={status} />
+      <span className="hs-badge-text">
+        Human Signal · {time} · {revisionCount} revision{revisionCount !== 1 ? "s" : ""} · {wc}w
+      </span>
+    </div>
+  );
 }
 
 // ─── AuthModal ────────────────────────────────────────────────────────────────
@@ -241,10 +366,10 @@ function PublishModal({ doc, user, onConfirm, onClose }) {
   const rawTitle  = docTitle(doc.content);
   const rawAuthor = user.user_metadata?.full_name || user.email.split("@")[0];
 
-  const [title, setTitle]   = useState(rawTitle === "Untitled" ? "" : rawTitle);
-  const [author, setAuthor] = useState(rawAuthor);
+  const [title, setTitle]     = useState(rawTitle === "Untitled" ? "" : rawTitle);
+  const [author, setAuthor]   = useState(rawAuthor);
   const [loading, setLoading] = useState(false);
-  const [error, setError]   = useState("");
+  const [error, setError]     = useState("");
 
   const submit = async (e) => {
     e.preventDefault();
@@ -292,8 +417,8 @@ function PublishModal({ doc, user, onConfirm, onClose }) {
 
 // ─── Feed ─────────────────────────────────────────────────────────────────────
 
-function Feed({ onRead }) {
-  const [pubs, setPubs]     = useState([]);
+function Feed({ onRead, onHsModal }) {
+  const [pubs, setPubs]       = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -302,6 +427,10 @@ function Feed({ onRead }) {
 
   return (
     <div id="feed-container">
+      <div id="feed-header">
+        <h1 id="feed-title">Explore human writing.</h1>
+        <button id="hs-link" onClick={onHsModal}>What is Human Signal?</button>
+      </div>
       <div id="feed-list">
         {loading && <p className="feed-empty">loading…</p>}
         {!loading && pubs.length === 0 && (
@@ -318,7 +447,15 @@ function Feed({ onRead }) {
             {pubPreview(pub.content) && (
               <p className="pub-card-preview">{pubPreview(pub.content)}</p>
             )}
-            <span className="pub-card-words">{wordCount(pub.content)}w</span>
+            {(pub.writing_time_seconds > 0 || pub.revision_count > 0) ? (
+              <HumanSignalBadge
+                writingTimeSecs={pub.writing_time_seconds}
+                revisionCount={pub.revision_count}
+                content={pub.content}
+              />
+            ) : (
+              <span className="pub-card-words">{wordCount(pub.content)}w</span>
+            )}
           </article>
         ))}
       </div>
@@ -360,7 +497,15 @@ function Profile({ user, onRead, onUnpublish }) {
             {pubPreview(pub.content) && (
               <p className="pub-card-preview">{pubPreview(pub.content)}</p>
             )}
-            <span className="pub-card-words">{wordCount(pub.content)}w</span>
+            {(pub.writing_time_seconds > 0 || pub.revision_count > 0) ? (
+              <HumanSignalBadge
+                writingTimeSecs={pub.writing_time_seconds}
+                revisionCount={pub.revision_count}
+                content={pub.content}
+              />
+            ) : (
+              <span className="pub-card-words">{wordCount(pub.content)}w</span>
+            )}
           </article>
         ))}
       </div>
@@ -371,11 +516,17 @@ function Profile({ user, onRead, onUnpublish }) {
 // ─── ReadingView ──────────────────────────────────────────────────────────────
 
 function ReadingView({ pub, font }) {
+  const hasHS = pub.writing_time_seconds > 0 || pub.revision_count > 0;
   return (
     <div id="reading-container">
       <div id="reading-byline">
         {pub.author_name} · {formatDate(pub.published_at)} · {wordCount(pub.content)}w
       </div>
+      {hasHS && (
+        <div id="reading-hs">
+          Human Signal · {formatWritingTime(pub.writing_time_seconds)} · {pub.revision_count || 0} revision{(pub.revision_count || 0) !== 1 ? "s" : ""}
+        </div>
+      )}
       <div id="reading-text" className={font === "arial" ? "font-arial" : ""}>{pub.content}</div>
     </div>
   );
@@ -401,7 +552,12 @@ export default function App() {
   const [readingPub, setReadingPub]   = useState(null);
   const [publishedDocIds, setPublishedDocIds] = useState(new Set());
   const [publishModalDoc, setPublishModalDoc] = useState(null);
-  const [font, setFont] = useState(() => localStorage.getItem("inkk_font") || "garamond");
+  const [font, setFont]               = useState(() => localStorage.getItem("inkk_font") || "garamond");
+  const [showLanding, setShowLanding] = useState(() => !localStorage.getItem("inkk_visited"));
+  const [hsModalOpen, setHsModalOpen] = useState(false);
+  const [liveWritingTimeSecs, setLiveWritingTimeSecs] = useState(() =>
+    initDocs.find(d => d.id === initActiveId)?.writingTimeSecs || 0
+  );
 
   const editorRef    = useRef(null);
   const containerRef = useRef(null);
@@ -413,8 +569,18 @@ export default function App() {
   const rafRef       = useRef(null);
   const userRef      = useRef(null);
 
+  // writing time tracking refs
+  const writingBaseRef         = useRef(initDocs.find(d => d.id === initActiveId)?.writingTimeSecs || 0);
+  const writingSessionStartRef = useRef(null);
+  const writingFlushRef        = useRef(0);
+
   useEffect(() => { userRef.current = user; }, [user]);
   useEffect(() => { localStorage.setItem("inkk_font", font); }, [font]);
+
+  // focus editor when landing is dismissed
+  useEffect(() => {
+    if (!showLanding && !isMobileRef.current) editorRef.current?.focus();
+  }, [showLanding]);
 
   const IDLE_MS = 1200;
 
@@ -426,6 +592,10 @@ export default function App() {
     contentRef.current = doc.content;
     el.innerText = doc.content;
     setWords(wordCount(doc.content));
+    writingBaseRef.current = doc.writingTimeSecs || 0;
+    writingFlushRef.current = 0;
+    writingSessionStartRef.current = null;
+    setLiveWritingTimeSecs(doc.writingTimeSecs || 0);
     const range = document.createRange();
     range.selectNodeContents(el);
     range.collapse(false);
@@ -453,6 +623,14 @@ export default function App() {
         ? mergeDocs(localDocs, cloudDocs)
         : cloudDocs;
       if (!merged.length) merged = [createDoc()];
+
+      // migrate merged docs
+      merged = merged.map(d => ({
+        ...d,
+        createdAt: d.createdAt || d.updatedAt || Date.now(),
+        writingTimeSecs: d.writingTimeSecs || 0,
+        revisionCount: d.revisionCount || 0,
+      }));
 
       const cloudIds = new Set(cloudDocs.map(d => d.id));
       for (const doc of merged) {
@@ -496,9 +674,19 @@ export default function App() {
 
   const switchDoc = useCallback((id) => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+
+    let timeToSave = writingBaseRef.current + writingFlushRef.current;
+    if (writingSessionStartRef.current !== null) {
+      timeToSave += (Date.now() - writingSessionStartRef.current) / 1000;
+      writingSessionStartRef.current = null;
+    }
+    writingFlushRef.current = 0;
+
     setDocs(prev => {
       const flushed = prev.map(d =>
-        d.id === activeId ? { ...d, content: contentRef.current, updatedAt: Date.now() } : d
+        d.id === activeId
+          ? { ...d, content: contentRef.current, updatedAt: Date.now(), writingTimeSecs: timeToSave }
+          : d
       );
       saveState(flushed, id);
       return flushed;
@@ -519,10 +707,20 @@ export default function App() {
 
   const newDoc = useCallback(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+
+    let timeToSave = writingBaseRef.current + writingFlushRef.current;
+    if (writingSessionStartRef.current !== null) {
+      timeToSave += (Date.now() - writingSessionStartRef.current) / 1000;
+      writingSessionStartRef.current = null;
+    }
+    writingFlushRef.current = 0;
+
     const doc = createDoc();
     setDocs(prev => {
       const flushed = prev.map(d =>
-        d.id === activeId ? { ...d, content: contentRef.current, updatedAt: Date.now() } : d
+        d.id === activeId
+          ? { ...d, content: contentRef.current, updatedAt: Date.now(), writingTimeSecs: timeToSave }
+          : d
       );
       const next = [...flushed, doc];
       saveState(next, doc.id);
@@ -558,7 +756,6 @@ export default function App() {
     const content = doc.id === activeId ? contentRef.current : doc.content;
     if (!content?.trim()) return;
     if (publishedDocIds.has(doc.id)) {
-      // unpublish immediately — no modal needed
       doUnpublish(doc.id).then(() =>
         setPublishedDocIds(prev => { const s = new Set(prev); s.delete(doc.id); return s; })
       );
@@ -574,7 +771,7 @@ export default function App() {
       setPublishedDocIds(prev => new Set([...prev, publishModalDoc.id]));
       setPublishModalDoc(null);
     }
-    return errMsg; // null on success, error string on failure
+    return errMsg;
   }, [publishModalDoc]);
 
   // ─ sign out ─────────────────────────────────────────────────────────────────
@@ -589,7 +786,14 @@ export default function App() {
 
   const scheduleMenuReturn = useCallback(() => {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-    idleTimerRef.current = setTimeout(() => setMenuVisible(true), IDLE_MS);
+    idleTimerRef.current = setTimeout(() => {
+      if (writingSessionStartRef.current !== null) {
+        const elapsed = (Date.now() - writingSessionStartRef.current) / 1000;
+        writingFlushRef.current += elapsed;
+        writingSessionStartRef.current = null;
+      }
+      setMenuVisible(true);
+    }, IDLE_MS);
   }, []);
 
   const scrollToCursor = useCallback(() => {
@@ -612,6 +816,14 @@ export default function App() {
     contentRef.current = text;
     setWords(wordCount(text));
     setMenuVisible(false);
+
+    if (writingSessionStartRef.current === null) {
+      writingSessionStartRef.current = Date.now();
+    }
+    const liveTime = writingBaseRef.current + writingFlushRef.current +
+      (Date.now() - writingSessionStartRef.current) / 1000;
+    setLiveWritingTimeSecs(liveTime);
+
     scheduleMenuReturn();
     scrollToCursor();
 
@@ -621,10 +833,20 @@ export default function App() {
     const capturedContent = text;
     saveTimerRef.current = setTimeout(() => {
       const capturedUpdatedAt = Date.now();
+      const capturedTime = writingBaseRef.current + writingFlushRef.current +
+        (writingSessionStartRef.current !== null
+          ? (Date.now() - writingSessionStartRef.current) / 1000
+          : 0);
       setDocs(prev => {
         const next = prev.map(d =>
           d.id === capturedId
-            ? { ...d, content: capturedContent, updatedAt: capturedUpdatedAt }
+            ? {
+                ...d,
+                content: capturedContent,
+                updatedAt: capturedUpdatedAt,
+                writingTimeSecs: capturedTime,
+                revisionCount: (d.revisionCount || 0) + 1,
+              }
             : d
         );
         saveState(next, capturedId);
@@ -704,6 +926,7 @@ export default function App() {
         setPanelOpen(false);
         setAccountMenuOpen(false);
         setAuthOpen(false);
+        setHsModalOpen(false);
         if (view !== "editor") { setView("editor"); setReadingPub(null); }
       }
     };
@@ -721,7 +944,8 @@ export default function App() {
       const el = editorRef.current;
       if (el) {
         el.innerText = doc.content;
-        if (!isMobileRef.current) el.focus();
+        // don't focus during landing screen
+        if (!isMobileRef.current && localStorage.getItem("inkk_visited")) el.focus();
       }
     }
     mountedRef.current = true;
@@ -739,25 +963,28 @@ export default function App() {
 
   // ─ render ───────────────────────────────────────────────────────────────────
 
-  const metaText = words > 0
-    ? `${words} word${words === 1 ? "" : "s"} · ${saveStatus === "saving" ? "saving…" : "saved"}`
-    : "";
-
   const sortedDocs = [...docs].sort((a, b) => b.updatedAt - a.updatedAt);
   const menuClass  = menuVisible ? "menu-visible" : "menu-hidden";
   const isEditor   = view === "editor";
 
-  const goToEditor = useCallback(() => { setView("editor"); setReadingPub(null); }, []);
-  const openReading = useCallback((pub) => { setReadingPub(pub); setView("reading"); }, []);
+  const activeDoc   = docs.find(d => d.id === activeId);
+  const liveRevCount = activeDoc?.revisionCount || 0;
+  const hsStatus    = humanSignalStatus(liveWritingTimeSecs, liveRevCount);
 
-  const subLabel =
+  const nonEditorSubLabel =
     view === "feed"    ? "feed" :
     view === "profile" ? "your profile" :
     view === "reading" ? (readingPub?.author_name || "") :
-    metaText;
+    "";
+
+  const goToEditor  = useCallback(() => { setView("editor"); setReadingPub(null); }, []);
+  const openReading = useCallback((pub) => { setReadingPub(pub); setView("reading"); }, []);
 
   return (
     <>
+      {/* ── landing overlay ── */}
+      {showLanding && <LandingScreen onDone={() => setShowLanding(false)} />}
+
       {/* ── doc panel (editor only) ── */}
       {isEditor && panelOpen && <div id="panel-backdrop" onClick={() => setPanelOpen(false)} />}
       {isEditor && (
@@ -859,7 +1086,7 @@ export default function App() {
         </>
       )}
 
-      {/* ── centred brand ── */}
+      {/* ── centred brand + human signal status ── */}
       <div id="menu" className={isEditor ? menuClass : ""}>
         <button
           id="brand"
@@ -868,7 +1095,18 @@ export default function App() {
         >
           inkk.
         </button>
-        <div id="menu-meta">{subLabel}</div>
+        {isEditor ? (
+          <>
+            <div id="menu-meta">{words > 0 ? `Human Signal: ${hsStatus}` : ""}</div>
+            {words > 0 && (
+              <div id="hs-sub">
+                {formatWritingTime(liveWritingTimeSecs)} · {liveRevCount} rev · {words}w · {saveStatus === "saving" ? "saving…" : "saved"}
+              </div>
+            )}
+          </>
+        ) : (
+          <div id="menu-meta">{nonEditorSubLabel}</div>
+        )}
         {isEditor && (
           <button
             id="font-btn"
@@ -900,7 +1138,7 @@ export default function App() {
         />
       </div>
 
-      {view === "feed" && <Feed onRead={openReading} />}
+      {view === "feed" && <Feed onRead={openReading} onHsModal={() => setHsModalOpen(true)} />}
 
       {view === "profile" && user && (
         <Profile
@@ -926,6 +1164,9 @@ export default function App() {
 
       {/* ── auth modal ── */}
       {authOpen && supabase && <AuthModal onClose={() => setAuthOpen(false)} />}
+
+      {/* ── human signal modal ── */}
+      {hsModalOpen && <HumanSignalModal onClose={() => setHsModalOpen(false)} />}
     </>
   );
 }

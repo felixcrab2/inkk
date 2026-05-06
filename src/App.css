@@ -19,6 +19,55 @@ body {
 .menu-visible { opacity: 1; transition: opacity 0.5s ease; }
 .menu-hidden  { opacity: 0; pointer-events: none; transition: opacity 0.5s ease; }
 
+/* ─── Landing screen ──────────────────────────────────────────────────────── */
+#landing {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: #faf9f7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  transition: opacity 0.6s ease;
+}
+#landing.fading { opacity: 0; pointer-events: none; }
+
+#landing-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 360px;
+  padding: 0 32px;
+}
+
+#landing-headline {
+  font-family: "EB Garamond", serif;
+  font-size: 2.1rem;
+  color: #1a1a1a;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+#landing-cursor {
+  display: inline-block;
+  width: 0;
+  height: 1.1em;
+  border-left: 1.5px solid #aaa;
+  vertical-align: -0.12em;
+  margin-left: 1px;
+  animation: blink 1s steps(2, start) infinite;
+}
+
+#landing-subtitle {
+  font-family: "EB Garamond", serif;
+  font-size: 1rem;
+  color: #888;
+  line-height: 1.7;
+  margin: 22px 0 0;
+  transition: opacity 0.9s ease;
+}
+
 /* ─── Hamburger ───────────────────────────────────────────────────────────── */
 #panel-toggle {
   position: fixed;
@@ -36,7 +85,7 @@ body {
 }
 #panel-toggle:hover { color: #555; }
 
-/* ─── Top-right cluster (feed link + account) ─────────────────────────────── */
+/* ─── Top-right cluster ───────────────────────────────────────────────────── */
 #top-right {
   position: fixed;
   top: 26px;
@@ -86,7 +135,7 @@ body {
 }
 #account-btn:hover { color: #555; }
 
-/* ─── Back button (non-editor views) ─────────────────────────────────────── */
+/* ─── Back button ─────────────────────────────────────────────────────────── */
 #back-btn {
   position: fixed;
   top: 26px;
@@ -286,6 +335,23 @@ body {
   line-height: 1.6;
 }
 
+/* ─── Human Signal modal ──────────────────────────────────────────────────── */
+#hs-modal-title {
+  font-family: "EB Garamond", serif;
+  font-size: 1.15rem;
+  color: #1a1a1a;
+  margin-bottom: 20px;
+  letter-spacing: 0.01em;
+}
+
+#hs-modal-body {
+  font-family: "EB Garamond", serif;
+  font-size: 0.97rem;
+  color: #666;
+  line-height: 1.7;
+  margin: 0;
+}
+
 /* ─── Centered brand ──────────────────────────────────────────────────────── */
 #menu {
   position: fixed;
@@ -296,7 +362,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  pointer-events: none; /* container is invisible; children re-enable */
+  pointer-events: none;
 }
 
 #brand {
@@ -325,6 +391,16 @@ body {
   min-height: 1em;
 }
 
+/* Human Signal status sub-line */
+#hs-sub {
+  font-family: "EB Garamond", serif;
+  font-size: 0.65rem;
+  color: #d0ceca;
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
 #font-btn {
   pointer-events: auto;
   background: none;
@@ -335,7 +411,7 @@ body {
   cursor: pointer;
   letter-spacing: 0.06em;
   padding: 0;
-  margin-top: 3px;
+  margin-top: 4px;
   transition: color 0.15s;
 }
 #font-btn:hover { color: #555; }
@@ -523,6 +599,35 @@ body {
   box-sizing: border-box;
 }
 
+#feed-header {
+  width: 100%;
+  max-width: 560px;
+  padding: 0 24px 28px;
+  box-sizing: border-box;
+}
+
+#feed-title {
+  font-family: "EB Garamond", serif;
+  font-size: 1.45rem;
+  font-weight: 400;
+  color: #1a1a1a;
+  margin: 0 0 6px;
+  letter-spacing: 0.01em;
+}
+
+#hs-link {
+  background: none;
+  border: none;
+  font-family: "EB Garamond", serif;
+  font-size: 0.82rem;
+  color: #bbbab6;
+  cursor: pointer;
+  padding: 0;
+  letter-spacing: 0.02em;
+  transition: color 0.15s;
+}
+#hs-link:hover { color: #555; }
+
 #feed-list {
   width: 100%;
   max-width: 560px;
@@ -609,6 +714,32 @@ body {
 }
 .pub-remove:hover { color: #888; }
 
+/* ─── Human Signal badge ──────────────────────────────────────────────────── */
+.hs-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.hs-badge-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #d8d6d2;
+  flex-shrink: 0;
+}
+.hs-badge-dot[data-status="beginning"] { background: #c8c5c0; }
+.hs-badge-dot[data-status="building"]  { background: #8a8a8a; }
+.hs-badge-dot[data-status="strong"]    { background: #3a3a3a; }
+
+.hs-badge-text {
+  font-family: "EB Garamond", serif;
+  font-size: 0.78rem;
+  color: #aaa;
+  letter-spacing: 0.02em;
+}
+
 /* ─── Reading view ────────────────────────────────────────────────────────── */
 #reading-container {
   height: 100vh;
@@ -626,6 +757,17 @@ body {
   font-family: "EB Garamond", serif;
   font-size: 0.82rem;
   color: #aaa;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.6rem;
+  width: fit-content;
+  max-width: 44vw;
+  min-width: 200px;
+}
+
+#reading-hs {
+  font-family: "EB Garamond", serif;
+  font-size: 0.82rem;
+  color: #bbbab6;
   letter-spacing: 0.03em;
   margin-bottom: 2.2rem;
   width: fit-content;
@@ -652,7 +794,9 @@ body {
   #text { font-size: 1.05rem; width: fit-content; max-width: 84vw; min-width: 160px; }
   #doc-panel { width: 220px; }
   #feed-list { max-width: 100%; }
+  #feed-header { max-width: 100%; }
   .pub-card-title { font-size: 1.1rem; }
-  #reading-text, #reading-byline { max-width: 84vw; }
+  #reading-text, #reading-byline, #reading-hs { max-width: 84vw; }
   #reading-text { font-size: 1.05rem; }
+  #landing-headline { font-size: 1.7rem; }
 }
