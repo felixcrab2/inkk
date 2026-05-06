@@ -101,15 +101,73 @@ function mergeDocs(local, cloud) {
   return [...map.values()].sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
+// ─── publications ─────────────────────────────────────────────────────────────
+
+async function fetchFeed() {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("publications")
+    .select("id, title, content, published_at, author_name")
+    .order("published_at", { ascending: false })
+    .limit(50);
+  if (error || !data) return [];
+  return data;
+}
+
+async function fetchMyPublications(userId) {
+  if (!supabase || !userId) return [];
+  const { data, error } = await supabase
+    .from("publications")
+    .select("id, doc_id, title, content, published_at")
+    .eq("user_id", userId)
+    .order("published_at", { ascending: false });
+  if (error || !data) return [];
+  return data;
+}
+
+async function doPublish(doc, user) {
+  if (!supabase || !user) return false;
+  const authorName = user.user_metadata?.full_name || user.email.split("@")[0];
+  const { error } = await supabase.from("publications").upsert({
+    doc_id: doc.id,
+    user_id: user.id,
+    title: docTitle(doc.content),
+    content: doc.content,
+    author_name: authorName,
+    published_at: new Date().toISOString(),
+  }, { onConflict: "doc_id" });
+  if (error) { console.error("Publish failed:", error.message); return false; }
+  return true;
+}
+
+async function doUnpublish(docId) {
+  if (!supabase) return;
+  await supabase.from("publications").delete().eq("doc_id", docId);
+}
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+function formatDate(iso) {
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "numeric", month: "short", year: "numeric",
+  });
+}
+
+function pubPreview(content) {
+  const lines = (content || "").trim().split("\n").filter(l => l.trim());
+  const body = lines.slice(1).join(" ").trim();
+  return body.length > 130 ? body.slice(0, 130).trimEnd() + "…" : body;
+}
+
 // ─── AuthModal ────────────────────────────────────────────────────────────────
 
 function AuthModal({ onClose }) {
-  const [mode, setMode]       = useState("signin");
-  const [email, setEmail]     = useState("");
+  const [mode, setMode]         = useState("signin");
+  const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError]     = useState("");
-  const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [error, setError]       = useState("");
+  const [message, setMessage]   = useState("");
+  const [loading, setLoading]   = useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -137,7 +195,6 @@ function AuthModal({ onClose }) {
     <div id="auth-overlay" onClick={onClose}>
       <div id="auth-modal" onClick={e => e.stopPropagation()}>
         <button id="auth-close" onClick={onClose}>×</button>
-
         {message ? (
           <p id="auth-message">{message}</p>
         ) : (
@@ -146,7 +203,6 @@ function AuthModal({ onClose }) {
               <button className={mode === "signin" ? "active" : ""} onClick={() => { setMode("signin"); setError(""); }}>sign in</button>
               <button className={mode === "signup" ? "active" : ""} onClick={() => { setMode("signup"); setError(""); }}>create account</button>
             </div>
-
             <form onSubmit={submit}>
               <input type="email" placeholder="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus />
               <input type="password" placeholder="password" value={password} onChange={e => setPassword(e.target.value)} required />
@@ -155,12 +211,102 @@ function AuthModal({ onClose }) {
                 {loading ? "…" : mode === "signin" ? "sign in" : "create account"}
               </button>
             </form>
-
             <div id="auth-divider"><span>or</span></div>
             <button id="google-btn" onClick={googleSignIn}>continue with Google</button>
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── Feed ─────────────────────────────────────────────────────────────────────
+
+function Feed({ onRead }) {
+  const [pubs, setPubs]     = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchFeed().then(data => { setPubs(data); setLoading(false); });
+  }, []);
+
+  return (
+    <div id="feed-container">
+      <div id="feed-list">
+        {loading && <p className="feed-empty">loading…</p>}
+        {!loading && pubs.length === 0 && (
+          <p className="feed-empty">nothing published yet.</p>
+        )}
+        {pubs.map(pub => (
+          <article key={pub.id} className="pub-card" onClick={() => onRead(pub)}>
+            <div className="pub-card-meta">
+              <span className="pub-author">{pub.author_name}</span>
+              <span className="pub-card-dot">·</span>
+              <span className="pub-card-date">{formatDate(pub.published_at)}</span>
+            </div>
+            <h2 className="pub-card-title">{pub.title}</h2>
+            {pubPreview(pub.content) && (
+              <p className="pub-card-preview">{pubPreview(pub.content)}</p>
+            )}
+            <span className="pub-card-words">{wordCount(pub.content)}w</span>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Profile ──────────────────────────────────────────────────────────────────
+
+function Profile({ user, onRead, onUnpublish }) {
+  const [pubs, setPubs]       = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchMyPublications(user.id).then(data => { setPubs(data); setLoading(false); });
+  }, [user]);
+
+  const handleUnpublish = async (pub, e) => {
+    e.stopPropagation();
+    await doUnpublish(pub.doc_id);
+    setPubs(prev => prev.filter(p => p.id !== pub.id));
+    if (onUnpublish) onUnpublish(pub.doc_id);
+  };
+
+  return (
+    <div id="feed-container">
+      <div id="feed-list">
+        {loading && <p className="feed-empty">loading…</p>}
+        {!loading && pubs.length === 0 && (
+          <p className="feed-empty">you haven't published anything yet.</p>
+        )}
+        {pubs.map(pub => (
+          <article key={pub.id} className="pub-card" onClick={() => onRead(pub)}>
+            <div className="pub-card-meta">
+              <span className="pub-card-date">{formatDate(pub.published_at)}</span>
+              <button className="pub-remove" onClick={e => handleUnpublish(pub, e)}>remove</button>
+            </div>
+            <h2 className="pub-card-title">{pub.title}</h2>
+            {pubPreview(pub.content) && (
+              <p className="pub-card-preview">{pubPreview(pub.content)}</p>
+            )}
+            <span className="pub-card-words">{wordCount(pub.content)}w</span>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── ReadingView ──────────────────────────────────────────────────────────────
+
+function ReadingView({ pub }) {
+  return (
+    <div id="reading-container">
+      <div id="reading-byline">
+        {pub.author_name} · {formatDate(pub.published_at)} · {wordCount(pub.content)}w
+      </div>
+      <div id="reading-text">{pub.content}</div>
     </div>
   );
 }
@@ -181,6 +327,10 @@ export default function App() {
   const [user, setUser]               = useState(null);
   const [authOpen, setAuthOpen]       = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [view, setView]               = useState("editor");
+  const [readingPub, setReadingPub]   = useState(null);
+  const [publishedDocIds, setPublishedDocIds] = useState(new Set());
+  const [publishStatus, setPublishStatus]     = useState("");
 
   const editorRef    = useRef(null);
   const containerRef = useRef(null);
@@ -192,7 +342,6 @@ export default function App() {
   const rafRef       = useRef(null);
   const userRef      = useRef(null);
 
-  // keep userRef in sync for use inside timer callbacks
   useEffect(() => { userRef.current = user; }, [user]);
 
   const IDLE_MS = 1200;
@@ -227,14 +376,12 @@ export default function App() {
       const saved = loadState();
       const localDocs = saved?.docs || [];
 
-      // on a fresh machine with no local content, just use cloud docs
       const hasLocalContent = localDocs.some(d => d.content.trim());
       let merged = (hasLocalContent || !cloudDocs.length)
         ? mergeDocs(localDocs, cloudDocs)
         : cloudDocs;
       if (!merged.length) merged = [createDoc()];
 
-      // push any local-only docs that have content up to cloud
       const cloudIds = new Set(cloudDocs.map(d => d.id));
       for (const doc of merged) {
         if (!cloudIds.has(doc.id) && doc.content.trim()) {
@@ -252,6 +399,9 @@ export default function App() {
 
       const docToLoad = merged.find(d => d.id === newActiveId);
       if (docToLoad) loadDocIntoEditor(docToLoad);
+
+      const myPubs = await fetchMyPublications(signedInUser.id);
+      setPublishedDocIds(new Set(myPubs.map(p => p.doc_id).filter(Boolean)));
     };
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -260,7 +410,11 @@ export default function App() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN"  && session?.user) syncOnLogin(session.user);
-      if (event === "SIGNED_OUT") { setUser(null); setAccountMenuOpen(false); }
+      if (event === "SIGNED_OUT") {
+        setUser(null);
+        setAccountMenuOpen(false);
+        setPublishedDocIds(new Set());
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -323,6 +477,28 @@ export default function App() {
       return next;
     });
   }, [activeId]);
+
+  // ─ publish ──────────────────────────────────────────────────────────────────
+
+  const handlePublish = useCallback(async () => {
+    const currentUser = userRef.current;
+    if (!currentUser) return;
+    const doc = docs.find(d => d.id === activeId);
+    if (!doc?.content?.trim()) return;
+
+    const isPublished = publishedDocIds.has(activeId);
+    setPublishStatus(isPublished ? "removing…" : "publishing…");
+    setAccountMenuOpen(false);
+
+    if (isPublished) {
+      await doUnpublish(activeId);
+      setPublishedDocIds(prev => { const s = new Set(prev); s.delete(activeId); return s; });
+    } else {
+      const ok = await doPublish(doc, currentUser);
+      if (ok) setPublishedDocIds(prev => new Set([...prev, activeId]));
+    }
+    setPublishStatus("");
+  }, [activeId, docs, publishedDocIds]);
 
   // ─ sign out ─────────────────────────────────────────────────────────────────
 
@@ -443,12 +619,20 @@ export default function App() {
 
   useEffect(() => {
     const handler = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); exportToPdf(); }
-      if (e.key === "Escape") { setPanelOpen(false); setAccountMenuOpen(false); setAuthOpen(false); }
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+        if (view === "editor") exportToPdf();
+      }
+      if (e.key === "Escape") {
+        setPanelOpen(false);
+        setAccountMenuOpen(false);
+        setAuthOpen(false);
+        if (view !== "editor") { setView("editor"); setReadingPub(null); }
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [exportToPdf]);
+  }, [exportToPdf, view]);
 
   // ─ mount ────────────────────────────────────────────────────────────────────
 
@@ -479,49 +663,78 @@ export default function App() {
 
   const sortedDocs = [...docs].sort((a, b) => b.updatedAt - a.updatedAt);
   const menuClass  = menuVisible ? "menu-visible" : "menu-hidden";
+  const isEditor   = view === "editor";
+  const activeDoc  = docs.find(d => d.id === activeId);
+  const isPublished = publishedDocIds.has(activeId);
+
+  const goToEditor = useCallback(() => { setView("editor"); setReadingPub(null); }, []);
+  const openReading = useCallback((pub) => { setReadingPub(pub); setView("reading"); }, []);
+
+  const subLabel =
+    view === "feed"    ? "feed" :
+    view === "profile" ? "your profile" :
+    view === "reading" ? (readingPub?.author_name || "") :
+    metaText;
 
   return (
     <>
-      {/* ── doc panel ── */}
-      {panelOpen && <div id="panel-backdrop" onClick={() => setPanelOpen(false)} />}
-      <div id="doc-panel" className={panelOpen ? "open" : ""}>
-        <button className="new-doc-btn" onClick={newDoc}>+ New document</button>
-        <div id="doc-list">
-          {sortedDocs.map(d => (
-            <div
-              key={d.id}
-              className={`doc-item${d.id === activeId ? " active" : ""}`}
-              onClick={() => switchDoc(d.id)}
-            >
-              <span className="doc-item-title">{docTitle(d.content)}</span>
-              <span className="doc-item-meta">{wordCount(d.content)}w</span>
-              {docs.length > 1 && (
-                <button className="doc-delete" onClick={e => deleteDoc(d.id, e)}>×</button>
-              )}
-            </div>
-          ))}
+      {/* ── doc panel (editor only) ── */}
+      {isEditor && panelOpen && <div id="panel-backdrop" onClick={() => setPanelOpen(false)} />}
+      {isEditor && (
+        <div id="doc-panel" className={panelOpen ? "open" : ""}>
+          <button className="new-doc-btn" onClick={newDoc}>+ New document</button>
+          <div id="doc-list">
+            {sortedDocs.map(d => (
+              <div
+                key={d.id}
+                className={`doc-item${d.id === activeId ? " active" : ""}`}
+                onClick={() => switchDoc(d.id)}
+              >
+                <span className="doc-item-title">{docTitle(d.content)}</span>
+                <span className="doc-item-meta">{wordCount(d.content)}w</span>
+                {docs.length > 1 && (
+                  <button className="doc-delete" onClick={e => deleteDoc(d.id, e)}>×</button>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* ── hamburger (top-left) ── */}
-      <button id="panel-toggle" className={menuClass} onClick={() => setPanelOpen(v => !v)} title="Documents">
-        <svg width="15" height="11" viewBox="0 0 15 11" fill="none">
-          <rect y="0"   width="15" height="1.5" rx="0.75" fill="currentColor" />
-          <rect y="4.8" width="15" height="1.5" rx="0.75" fill="currentColor" />
-          <rect y="9.6" width="15" height="1.5" rx="0.75" fill="currentColor" />
-        </svg>
-      </button>
-
-      {/* ── account button (top-right) ── */}
-      {supabase && (
-        <button
-          id="account-btn"
-          className={menuClass}
-          onClick={() => user ? setAccountMenuOpen(v => !v) : setAuthOpen(true)}
-          title={user ? user.email : "Sign in"}
-        >
-          {user ? user.email[0].toUpperCase() : "sign in"}
+      {/* ── top-left: hamburger (editor) or back arrow ── */}
+      {isEditor ? (
+        <button id="panel-toggle" className={menuClass} onClick={() => setPanelOpen(v => !v)} title="Documents">
+          <svg width="15" height="11" viewBox="0 0 15 11" fill="none">
+            <rect y="0"   width="15" height="1.5" rx="0.75" fill="currentColor" />
+            <rect y="4.8" width="15" height="1.5" rx="0.75" fill="currentColor" />
+            <rect y="9.6" width="15" height="1.5" rx="0.75" fill="currentColor" />
+          </svg>
         </button>
+      ) : (
+        <button id="back-btn" onClick={goToEditor}>←</button>
+      )}
+
+      {/* ── top-right: feed link + account ── */}
+      {supabase && (
+        <div id="top-right">
+          {view !== "feed" && (
+            <button
+              id="feed-link"
+              className={isEditor ? menuClass : ""}
+              onClick={() => { setView("feed"); setAccountMenuOpen(false); }}
+            >
+              feed
+            </button>
+          )}
+          <button
+            id="account-btn"
+            className={isEditor ? menuClass : ""}
+            onClick={() => user ? setAccountMenuOpen(v => !v) : setAuthOpen(true)}
+            title={user ? user.email : "Sign in"}
+          >
+            {user ? user.email[0].toUpperCase() : "sign in"}
+          </button>
+        </div>
       )}
 
       {/* ── account dropdown ── */}
@@ -530,30 +743,58 @@ export default function App() {
           <div id="account-backdrop" onClick={() => setAccountMenuOpen(false)} />
           <div id="account-menu">
             <span id="account-email">{user.email}</span>
+            <button onClick={() => { setView("profile"); setAccountMenuOpen(false); }}>my profile</button>
+            {isEditor && activeDoc?.content?.trim() && (
+              <button onClick={handlePublish}>
+                {publishStatus || (isPublished ? "unpublish" : "publish")}
+              </button>
+            )}
             <button onClick={signOut}>sign out</button>
           </div>
         </>
       )}
 
       {/* ── centred brand ── */}
-      <div id="menu" className={menuClass}>
-        <button id="brand" onClick={exportToPdf} title="Export PDF  ⌘S">inkk.</button>
-        <div id="menu-meta">{metaText}</div>
+      <div id="menu" className={isEditor ? menuClass : ""}>
+        <button
+          id="brand"
+          onClick={isEditor ? exportToPdf : goToEditor}
+          title={isEditor ? "Export PDF  ⌘S" : "Back to editor"}
+        >
+          inkk.
+        </button>
+        <div id="menu-meta">{subLabel}</div>
       </div>
 
-      {/* ── editor ── */}
-      <div id="text-container" ref={containerRef} onClick={() => editorRef.current?.focus()}>
-        <div
-          id="text"
-          ref={editorRef}
-          contentEditable
-          suppressContentEditableWarning
-          spellCheck={false}
-          autoCorrect="off"
-          autoCapitalize="off"
-          onInput={onInput}
+      {/* ── main content area ── */}
+      {view === "editor" && (
+        <div id="text-container" ref={containerRef} onClick={() => editorRef.current?.focus()}>
+          <div
+            id="text"
+            ref={editorRef}
+            contentEditable
+            suppressContentEditableWarning
+            spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="off"
+            onInput={onInput}
+          />
+        </div>
+      )}
+
+      {view === "feed" && <Feed onRead={openReading} />}
+
+      {view === "profile" && user && (
+        <Profile
+          user={user}
+          onRead={openReading}
+          onUnpublish={(docId) =>
+            setPublishedDocIds(prev => { const s = new Set(prev); s.delete(docId); return s; })
+          }
         />
-      </div>
+      )}
+
+      {view === "reading" && readingPub && <ReadingView pub={readingPub} />}
 
       {/* ── auth modal ── */}
       {authOpen && supabase && <AuthModal onClose={() => setAuthOpen(false)} />}

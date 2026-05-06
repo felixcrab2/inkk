@@ -36,12 +36,31 @@ body {
 }
 #panel-toggle:hover { color: #555; }
 
-/* ─── Account button (top-right, mirrors hamburger) ──────────────────────── */
-#account-btn {
+/* ─── Top-right cluster (feed link + account) ─────────────────────────────── */
+#top-right {
   position: fixed;
   top: 26px;
   right: 28px;
   z-index: 1001;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+#feed-link {
+  background: none;
+  border: none;
+  font-family: "EB Garamond", serif;
+  font-size: 0.82rem;
+  color: #c8c5c0;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  padding: 0;
+  transition: color 0.15s;
+}
+#feed-link:hover { color: #555; }
+
+#account-btn {
   background: none;
   border: none;
   font-family: "EB Garamond", serif;
@@ -53,6 +72,24 @@ body {
   transition: color 0.15s;
 }
 #account-btn:hover { color: #555; }
+
+/* ─── Back button (non-editor views) ─────────────────────────────────────── */
+#back-btn {
+  position: fixed;
+  top: 26px;
+  left: 28px;
+  z-index: 1001;
+  background: none;
+  border: none;
+  font-family: "EB Garamond", serif;
+  font-size: 1.1rem;
+  color: #c8c5c0;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+#back-btn:hover { color: #555; }
 
 /* ─── Account dropdown ────────────────────────────────────────────────────── */
 #account-backdrop {
@@ -425,9 +462,148 @@ body {
   50%       { border-color: #d0ceca;    }
 }
 
+/* ─── Feed & Profile ──────────────────────────────────────────────────────── */
+#feed-container {
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 90px;
+  padding-bottom: 80px;
+  box-sizing: border-box;
+}
+
+#feed-list {
+  width: 100%;
+  max-width: 560px;
+  padding: 0 24px;
+  box-sizing: border-box;
+}
+
+.feed-empty {
+  font-family: "EB Garamond", serif;
+  font-size: 1rem;
+  color: #c0bfbc;
+  text-align: center;
+  padding-top: 60px;
+  margin: 0;
+}
+
+.pub-card {
+  padding: 22px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.pub-card:first-of-type { border-top: 1px solid rgba(0, 0, 0, 0.06); }
+.pub-card:hover { opacity: 0.65; }
+
+.pub-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 7px;
+}
+
+.pub-author {
+  font-family: "EB Garamond", serif;
+  font-size: 0.82rem;
+  color: #888;
+}
+
+.pub-card-dot {
+  font-family: "EB Garamond", serif;
+  font-size: 0.82rem;
+  color: #d0ceca;
+}
+
+.pub-card-date {
+  font-family: "EB Garamond", serif;
+  font-size: 0.82rem;
+  color: #c0bfbc;
+}
+
+.pub-card-title {
+  font-family: "EB Garamond", serif;
+  font-size: 1.25rem;
+  font-weight: 400;
+  color: #1a1a1a;
+  margin: 0 0 5px;
+  line-height: 1.3;
+}
+
+.pub-card-preview {
+  font-family: "EB Garamond", serif;
+  font-size: 0.93rem;
+  color: #999;
+  margin: 0 0 8px;
+  line-height: 1.5;
+}
+
+.pub-card-words {
+  font-family: "EB Garamond", serif;
+  font-size: 0.78rem;
+  color: #c8c5c0;
+}
+
+.pub-remove {
+  background: none;
+  border: none;
+  font-family: "EB Garamond", serif;
+  font-size: 0.78rem;
+  color: #d0ceca;
+  cursor: pointer;
+  padding: 0;
+  margin-left: auto;
+  transition: color 0.15s;
+}
+.pub-remove:hover { color: #888; }
+
+/* ─── Reading view ────────────────────────────────────────────────────────── */
+#reading-container {
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 12vh;
+  padding-bottom: 20vh;
+  box-sizing: border-box;
+}
+
+#reading-byline {
+  font-family: "EB Garamond", serif;
+  font-size: 0.82rem;
+  color: #aaa;
+  letter-spacing: 0.03em;
+  margin-bottom: 2.2rem;
+  width: fit-content;
+  max-width: 44vw;
+  min-width: 200px;
+}
+
+#reading-text {
+  width: fit-content;
+  max-width: 44vw;
+  min-width: 200px;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  font-family: "EB Garamond", serif;
+  font-size: 1.2rem;
+  line-height: 1.5;
+  color: #1a1a1a;
+  padding: 0 8px 8px;
+}
+
 /* ─── Mobile ──────────────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
   #text-container { padding-left: 28px; padding-right: 28px; }
   #text { font-size: 1.05rem; width: fit-content; max-width: 84vw; min-width: 160px; }
   #doc-panel { width: 220px; }
+  #feed-list { max-width: 100%; }
+  .pub-card-title { font-size: 1.1rem; }
+  #reading-text, #reading-byline { max-width: 84vw; }
+  #reading-text { font-size: 1.05rem; }
 }
