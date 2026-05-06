@@ -7,7 +7,7 @@ import { supabase } from "./supabase";
 import {
   Menu, ArrowLeft, PenLine, Globe, User,
   Share2, Check, Download, Maximize2, Minimize2,
-  Copy, CheckCheck, Plus, Trash2, Type,
+  Copy, CheckCheck, Plus, Trash2, Type, Search,
 } from "lucide-react";
 
 // ─── local storage ────────────────────────────────────────────────────────────
@@ -176,7 +176,7 @@ async function fetchFeed() {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("publications")
-    .select("id, title, content, published_at, author_name, writing_time_seconds, revision_count")
+    .select("id, title, content, published_at, author_name, author_username, user_id, writing_time_seconds, revision_count")
     .order("published_at", { ascending: false })
     .limit(50);
   if (error || !data) return [];
@@ -194,13 +194,14 @@ async function fetchMyPublications(userId) {
   return data;
 }
 
-async function doPublish(doc, user, title, authorName) {
+async function doPublish(doc, user, title, authorName, authorUsername) {
   if (!supabase || !user) return "Not signed in.";
   const { data: existing, error: fetchErr } = await supabase
     .from("publications").select("id").eq("doc_id", doc.id).maybeSingle();
   if (fetchErr) return fetchErr.message;
   const payload = {
     title, content: doc.content, author_name: authorName,
+    author_username: authorUsername || null,
     published_at: new Date().toISOString(),
     writing_time_seconds: Math.round(doc.writingTimeSecs || 0),
     revision_count: doc.revisionCount || 0,
@@ -217,6 +218,45 @@ async function doPublish(doc, user, title, authorName) {
 async function doUnpublish(docId) {
   if (!supabase) return;
   await supabase.from("publications").delete().eq("doc_id", docId);
+}
+
+// ─── Profiles ─────────────────────────────────────────────────────────────────
+
+async function fetchProfile(userId) {
+  if (!supabase || !userId) return null;
+  const { data } = await supabase
+    .from("profiles").select("id, username, display_name").eq("id", userId).maybeSingle();
+  return data || null;
+}
+
+async function upsertProfile(userId, username, displayName) {
+  if (!supabase || !userId) return "Not signed in.";
+  const { error } = await supabase
+    .from("profiles").upsert({ id: userId, username, display_name: displayName || null });
+  return error ? error.message : null;
+}
+
+async function searchProfiles(query) {
+  if (!supabase || !query.trim()) return [];
+  const q = query.trim();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, username, display_name")
+    .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
+    .limit(20);
+  if (error || !data) return [];
+  return data;
+}
+
+async function fetchUserPublications(userId) {
+  if (!supabase || !userId) return [];
+  const { data, error } = await supabase
+    .from("publications")
+    .select("id, title, content, published_at, author_name, writing_time_seconds, revision_count")
+    .eq("user_id", userId)
+    .order("published_at", { ascending: false });
+  if (error || !data) return [];
+  return data;
 }
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
@@ -378,11 +418,66 @@ function AuthModal({ onClose }) {
   );
 }
 
+// ─── UsernameModal ────────────────────────────────────────────────────────────
+
+function UsernameModal({ user, onDone }) {
+  const [username, setUsername]       = useState("");
+  const [displayName, setDisplayName] = useState(user.user_metadata?.full_name || "");
+  const [error, setError]             = useState("");
+  const [loading, setLoading]         = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    const u = username.trim();
+    if (u.length < 3) { setError("At least 3 characters."); return; }
+    setLoading(true); setError("");
+    const errMsg = await upsertProfile(user.id, u, displayName.trim());
+    if (errMsg) {
+      setError(errMsg.includes("unique") || errMsg.includes("duplicate") ? "Username taken." : errMsg);
+      setLoading(false);
+    } else {
+      onDone({ id: user.id, username: u, display_name: displayName.trim() });
+    }
+  };
+
+  return (
+    <div id="auth-overlay">
+      <div id="auth-modal" onClick={e => e.stopPropagation()}>
+        <div id="auth-tabs">
+          <button className="active" style={{ cursor: "default" }}>choose a username</button>
+        </div>
+        <form onSubmit={submit}>
+          <input
+            type="text"
+            placeholder="username"
+            value={username}
+            onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+            required
+            autoFocus
+            maxLength={20}
+          />
+          <input
+            type="text"
+            placeholder="display name (optional)"
+            value={displayName}
+            onChange={e => setDisplayName(e.target.value)}
+            maxLength={50}
+          />
+          {error && <p className="auth-error">{error}</p>}
+          <button id="auth-submit" type="submit" disabled={loading || username.length < 3}>
+            {loading ? "saving…" : "continue"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── PublishModal ─────────────────────────────────────────────────────────────
 
-function PublishModal({ doc, user, onConfirm, onClose }) {
+function PublishModal({ doc, user, profile, onConfirm, onClose }) {
   const rawTitle  = docTitle(doc.content);
-  const rawAuthor = user.user_metadata?.full_name || user.email.split("@")[0];
+  const rawAuthor = profile?.username || user.user_metadata?.full_name || user.email.split("@")[0];
   const [title, setTitle]     = useState(rawTitle === "Untitled" ? "" : rawTitle);
   const [author, setAuthor]   = useState(rawAuthor);
   const [loading, setLoading] = useState(false);
@@ -420,7 +515,7 @@ function PublishModal({ doc, user, onConfirm, onClose }) {
 
 // ─── Feed ─────────────────────────────────────────────────────────────────────
 
-function Feed({ onRead, onHsModal }) {
+function Feed({ onRead, onHsModal, onAuthorClick }) {
   const [pubs, setPubs]       = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -442,7 +537,9 @@ function Feed({ onRead, onHsModal }) {
         {pubs.map(pub => (
           <article key={pub.id} className="pub-card" onClick={() => onRead(pub)}>
             <div className="pub-card-meta">
-              <span className="pub-author">{pub.author_name}</span>
+              <button className="pub-author-btn" onClick={e => { e.stopPropagation(); if (pub.user_id) onAuthorClick(pub.user_id); }}>
+                {pub.author_name}
+              </button>
               <span className="pub-dot">·</span>
               <span className="pub-date">{formatDate(pub.published_at)}</span>
               <span className="pub-dot">·</span>
@@ -470,7 +567,7 @@ function Feed({ onRead, onHsModal }) {
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
-function Profile({ user, localDocs, streak, onRead, onUnpublish, onSignIn, onSignOut }) {
+function Profile({ user, profile, localDocs, streak, onRead, onUnpublish, onSignIn, onSignOut }) {
   const [pubs, setPubs]       = useState([]);
   const [loading, setLoading] = useState(!!user);
 
@@ -508,7 +605,11 @@ function Profile({ user, localDocs, streak, onRead, onUnpublish, onSignIn, onSig
       <div id="profile-header">
         <div id="profile-avatar">{initial}</div>
         <div id="profile-info">
-          <div id="profile-email">{user.email}</div>
+          {profile?.username
+            ? <div id="profile-username">@{profile.username}</div>
+            : <div id="profile-email">{user.email}</div>
+          }
+          {profile?.display_name && <div id="profile-email">{profile.display_name}</div>}
           {user.created_at && (
             <div id="profile-joined">Member since {formatJoined(user.created_at)}</div>
           )}
@@ -566,6 +667,102 @@ function Profile({ user, localDocs, streak, onRead, onUnpublish, onSignIn, onSig
       </div>
 
       <button id="signout-btn" onClick={onSignOut}>Sign out</button>
+    </div>
+  );
+}
+
+// ─── SearchView ───────────────────────────────────────────────────────────────
+
+function SearchView({ onViewUser }) {
+  const [query, setQuery]       = useState("");
+  const [results, setResults]   = useState([]);
+  const [loading, setLoading]   = useState(false);
+  const [searched, setSearched] = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      if (!query.trim()) { setResults([]); setSearched(false); return; }
+      setLoading(true);
+      const data = await searchProfiles(query);
+      setResults(data); setSearched(true); setLoading(false);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  return (
+    <div id="search-container">
+      <div id="search-bar">
+        <Search size={14} id="search-icon" />
+        <input
+          ref={inputRef}
+          id="search-input"
+          type="text"
+          placeholder="Find writers by username…"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+        />
+        {query && <button id="search-clear" onClick={() => setQuery("")}>×</button>}
+      </div>
+      <div id="search-results">
+        {loading && <p className="feed-empty">searching…</p>}
+        {!loading && searched && results.length === 0 && <p className="feed-empty">no writers found.</p>}
+        {!loading && !searched && <p className="feed-empty search-prompt">Search for a writer by username.</p>}
+        {results.map(p => (
+          <div key={p.id} className="user-card" onClick={() => onViewUser(p)}>
+            <div className="user-card-avatar">{(p.username || "?")[0].toUpperCase()}</div>
+            <div className="user-card-info">
+              <div className="user-card-username">@{p.username}</div>
+              {p.display_name && <div className="user-card-name">{p.display_name}</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── UserProfileView ──────────────────────────────────────────────────────────
+
+function UserProfileView({ profile, onRead }) {
+  const [pubs, setPubs]       = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchUserPublications(profile.id).then(data => { setPubs(data); setLoading(false); });
+  }, [profile.id]);
+
+  const initial = (profile.username || "?")[0].toUpperCase();
+
+  return (
+    <div id="user-profile-container">
+      <div id="user-profile-header">
+        <div className="user-profile-avatar">{initial}</div>
+        <div>
+          <div id="user-profile-username">@{profile.username}</div>
+          {profile.display_name && <div id="user-profile-name">{profile.display_name}</div>}
+        </div>
+      </div>
+      <div id="user-profile-list">
+        {loading && <p className="feed-empty">loading…</p>}
+        {!loading && pubs.length === 0 && <p className="feed-empty">nothing published yet.</p>}
+        {pubs.map(pub => (
+          <article key={pub.id} className="pub-card" onClick={() => onRead(pub)}>
+            <div className="pub-card-meta">
+              <span className="pub-date">{formatDate(pub.published_at)}</span>
+              <span className="pub-dot">·</span>
+              <span className="pub-read-time">{readingTime(pub.content)}</span>
+            </div>
+            <h2 className="pub-card-title">{pub.title}</h2>
+            {pubPreview(pub.content) && <p className="pub-card-preview">{pubPreview(pub.content)}</p>}
+            {(pub.writing_time_seconds > 0 || pub.revision_count > 0) && (
+              <HumanSignalBadge writingTimeSecs={pub.writing_time_seconds} revisionCount={pub.revision_count} content={pub.content} />
+            )}
+          </article>
+        ))}
+      </div>
     </div>
   );
 }
@@ -649,6 +846,9 @@ export default function App() {
   const [toasts, setToasts]           = useState([]);
   const [focusMode, setFocusMode]     = useState(false);
   const [publishMenuOpen, setPublishMenuOpen] = useState(false);
+  const [profile, setProfile]         = useState(null);
+  const [usernameModalOpen, setUsernameModalOpen] = useState(false);
+  const [viewingUser, setViewingUser] = useState(null);
 
   const editorRef    = useRef(null);
   const containerRef = useRef(null);
@@ -737,6 +937,9 @@ export default function App() {
       if (docToLoad) loadDocIntoEditor(docToLoad);
       const myPubs = await fetchMyPublications(signedInUser.id);
       setPublishedDocIds(new Set(myPubs.map(p => p.doc_id).filter(Boolean)));
+      const prof = await fetchProfile(signedInUser.id);
+      if (prof) setProfile(prof);
+      else setUsernameModalOpen(true);
     };
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -744,7 +947,7 @@ export default function App() {
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" && session?.user) syncOnLogin(session.user);
-      if (event === "SIGNED_OUT") { setUser(null); setPublishedDocIds(new Set()); }
+      if (event === "SIGNED_OUT") { setUser(null); setPublishedDocIds(new Set()); setProfile(null); setUsernameModalOpen(false); }
     });
     return () => subscription.unsubscribe();
   }, [loadDocIntoEditor]);
@@ -832,14 +1035,24 @@ export default function App() {
   const confirmPublish = useCallback(async (title, authorName) => {
     if (!publishModalDoc) return "No document selected.";
     const wasAlreadyPublished = publishedDocIds.has(publishModalDoc.id);
-    const errMsg = await doPublish(publishModalDoc, userRef.current, title, authorName);
+    const errMsg = await doPublish(publishModalDoc, userRef.current, title, authorName, profile?.username);
     if (!errMsg) {
       setPublishedDocIds(prev => new Set([...prev, publishModalDoc.id]));
       setPublishModalDoc(null);
       addToast(wasAlreadyPublished ? "Updated." : "Published to feed.");
     }
     return errMsg;
-  }, [publishModalDoc, publishedDocIds, addToast]);
+  }, [publishModalDoc, publishedDocIds, profile, addToast]);
+
+  const openUserProfile = useCallback(async (userIdOrProfile, from) => {
+    const prof = typeof userIdOrProfile === "string"
+      ? await fetchProfile(userIdOrProfile)
+      : userIdOrProfile;
+    if (!prof) { addToast("This writer hasn't set up their profile."); return; }
+    prevViewRef.current = from || view;
+    setViewingUser(prof);
+    setView("userProfile");
+  }, [view, addToast]);
 
   // ─ sign out ─────────────────────────────────────────────────────────────────
 
@@ -967,13 +1180,15 @@ export default function App() {
         if (focusMode) { setFocusMode(false); return; }
         if (publishMenuOpen) { setPublishMenuOpen(false); return; }
         if (publishModalDoc) { setPublishModalDoc(null); return; }
+        if (usernameModalOpen) return;
         setPanelOpen(false); setAuthOpen(false); setHsModalOpen(false);
+        if (view === "userProfile") { setView(prevViewRef.current || "search"); setViewingUser(null); return; }
         if (view !== "editor") { setView("editor"); setReadingPub(null); }
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [exportToPdf, view, focusMode, publishMenuOpen, publishModalDoc]);
+  }, [exportToPdf, view, focusMode, publishMenuOpen, publishModalDoc, usernameModalOpen]);
 
   // ─ mount ────────────────────────────────────────────────────────────────────
 
@@ -1037,7 +1252,7 @@ export default function App() {
               <Menu size={18} />
             </button>
           )}
-          {view === "reading" && (
+          {(view === "reading" || view === "userProfile") && (
             <button className="icon-btn" onClick={goBack} title="Back">
               <ArrowLeft size={18} />
             </button>
@@ -1177,11 +1392,13 @@ export default function App() {
         <Feed
           onRead={pub => openReading(pub, "feed")}
           onHsModal={() => setHsModalOpen(true)}
+          onAuthorClick={userId => openUserProfile(userId, "feed")}
         />
       )}
       {view === "profile" && (
         <Profile
           user={user}
+          profile={profile}
           localDocs={docs}
           streak={streak}
           onRead={pub => openReading(pub, "profile")}
@@ -1190,10 +1407,16 @@ export default function App() {
           onSignOut={signOut}
         />
       )}
+      {view === "search" && (
+        <SearchView onViewUser={p => openUserProfile(p, "search")} />
+      )}
+      {view === "userProfile" && viewingUser && (
+        <UserProfileView profile={viewingUser} onRead={pub => openReading(pub, "userProfile")} />
+      )}
       {view === "reading" && readingPub && <ReadingView pub={readingPub} font={font} />}
 
       {/* ── bottom nav ── */}
-      {view !== "reading" && (
+      {view !== "reading" && view !== "userProfile" && (
         <nav id="bottom-nav" className={isEditor ? menuClass : ""}>
           <button className={`nav-tab ${isEditor ? "active" : ""}`} onClick={() => setView("editor")}>
             <PenLine size={18} strokeWidth={1.75} />
@@ -1202,6 +1425,10 @@ export default function App() {
           <button className={`nav-tab ${view === "feed" ? "active" : ""}`} onClick={() => setView("feed")}>
             <Globe size={18} strokeWidth={1.75} />
             <span className="nav-label">Feed</span>
+          </button>
+          <button className={`nav-tab ${view === "search" ? "active" : ""}`} onClick={() => setView("search")}>
+            <Search size={18} strokeWidth={1.75} />
+            <span className="nav-label">People</span>
           </button>
           <button
             className={`nav-tab ${view === "profile" ? "active" : ""}`}
@@ -1220,10 +1447,13 @@ export default function App() {
 
       {/* ── modals ── */}
       {publishModalDoc && user && (
-        <PublishModal doc={publishModalDoc} user={user} onConfirm={confirmPublish} onClose={() => setPublishModalDoc(null)} />
+        <PublishModal doc={publishModalDoc} user={user} profile={profile} onConfirm={confirmPublish} onClose={() => setPublishModalDoc(null)} />
       )}
       {authOpen && supabase && <AuthModal onClose={() => setAuthOpen(false)} />}
       {hsModalOpen && <HumanSignalModal onClose={() => setHsModalOpen(false)} />}
+      {usernameModalOpen && user && (
+        <UsernameModal user={user} onDone={prof => { setProfile(prof); setUsernameModalOpen(false); }} />
+      )}
 
       {/* ── focus mode exit ── */}
       {focusMode && (
