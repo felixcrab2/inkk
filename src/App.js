@@ -226,7 +226,7 @@ function Toasts({ toasts }) {
   return (
     <div id="toast-stack">
       {toasts.map(t => (
-        <div key={t.id} className="toast">{t.message}</div>
+        <div key={t.id} className={t.type === "hint" ? "toast toast-hint" : "toast"}>{t.message}</div>
       ))}
     </div>
   );
@@ -678,9 +678,9 @@ export default function App() {
     if (!showLanding && !isMobileRef.current) editorRef.current?.focus();
   }, [showLanding]);
 
-  const addToast = useCallback((message) => {
+  const addToast = useCallback((message, type) => {
     const id = Date.now();
-    setToasts(prev => [...prev, { id, message }]);
+    setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 2800);
   }, []);
 
@@ -879,7 +879,7 @@ export default function App() {
     if (!saveHintShownRef.current) {
       saveHintShownRef.current = true;
       localStorage.setItem("inkk_save_hint", "1");
-      setTimeout(() => addToast("Your writing saves automatically — no need to do anything."), 1200);
+      setTimeout(() => addToast("Saves automatically.", "hint"), 1500);
     }
     const el = editorRef.current;
     if (!el) return;
@@ -1060,7 +1060,7 @@ export default function App() {
                 }}
               >
                 {isPublished
-                  ? <><Check size={13} /><span className="btn-label">Published ✓</span></>
+                  ? <><Check size={13} /><span className="btn-label">Published</span></>
                   : <><Share2 size={13} /><span className="btn-label">Publish</span></>
                 }
               </button>
