@@ -145,6 +145,48 @@ body {
 
 .btn-label { font-family: "EB Garamond", serif; }
 
+/* ─── Publish dropdown ────────────────────────────────────────────────────── */
+#publish-menu-wrap {
+  position: relative;
+}
+
+#publish-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+}
+
+#publish-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  min-width: 160px;
+  z-index: 200;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.publish-menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  font-size: 0.82rem;
+  font-family: "EB Garamond", serif;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.publish-menu-item:hover { background: var(--surface); }
+.publish-menu-danger { color: #c0392b; }
+
 /* ─── Bottom nav ──────────────────────────────────────────────────────────── */
 #bottom-nav {
   position: fixed;

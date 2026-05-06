@@ -648,6 +648,7 @@ export default function App() {
   const [streak, setStreak]           = useState(() => loadStreak().count);
   const [toasts, setToasts]           = useState([]);
   const [focusMode, setFocusMode]     = useState(false);
+  const [publishMenuOpen, setPublishMenuOpen] = useState(false);
 
   const editorRef    = useRef(null);
   const containerRef = useRef(null);
@@ -663,6 +664,7 @@ export default function App() {
   const writingBaseRef         = useRef(initDocs.find(d => d.id === initActiveId)?.writingTimeSecs || 0);
   const writingSessionStartRef = useRef(null);
   const writingFlushRef        = useRef(0);
+  const saveHintShownRef       = useRef(!!localStorage.getItem("inkk_save_hint"));
 
   useEffect(() => { userRef.current = user; }, [user]);
   useEffect(() => { localStorage.setItem("inkk_font", font); }, [font]);
@@ -824,26 +826,20 @@ export default function App() {
     if (!userRef.current) { setAuthOpen(true); return; }
     const content = doc.id === activeId ? contentRef.current : doc.content;
     if (!content?.trim()) return;
-    if (publishedDocIds.has(doc.id)) {
-      doUnpublish(doc.id).then(() => {
-        setPublishedDocIds(prev => { const s = new Set(prev); s.delete(doc.id); return s; });
-        addToast("Removed from feed.");
-      });
-    } else {
-      setPublishModalDoc({ ...doc, content });
-    }
-  }, [activeId, publishedDocIds, addToast]);
+    setPublishModalDoc({ ...doc, content });
+  }, [activeId]);
 
   const confirmPublish = useCallback(async (title, authorName) => {
     if (!publishModalDoc) return "No document selected.";
+    const wasAlreadyPublished = publishedDocIds.has(publishModalDoc.id);
     const errMsg = await doPublish(publishModalDoc, userRef.current, title, authorName);
     if (!errMsg) {
       setPublishedDocIds(prev => new Set([...prev, publishModalDoc.id]));
       setPublishModalDoc(null);
-      addToast("Published to feed.");
+      addToast(wasAlreadyPublished ? "Updated." : "Published to feed.");
     }
     return errMsg;
-  }, [publishModalDoc, addToast]);
+  }, [publishModalDoc, publishedDocIds, addToast]);
 
   // ─ sign out ─────────────────────────────────────────────────────────────────
 
@@ -880,6 +876,11 @@ export default function App() {
   }, []);
 
   const onInput = useCallback(() => {
+    if (!saveHintShownRef.current) {
+      saveHintShownRef.current = true;
+      localStorage.setItem("inkk_save_hint", "1");
+      setTimeout(() => addToast("Your writing saves automatically — no need to do anything."), 1200);
+    }
     const el = editorRef.current;
     if (!el) return;
     const text = el.innerText;
@@ -920,7 +921,7 @@ export default function App() {
         pushDocToCloud({ id: capturedId, content: capturedContent, updatedAt: capturedUpdatedAt }, userRef.current.id);
       setSaveStatus("saved");
     }, 500);
-  }, [activeId, scheduleMenuReturn, scrollToCursor]);
+  }, [activeId, scheduleMenuReturn, scrollToCursor, addToast]);
 
   // ─ PDF export ───────────────────────────────────────────────────────────────
 
@@ -964,6 +965,7 @@ export default function App() {
       if ((e.metaKey || e.ctrlKey) && e.key === ".") { e.preventDefault(); if (view === "editor") setFocusMode(v => !v); }
       if (e.key === "Escape") {
         if (focusMode) { setFocusMode(false); return; }
+        if (publishMenuOpen) { setPublishMenuOpen(false); return; }
         if (publishModalDoc) { setPublishModalDoc(null); return; }
         setPanelOpen(false); setAuthOpen(false); setHsModalOpen(false);
         if (view !== "editor") { setView("editor"); setReadingPub(null); }
@@ -971,7 +973,7 @@ export default function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [exportToPdf, view, focusMode, publishModalDoc]);
+  }, [exportToPdf, view, focusMode, publishMenuOpen, publishModalDoc]);
 
   // ─ mount ────────────────────────────────────────────────────────────────────
 
@@ -1046,16 +1048,39 @@ export default function App() {
         </div>
         <div id="top-bar-right">
           {isEditor && supabase && hasContent && (
-            <button
-              id="publish-btn"
-              className={menuClass}
-              onClick={() => { const doc = docs.find(d => d.id === activeId); if (doc) openPublishModal(doc); }}
-            >
-              {isPublished
-                ? <><Check size={13} /><span className="btn-label">Published</span></>
-                : <><Share2 size={13} /><span className="btn-label">Publish</span></>
-              }
-            </button>
+            <div id="publish-menu-wrap">
+              <button
+                id="publish-btn"
+                className={menuClass}
+                onClick={() => {
+                  const doc = docs.find(d => d.id === activeId);
+                  if (!doc) return;
+                  if (isPublished) setPublishMenuOpen(v => !v);
+                  else openPublishModal(doc);
+                }}
+              >
+                {isPublished
+                  ? <><Check size={13} /><span className="btn-label">Published ✓</span></>
+                  : <><Share2 size={13} /><span className="btn-label">Publish</span></>
+                }
+              </button>
+              {isPublished && publishMenuOpen && (
+                <div id="publish-menu">
+                  <button className="publish-menu-item" onClick={() => {
+                    setPublishMenuOpen(false);
+                    const doc = docs.find(d => d.id === activeId);
+                    if (doc) openPublishModal(doc);
+                  }}>Update</button>
+                  <button className="publish-menu-item publish-menu-danger" onClick={() => {
+                    setPublishMenuOpen(false);
+                    doUnpublish(activeId).then(() => {
+                      setPublishedDocIds(prev => { const s = new Set(prev); s.delete(activeId); return s; });
+                      addToast("Removed from feed.");
+                    });
+                  }}>Remove from feed</button>
+                </div>
+              )}
+            </div>
           )}
           {isEditor && (
             <button
@@ -1206,6 +1231,9 @@ export default function App() {
           <Minimize2 size={14} />
         </button>
       )}
+
+      {/* ── publish menu backdrop ── */}
+      {publishMenuOpen && <div id="publish-menu-backdrop" onClick={() => setPublishMenuOpen(false)} />}
 
       {/* ── toasts ── */}
       <Toasts toasts={toasts} />
