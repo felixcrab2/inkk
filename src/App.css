@@ -326,6 +326,7 @@ body {
 }
 
 #font-btn {
+  pointer-events: auto;
   background: none;
   border: none;
   font-family: "EB Garamond", serif;
