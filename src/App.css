@@ -456,6 +456,24 @@ body.focus-mode #text-container {
   mask-image: linear-gradient(to bottom, transparent 0px, transparent 50px, black 90px, black 100%);
 }
 
+#title-input {
+  width: fit-content;
+  max-width: 44vw;
+  min-width: 200px;
+  background: none;
+  border: none;
+  outline: none;
+  font-family: "EB Garamond", serif;
+  font-size: 1.65rem;
+  color: var(--text);
+  padding: 0 8px 0;
+  margin-bottom: 10px;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+}
+#title-input::placeholder { color: #d0ceca; }
+#title-input.font-arial { font-family: Arial, sans-serif; }
+
 #text {
   width: fit-content;
   max-width: 44vw;
@@ -1069,6 +1087,15 @@ body.focus-mode #text-container {
 
 #reading-text.font-arial { font-family: Arial, sans-serif; }
 
+#reading-text::first-letter {
+  font-size: 4.4em;
+  float: left;
+  line-height: 0.74;
+  margin-right: 6px;
+  padding-top: 5px;
+  font-family: "EB Garamond", serif;
+}
+
 /* ─── Auth modal ──────────────────────────────────────────────────────────── */
 #auth-overlay {
   position: fixed;
@@ -1245,6 +1272,7 @@ body.focus-mode #text-container {
 /* ─── Mobile ──────────────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
   #text { font-size: 1.05rem; max-width: 88vw; }
+  #title-input { font-size: 1.35rem; max-width: 88vw; }
   #text-container { padding-left: 0; padding-right: 0; }
   #reading-inner { padding: 32px 20px 20vh; }
   #reading-headline { font-size: 1.5rem; }

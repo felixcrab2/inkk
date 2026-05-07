@@ -14,7 +14,7 @@ import {
 
 function createDoc() {
   const now = Date.now();
-  return { id: crypto.randomUUID(), content: "", updatedAt: now, createdAt: now, writingTimeSecs: 0, revisionCount: 0 };
+  return { id: crypto.randomUUID(), title: "", content: "", updatedAt: now, createdAt: now, writingTimeSecs: 0, revisionCount: 0 };
 }
 
 function loadState() {
@@ -36,6 +36,7 @@ function initState() {
   }
   const docs = saved.docs.map(d => ({
     ...d,
+    title: d.title ?? "",
     createdAt: d.createdAt || d.updatedAt || Date.now(),
     writingTimeSecs: d.writingTimeSecs || 0,
     revisionCount: d.revisionCount || 0,
@@ -476,7 +477,7 @@ function UsernameModal({ user, onDone }) {
 // ─── PublishModal ─────────────────────────────────────────────────────────────
 
 function PublishModal({ doc, user, profile, onConfirm, onClose }) {
-  const rawTitle  = docTitle(doc.content);
+  const rawTitle  = doc.title || docTitle(doc.content);
   const rawAuthor = profile?.username || user.user_metadata?.full_name || user.email.split("@")[0];
   const [title, setTitle]     = useState(rawTitle === "Untitled" ? "" : rawTitle);
   const [author, setAuthor]   = useState(rawAuthor);
@@ -850,9 +851,11 @@ export default function App() {
   const [usernameModalOpen, setUsernameModalOpen] = useState(false);
   const [viewingUser, setViewingUser] = useState(null);
 
-  const editorRef    = useRef(null);
-  const containerRef = useRef(null);
-  const contentRef   = useRef("");
+  const editorRef      = useRef(null);
+  const titleEditorRef = useRef(null);
+  const containerRef   = useRef(null);
+  const contentRef     = useRef("");
+  const titleRef       = useRef("");
   const isMobileRef  = useRef(false);
   const mountedRef   = useRef(false);
   const idleTimerRef = useRef(null);
@@ -895,6 +898,8 @@ export default function App() {
   const loadDocIntoEditor = useCallback((doc) => {
     const el = editorRef.current;
     if (!el) return;
+    titleRef.current = doc.title || "";
+    if (titleEditorRef.current) titleEditorRef.current.value = doc.title || "";
     contentRef.current = doc.content;
     el.innerText = doc.content;
     setWords(wordCount(doc.content));
@@ -926,6 +931,7 @@ export default function App() {
       if (!merged.length) merged = [createDoc()];
       merged = merged.map(d => ({
         ...d,
+        title: d.title ?? "",
         createdAt: d.createdAt || d.updatedAt || Date.now(),
         writingTimeSecs: d.writingTimeSecs || 0,
         revisionCount: d.revisionCount || 0,
@@ -968,7 +974,7 @@ export default function App() {
     writingFlushRef.current = 0;
     setDocs(prev => {
       const flushed = prev.map(d =>
-        d.id === activeId ? { ...d, content: contentRef.current, updatedAt: Date.now(), writingTimeSecs: timeToSave } : d
+        d.id === activeId ? { ...d, title: titleRef.current, content: contentRef.current, updatedAt: Date.now(), writingTimeSecs: timeToSave } : d
       );
       saveState(flushed, id);
       return flushed;
@@ -998,7 +1004,7 @@ export default function App() {
     const doc = createDoc();
     setDocs(prev => {
       const flushed = prev.map(d =>
-        d.id === activeId ? { ...d, content: contentRef.current, updatedAt: Date.now(), writingTimeSecs: timeToSave } : d
+        d.id === activeId ? { ...d, title: titleRef.current, content: contentRef.current, updatedAt: Date.now(), writingTimeSecs: timeToSave } : d
       );
       const next = [...flushed, doc];
       saveState(next, doc.id);
@@ -1117,6 +1123,7 @@ export default function App() {
 
     const capturedId = activeId;
     const capturedContent = text;
+    const capturedTitle = titleRef.current;
     saveTimerRef.current = setTimeout(() => {
       const capturedUpdatedAt = Date.now();
       const capturedTime = writingBaseRef.current + writingFlushRef.current +
@@ -1124,7 +1131,7 @@ export default function App() {
       setDocs(prev => {
         const next = prev.map(d =>
           d.id === capturedId
-            ? { ...d, content: capturedContent, updatedAt: capturedUpdatedAt, writingTimeSecs: capturedTime, revisionCount: (d.revisionCount || 0) + 1 }
+            ? { ...d, title: capturedTitle, content: capturedContent, updatedAt: capturedUpdatedAt, writingTimeSecs: capturedTime, revisionCount: (d.revisionCount || 0) + 1 }
             : d
         );
         saveState(next, capturedId);
@@ -1140,6 +1147,27 @@ export default function App() {
     }, 500);
   }, [activeId, scheduleMenuReturn, scrollToCursor, addToast]);
 
+  const onTitleInput = useCallback(() => {
+    const el = titleEditorRef.current;
+    if (!el) return;
+    titleRef.current = el.value;
+    setSaveStatus("saving");
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    const capturedId = activeId;
+    const capturedTitle = el.value;
+    saveTimerRef.current = setTimeout(() => {
+      const capturedUpdatedAt = Date.now();
+      setDocs(prev => {
+        const next = prev.map(d =>
+          d.id === capturedId ? { ...d, title: capturedTitle, updatedAt: capturedUpdatedAt } : d
+        );
+        saveState(next, capturedId);
+        return next;
+      });
+      setSaveStatus("saved");
+    }, 500);
+  }, [activeId]);
+
   // ─ PDF export ───────────────────────────────────────────────────────────────
 
   const exportToPdf = useCallback(async () => {
@@ -1150,7 +1178,7 @@ export default function App() {
     const sourceDoc = docsRef.current.find(d => d.id === activeId);
     const prof      = profileRef.current;
     const u         = userRef.current;
-    const titleStr  = docTitle(text);
+    const titleStr  = titleRef.current.trim() || docTitle(text);
     const authorStr = prof?.username
       ? `@${prof.username}`
       : (u?.user_metadata?.full_name || u?.email?.split("@")[0] || "");
@@ -1235,22 +1263,51 @@ export default function App() {
     pdf.setFontSize(BFS);
     setC(C_BLACK);
 
-    // strip title line from body if it matches the first line
-    const firstLineRaw = text.trim().split("\n")[0].trim();
-    const stripTitle   = firstLineRaw.length < 80 && firstLineRaw === titleStr && titleStr !== "Untitled";
-    const bodyText     = stripTitle ? text.trim().slice(firstLineRaw.length).trim() : text.trim();
-    const bodyParas    = bodyText.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+    // if using the old first-line-as-title pattern, strip it from body
+    const bodyText  = text.trim();
+    const bodyParas = bodyText.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
 
-    for (let pi = 0; pi < bodyParas.length; pi++) {
-      const lines = bodyParas[pi]
-        .split("\n")
-        .flatMap(raw => pdf.splitTextToSize(raw || " ", tW));
-
+    const renderLines = (lines, startX) => {
       for (const ln of lines) {
         if (y > bodyBottom) { newPage(); y = 72; pdf.setFontSize(BFS); setC(C_BLACK); }
-        if (ln.trim()) pdf.text(ln, mx, y);
+        if (ln.trim()) pdf.text(ln, startX, y);
         y += LH;
       }
+    };
+
+    for (let pi = 0; pi < bodyParas.length; pi++) {
+      const para = bodyParas[pi];
+
+      if (pi === 0 && para.length > 0) {
+        // ── drop cap ────────────────────────────────────────────────────────
+        const DROP_FS    = 62;
+        const DROP_LINES = 3;
+        const dropChar   = para[0].toUpperCase();
+        const restPara   = para.slice(1);
+
+        pdf.setFontSize(DROP_FS);
+        setC(C_BLACK);
+        const dropW      = pdf.getTextWidth(dropChar) + 5;
+        const dropBaseline = y + (DROP_LINES - 1) * LH;
+        pdf.text(dropChar, mx, dropBaseline);
+
+        pdf.setFontSize(BFS);
+        const indentX    = mx + dropW;
+        const indentW    = tW - dropW;
+        const indented   = restPara.split("\n").flatMap(r => pdf.splitTextToSize(r || " ", indentW));
+        const beside     = indented.slice(0, DROP_LINES);
+        const after      = indented.slice(DROP_LINES);
+
+        for (let i = 0; i < beside.length; i++) {
+          if (beside[i].trim()) pdf.text(beside[i], indentX, y + i * LH);
+        }
+        y += Math.max(beside.length, DROP_LINES) * LH;
+        renderLines(after, mx);
+      } else {
+        const lines = para.split("\n").flatMap(r => pdf.splitTextToSize(r || " ", tW));
+        renderLines(lines, mx);
+      }
+
       if (pi < bodyParas.length - 1) y += PGAP;
     }
 
@@ -1284,8 +1341,10 @@ export default function App() {
     isMobileRef.current = isMobile();
     const doc = initDocs.find(d => d.id === initActiveId) || initDocs[0];
     if (doc) {
+      titleRef.current = doc.title || "";
       contentRef.current = doc.content;
       writingBaseRef.current = doc.writingTimeSecs || 0;
+      if (titleEditorRef.current) titleEditorRef.current.value = doc.title || "";
       const el = editorRef.current;
       if (el) {
         el.innerText = doc.content;
@@ -1414,7 +1473,7 @@ export default function App() {
             {sortedDocs.map(d => (
               <div key={d.id} className={`doc-item${d.id === activeId ? " active" : ""}`} onClick={() => switchDoc(d.id)}>
                 <div className="doc-item-body">
-                  <span className="doc-item-title">{docTitle(d.content)}</span>
+                  <span className="doc-item-title">{d.title || docTitle(d.content)}</span>
                   <span className="doc-item-meta">
                     {wordCount(d.content)}w
                     {d.writingTimeSecs > 60 && ` · ${formatWritingTime(d.writingTimeSecs)}`}
@@ -1466,8 +1525,16 @@ export default function App() {
         id="text-container"
         ref={containerRef}
         style={{ display: isEditor ? "" : "none" }}
-        onClick={() => editorRef.current?.focus()}
       >
+        <input
+          id="title-input"
+          ref={titleEditorRef}
+          type="text"
+          placeholder="Title"
+          className={font === "arial" ? "font-arial" : ""}
+          onInput={onTitleInput}
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); editorRef.current?.focus(); } }}
+        />
         <div
           id="text"
           ref={editorRef}
