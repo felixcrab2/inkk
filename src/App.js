@@ -847,6 +847,7 @@ export default function App() {
   const [toasts, setToasts]           = useState([]);
   const [focusMode, setFocusMode]     = useState(false);
   const [publishMenuOpen, setPublishMenuOpen] = useState(false);
+  const [showTitleInput, setShowTitleInput] = useState(() => !!initDocs.find(d => d.id === initActiveId)?.title);
   const [profile, setProfile]         = useState(null);
   const [usernameModalOpen, setUsernameModalOpen] = useState(false);
   const [viewingUser, setViewingUser] = useState(null);
@@ -987,7 +988,7 @@ export default function App() {
   useEffect(() => {
     if (!mountedRef.current) return;
     const doc = docs.find(d => d.id === activeId);
-    if (doc) loadDocIntoEditor(doc);
+    if (doc) { loadDocIntoEditor(doc); setShowTitleInput(!!doc.title); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
 
@@ -1345,6 +1346,7 @@ export default function App() {
       contentRef.current = doc.content;
       writingBaseRef.current = doc.writingTimeSecs || 0;
       if (titleEditorRef.current) titleEditorRef.current.value = doc.title || "";
+      setShowTitleInput(!!doc.title);
       const el = editorRef.current;
       if (el) {
         el.innerText = doc.content;
@@ -1526,15 +1528,26 @@ export default function App() {
         ref={containerRef}
         style={{ display: isEditor ? "" : "none" }}
       >
-        <input
-          id="title-input"
-          ref={titleEditorRef}
-          type="text"
-          placeholder="Title"
-          className={font === "arial" ? "font-arial" : ""}
-          onInput={onTitleInput}
-          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); editorRef.current?.focus(); } }}
-        />
+        {showTitleInput ? (
+          <input
+            id="title-input"
+            ref={titleEditorRef}
+            type="text"
+            placeholder="Title"
+            className={font === "arial" ? "font-arial" : ""}
+            onInput={onTitleInput}
+            onBlur={() => { if (!titleRef.current.trim()) { titleRef.current = ""; setShowTitleInput(false); } }}
+            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); editorRef.current?.focus(); } }}
+          />
+        ) : (
+          <button
+            id="add-title-btn"
+            className={menuClass}
+            onClick={() => { setShowTitleInput(true); setTimeout(() => titleEditorRef.current?.focus(), 20); }}
+          >
+            add title
+          </button>
+        )}
         <div
           id="text"
           ref={editorRef}
