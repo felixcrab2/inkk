@@ -772,19 +772,30 @@ body.focus-mode #text-container {
   margin-bottom: 24px;
 }
 
-#profile-avatar {
-  width: 44px;
-  height: 44px;
+#profile-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+#avatar-upload-btn {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: var(--text);
-  color: var(--bg);
-  font-family: "Cormorant Garamond", serif;
-  font-size: 1.2rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: 0.62rem;
+  color: var(--muted);
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1;
 }
+#avatar-upload-btn:hover { color: var(--text); border-color: #aaa; }
 
 #profile-email {
   font-family: "Cormorant Garamond", serif;

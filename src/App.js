@@ -65,6 +65,32 @@ function isMobile() {
   );
 }
 
+function dropCapSrc(letter, images) {
+  if (!letter || !images) return null;
+  const l = letter.toLowerCase();
+  const list = images[l];
+  return list?.length ? `/drop_caps/${l}/${list[0]}.png` : null;
+}
+
+async function compressAvatar(file, size = 120) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        const s = Math.min(img.width, img.height);
+        ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size);
+        resolve(canvas.toDataURL("image/jpeg", 0.78));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 async function fetchBase64(url) {
   const res = await fetch(url);
   const buf = await res.arrayBuffer();
@@ -229,7 +255,7 @@ async function doUnpublish(docId) {
 async function fetchProfile(userId) {
   if (!supabase || !userId) return null;
   const { data } = await supabase
-    .from("profiles").select("id, username, display_name").eq("id", userId).maybeSingle();
+    .from("profiles").select("id, username, display_name, avatar_data").eq("id", userId).maybeSingle();
   return data || null;
 }
 
@@ -240,12 +266,19 @@ async function upsertProfile(userId, username, displayName) {
   return error ? error.message : null;
 }
 
+async function updateAvatar(userId, avatarData) {
+  if (!supabase || !userId) return "Not signed in.";
+  const { error } = await supabase
+    .from("profiles").update({ avatar_data: avatarData }).eq("id", userId);
+  return error ? error.message : null;
+}
+
 async function searchProfiles(query) {
   if (!supabase || !query.trim()) return [];
   const q = query.trim();
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, username, display_name")
+    .select("id, username, display_name, avatar_data")
     .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
     .limit(20);
   if (error || !data) return [];
@@ -264,6 +297,38 @@ async function fetchUserPublications(userId) {
 }
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
+
+// ─── DropCapAvatar ────────────────────────────────────────────────────────────
+
+function DropCapAvatar({ letter, avatarData, dropCapImages, size = 36 }) {
+  const [imgErr, setImgErr] = useState(false);
+  const src = !imgErr ? dropCapSrc(letter, dropCapImages) : null;
+  const circleStyle = {
+    width: size, height: size, borderRadius: "50%", overflow: "hidden",
+    flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+  };
+  if (avatarData) {
+    return (
+      <div style={circleStyle}>
+        <img src={avatarData} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      </div>
+    );
+  }
+  if (src) {
+    return (
+      <div style={{ ...circleStyle, background: "#f0ece6" }}>
+        <img src={src} alt={letter?.toUpperCase()} onError={() => setImgErr(true)}
+          style={{ width: "72%", height: "72%", objectFit: "contain" }} />
+      </div>
+    );
+  }
+  return (
+    <div style={{ ...circleStyle, background: "var(--text)", color: "var(--bg)",
+      fontFamily: '"Cormorant Garamond", serif', fontSize: size * 0.44 }}>
+      {(letter || "?").toUpperCase()}
+    </div>
+  );
+}
 
 function Toasts({ toasts }) {
   if (!toasts.length) return null;
@@ -571,9 +636,11 @@ function Feed({ onRead, onHsModal, onAuthorClick }) {
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
-function Profile({ user, profile, localDocs, streak, onRead, onUnpublish, onSignIn, onSignOut }) {
-  const [pubs, setPubs]       = useState([]);
-  const [loading, setLoading] = useState(!!user);
+function Profile({ user, profile, localDocs, streak, dropCapImages, onRead, onUnpublish, onSignIn, onSignOut, onAvatarChange }) {
+  const [pubs, setPubs]           = useState([]);
+  const [loading, setLoading]     = useState(!!user);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef              = useRef(null);
 
   useEffect(() => {
     if (!user) { setPubs([]); setLoading(false); return; }
@@ -585,6 +652,16 @@ function Profile({ user, profile, localDocs, streak, onRead, onUnpublish, onSign
     await doUnpublish(pub.doc_id);
     setPubs(prev => prev.filter(p => p.id !== pub.id));
     if (onUnpublish) onUnpublish(pub.doc_id);
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    const data = await compressAvatar(file);
+    await onAvatarChange(data);
+    setUploading(false);
+    e.target.value = "";
   };
 
   if (!user) {
@@ -602,12 +679,18 @@ function Profile({ user, profile, localDocs, streak, onRead, onUnpublish, onSign
   }
 
   const totalWords = localDocs.reduce((sum, d) => sum + wordCount(d.content), 0);
-  const initial = user.email[0].toUpperCase();
+  const avatarLetter = profile?.username?.[0] || user.email[0];
 
   return (
     <div id="profile-container">
       <div id="profile-header">
-        <div id="profile-avatar">{initial}</div>
+        <div id="profile-avatar-wrap">
+          <DropCapAvatar letter={avatarLetter} avatarData={profile?.avatar_data} dropCapImages={dropCapImages} size={44} />
+          <button id="avatar-upload-btn" onClick={() => fileInputRef.current?.click()} title="Change photo">
+            {uploading ? "…" : "✎"}
+          </button>
+          <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFileChange} />
+        </div>
         <div id="profile-info">
           {profile?.username
             ? <div id="profile-username">@{profile.username}</div>
@@ -677,7 +760,7 @@ function Profile({ user, profile, localDocs, streak, onRead, onUnpublish, onSign
 
 // ─── SearchView ───────────────────────────────────────────────────────────────
 
-function SearchView({ onViewUser }) {
+function SearchView({ onViewUser, dropCapImages }) {
   const [query, setQuery]       = useState("");
   const [results, setResults]   = useState([]);
   const [loading, setLoading]   = useState(false);
@@ -716,7 +799,7 @@ function SearchView({ onViewUser }) {
         {!loading && !searched && <p className="feed-empty search-prompt">Search for a writer by username.</p>}
         {results.map(p => (
           <div key={p.id} className="user-card" onClick={() => onViewUser(p)}>
-            <div className="user-card-avatar">{(p.username || "?")[0].toUpperCase()}</div>
+            <DropCapAvatar letter={p.username?.[0]} avatarData={p.avatar_data} dropCapImages={dropCapImages} size={38} />
             <div className="user-card-info">
               <div className="user-card-username">@{p.username}</div>
               {p.display_name && <div className="user-card-name">{p.display_name}</div>}
@@ -730,7 +813,7 @@ function SearchView({ onViewUser }) {
 
 // ─── UserProfileView ──────────────────────────────────────────────────────────
 
-function UserProfileView({ profile, onRead }) {
+function UserProfileView({ profile, onRead, dropCapImages }) {
   const [pubs, setPubs]       = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -738,12 +821,10 @@ function UserProfileView({ profile, onRead }) {
     fetchUserPublications(profile.id).then(data => { setPubs(data); setLoading(false); });
   }, [profile.id]);
 
-  const initial = (profile.username || "?")[0].toUpperCase();
-
   return (
     <div id="user-profile-container">
       <div id="user-profile-header">
-        <div className="user-profile-avatar">{initial}</div>
+        <DropCapAvatar letter={profile.username?.[0]} avatarData={profile.avatar_data} dropCapImages={dropCapImages} size={44} />
         <div>
           <div id="user-profile-username">@{profile.username}</div>
           {profile.display_name && <div id="user-profile-name">{profile.display_name}</div>}
@@ -852,6 +933,7 @@ export default function App() {
   const [publishMenuOpen, setPublishMenuOpen] = useState(false);
   const [showTitleInput, setShowTitleInput] = useState(() => !!initDocs.find(d => d.id === initActiveId)?.title);
   const [profile, setProfile]         = useState(null);
+  const [dropCapImages, setDropCapImages] = useState({});
   const [usernameModalOpen, setUsernameModalOpen] = useState(false);
   const [viewingUser, setViewingUser] = useState(null);
 
@@ -880,6 +962,9 @@ export default function App() {
   useEffect(() => { docsRef.current = docs; }, [docs]);
   useEffect(() => { profileRef.current = profile; }, [profile]);
   useEffect(() => { localStorage.setItem("inkk_font", font); }, [font]);
+  useEffect(() => {
+    fetch("/drop_caps/manifest.json").then(r => r.json()).then(setDropCapImages).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (focusMode) document.body.classList.add("focus-mode");
@@ -895,6 +980,17 @@ export default function App() {
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 2800);
   }, []);
+
+  const handleAvatarChange = useCallback(async (avatarData) => {
+    if (!userRef.current) return;
+    const err = await updateAvatar(userRef.current.id, avatarData);
+    if (!err) {
+      setProfile(prev => prev ? { ...prev, avatar_data: avatarData } : prev);
+      addToast("Profile picture updated.");
+    } else {
+      addToast("Could not save picture.");
+    }
+  }, [addToast]);
 
   const IDLE_MS = 1200;
 
@@ -1564,17 +1660,19 @@ export default function App() {
           profile={profile}
           localDocs={docs}
           streak={streak}
+          dropCapImages={dropCapImages}
           onRead={pub => openReading(pub, "profile")}
           onUnpublish={docId => setPublishedDocIds(prev => { const s = new Set(prev); s.delete(docId); return s; })}
           onSignIn={() => setAuthOpen(true)}
           onSignOut={signOut}
+          onAvatarChange={handleAvatarChange}
         />
       )}
       {view === "search" && (
-        <SearchView onViewUser={p => openUserProfile(p, "search")} />
+        <SearchView onViewUser={p => openUserProfile(p, "search")} dropCapImages={dropCapImages} />
       )}
       {view === "userProfile" && viewingUser && (
-        <UserProfileView profile={viewingUser} onRead={pub => openReading(pub, "userProfile")} />
+        <UserProfileView profile={viewingUser} onRead={pub => openReading(pub, "userProfile")} dropCapImages={dropCapImages} />
       )}
       {view === "reading" && readingPub && <ReadingView pub={readingPub} font={font} />}
 
@@ -1598,7 +1696,12 @@ export default function App() {
             onClick={() => setView("profile")}
           >
             {user ? (
-              <div className="nav-avatar">{user.email[0].toUpperCase()}</div>
+              <DropCapAvatar
+                letter={profile?.username?.[0] || user.email[0]}
+                avatarData={profile?.avatar_data}
+                dropCapImages={dropCapImages}
+                size={22}
+              />
             ) : (
               <User size={18} strokeWidth={1.75} />
             )}
