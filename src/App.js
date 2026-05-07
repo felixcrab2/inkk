@@ -71,6 +71,15 @@ function isMobile() {
   );
 }
 
+async function fetchImageDimensions(url) {
+  return new Promise(resolve => {
+    const img = new window.Image();
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
 async function fetchBase64(url) {
   const res = await fetch(url);
   const buf = await res.arrayBuffer();
@@ -885,11 +894,15 @@ export default function App() {
   const profileRef             = useRef(null);
   const dropCapRef             = useRef({ char: extractDropCap(initDocs.find(d => d.id === initActiveId)?.content || "").char, index: 0 });
   const dropCapImagesRef       = useRef({});
+  const dropCapIndicesRef      = useRef({});   // { [docId]: { char, index } }
+  const activeIdRef            = useRef(initActiveId);
+  const syncedUserRef          = useRef(null);
 
   useEffect(() => { userRef.current = user; }, [user]);
   useEffect(() => { docsRef.current = docs; }, [docs]);
   useEffect(() => { profileRef.current = profile; }, [profile]);
   useEffect(() => { dropCapImagesRef.current = dropCapImages; }, [dropCapImages]);
+  useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
 
   useEffect(() => {
     fetch("/drop_caps/manifest.json")
@@ -924,9 +937,11 @@ export default function App() {
     titleRef.current = doc.title || "";
     if (titleEditorRef.current) titleEditorRef.current.value = doc.title || "";
     const { char, rest } = extractDropCap(doc.content);
+    const saved = dropCapIndicesRef.current[doc.id];
+    const restoredIndex = (saved && saved.char === char) ? saved.index : 0;
     setDropCapChar(char);
-    setDropCapIndex(0);
-    dropCapRef.current = { char, index: 0 };
+    setDropCapIndex(restoredIndex);
+    dropCapRef.current = { char, index: restoredIndex };
     contentRef.current = doc.content;
     el.innerText = rest;
     setWords(wordCount(doc.content));
@@ -948,6 +963,8 @@ export default function App() {
     if (!supabase) return;
 
     const syncOnLogin = async (signedInUser) => {
+      if (syncedUserRef.current === signedInUser.id) return;
+      syncedUserRef.current = signedInUser.id;
       setUser(signedInUser); userRef.current = signedInUser; setAuthOpen(false);
       const cloudDocs = await fetchCloudDocs();
       const saved = loadState();
@@ -984,7 +1001,7 @@ export default function App() {
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" && session?.user) syncOnLogin(session.user);
-      if (event === "SIGNED_OUT") { setUser(null); setPublishedDocIds(new Set()); setProfile(null); setUsernameModalOpen(false); }
+      if (event === "SIGNED_OUT") { syncedUserRef.current = null; setUser(null); setPublishedDocIds(new Set()); setProfile(null); setUsernameModalOpen(false); }
     });
     return () => subscription.unsubscribe();
   }, [loadDocIntoEditor]);
@@ -1154,7 +1171,7 @@ export default function App() {
       }
     }
 
-    const fullContent = (dropCapRef.current.char || "") + editorText;
+    const fullContent = (dropCapRef.current.char || "") + editorText.replace(/\n+$/, "");
     contentRef.current = fullContent;
     setWords(wordCount(fullContent));
     setMenuVisible(false);
@@ -1226,17 +1243,26 @@ export default function App() {
     const next = (index + 1) % images.length;
     setDropCapIndex(next);
     dropCapRef.current = { char, index: next };
+    dropCapIndicesRef.current[activeIdRef.current] = { char, index: next };
   }, []);
 
   const onEditorKeyDown = useCallback((e) => {
     if (e.key === "Backspace" && dropCapRef.current.char) {
       const el = editorRef.current;
-      if (el && !el.innerText.trim()) {
+      if (el && el.innerText.replace(/\n/g, "") === "") {
+        e.preventDefault();
+        const letter = dropCapRef.current.char.toUpperCase();
         setDropCapChar("");
         setDropCapIndex(0);
         dropCapRef.current = { char: "", index: 0 };
         contentRef.current = "";
         setWords(0);
+        el.innerText = letter;
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(false);
+        const sel = window.getSelection();
+        if (sel) { sel.removeAllRanges(); sel.addRange(range); }
       }
     }
   }, []);
@@ -1354,18 +1380,42 @@ export default function App() {
 
       if (pi === 0 && para.length > 0) {
         // ── drop cap ────────────────────────────────────────────────────────
-        const DROP_FS    = 62;
         const DROP_LINES = 3;
-        const dropChar   = para[0].toUpperCase();
         const restPara   = para.slice(1);
 
-        pdf.setFontSize(DROP_FS);
-        setC(C_BLACK);
-        const dropW      = pdf.getTextWidth(dropChar) + 5;
-        const dropBaseline = y + (DROP_LINES - 1) * LH;
-        pdf.text(dropChar, mx, dropBaseline);
+        const { char: dcChar, index: dcIndex } = dropCapRef.current;
+        const dcList   = dropCapImagesRef.current[dcChar] || [];
+        const dcImgSrc = dcChar && dcList.length > 0
+          ? `/drop_caps/${dcChar}/${dcList[dcIndex % dcList.length]}.png`
+          : null;
+
+        let dropW = 0;
+
+        if (dcImgSrc) {
+          try {
+            const dims = await fetchImageDimensions(dcImgSrc);
+            if (dims) {
+              const dropH = DROP_LINES * LH;
+              const imgW  = dims.w * (dropH / dims.h);
+              const dcB64 = await fetchBase64(dcImgSrc);
+              pdf.addImage("data:image/png;base64," + dcB64, "PNG", mx, y - 10, imgW, dropH);
+              dropW = imgW + 6;
+            }
+          } catch {}
+        }
+
+        if (!dropW) {
+          const DROP_FS  = 62;
+          const dropChar = para[0].toUpperCase();
+          pdf.setFontSize(DROP_FS);
+          setC(C_BLACK);
+          dropW = pdf.getTextWidth(dropChar) + 5;
+          pdf.text(dropChar, mx, y + (DROP_LINES - 1) * LH);
+          pdf.setFontSize(BFS);
+        }
 
         pdf.setFontSize(BFS);
+        setC(C_BLACK);
         const indentX    = mx + dropW;
         const indentW    = tW - dropW;
         const indented   = restPara.split("\n").flatMap(r => pdf.splitTextToSize(r || " ", indentW));
