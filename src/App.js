@@ -53,6 +53,12 @@ function docTitle(content) {
   return first.length > 0 ? first : "Untitled";
 }
 
+function extractDropCap(content) {
+  const fc = (content || "")[0] || "";
+  if (/[a-zA-Z]/.test(fc)) return { char: fc.toLowerCase(), rest: (content || "").slice(1) };
+  return { char: "", rest: content || "" };
+}
+
 function wordCount(content) {
   const t = (content || "").trim();
   return t ? t.split(/\s+/).length : 0;
@@ -852,6 +858,9 @@ export default function App() {
   const [publishMenuOpen, setPublishMenuOpen] = useState(false);
   const [showTitleInput, setShowTitleInput] = useState(() => !!initDocs.find(d => d.id === initActiveId)?.title);
   const [profile, setProfile]         = useState(null);
+  const [dropCapChar, setDropCapChar]   = useState(() => extractDropCap(initDocs.find(d => d.id === initActiveId)?.content || "").char);
+  const [dropCapIndex, setDropCapIndex] = useState(0);
+  const [dropCapImages, setDropCapImages] = useState({});
   const [usernameModalOpen, setUsernameModalOpen] = useState(false);
   const [viewingUser, setViewingUser] = useState(null);
 
@@ -874,10 +883,20 @@ export default function App() {
   const saveHintShownRef       = useRef(!!localStorage.getItem("inkk_save_hint"));
   const docsRef                = useRef(initDocs);
   const profileRef             = useRef(null);
+  const dropCapRef             = useRef({ char: extractDropCap(initDocs.find(d => d.id === initActiveId)?.content || "").char, index: 0 });
+  const dropCapImagesRef       = useRef({});
 
   useEffect(() => { userRef.current = user; }, [user]);
   useEffect(() => { docsRef.current = docs; }, [docs]);
   useEffect(() => { profileRef.current = profile; }, [profile]);
+  useEffect(() => { dropCapImagesRef.current = dropCapImages; }, [dropCapImages]);
+
+  useEffect(() => {
+    fetch("/drop_caps/manifest.json")
+      .then(r => r.json())
+      .then(data => setDropCapImages(data))
+      .catch(() => {});
+  }, []);
   useEffect(() => { localStorage.setItem("inkk_font", font); }, [font]);
 
   useEffect(() => {
@@ -904,8 +923,12 @@ export default function App() {
     if (!el) return;
     titleRef.current = doc.title || "";
     if (titleEditorRef.current) titleEditorRef.current.value = doc.title || "";
+    const { char, rest } = extractDropCap(doc.content);
+    setDropCapChar(char);
+    setDropCapIndex(0);
+    dropCapRef.current = { char, index: 0 };
     contentRef.current = doc.content;
-    el.innerText = doc.content;
+    el.innerText = rest;
     setWords(wordCount(doc.content));
     writingBaseRef.current = doc.writingTimeSecs || 0;
     writingFlushRef.current = 0;
@@ -1110,9 +1133,30 @@ export default function App() {
     }
     const el = editorRef.current;
     if (!el) return;
-    const text = el.innerText;
-    contentRef.current = text;
-    setWords(wordCount(text));
+    let editorText = el.innerText;
+
+    // First ever character typed — promote it to drop cap
+    if (!dropCapRef.current.char && editorText.length > 0) {
+      const fc = editorText[0];
+      if (/[a-zA-Z]/.test(fc)) {
+        const char = fc.toLowerCase();
+        setDropCapChar(char);
+        setDropCapIndex(0);
+        dropCapRef.current = { char, index: 0 };
+        editorText = editorText.slice(1);
+        el.innerText = editorText;
+        // restore cursor to start
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(true);
+        const sel = window.getSelection();
+        if (sel) { sel.removeAllRanges(); sel.addRange(range); }
+      }
+    }
+
+    const fullContent = (dropCapRef.current.char || "") + editorText;
+    contentRef.current = fullContent;
+    setWords(wordCount(fullContent));
     setMenuVisible(false);
 
     if (writingSessionStartRef.current === null) writingSessionStartRef.current = Date.now();
@@ -1126,7 +1170,7 @@ export default function App() {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
 
     const capturedId = activeId;
-    const capturedContent = text;
+    const capturedContent = contentRef.current;
     const capturedTitle = titleRef.current;
     saveTimerRef.current = setTimeout(() => {
       const capturedUpdatedAt = Date.now();
@@ -1171,6 +1215,31 @@ export default function App() {
       setSaveStatus("saved");
     }, 500);
   }, [activeId]);
+
+  // ─ drop cap ─────────────────────────────────────────────────────────────────
+
+  const cycleDropCap = useCallback(() => {
+    const { char, index } = dropCapRef.current;
+    if (!char) return;
+    const images = dropCapImagesRef.current[char];
+    if (!images || images.length === 0) return;
+    const next = (index + 1) % images.length;
+    setDropCapIndex(next);
+    dropCapRef.current = { char, index: next };
+  }, []);
+
+  const onEditorKeyDown = useCallback((e) => {
+    if (e.key === "Backspace" && dropCapRef.current.char) {
+      const el = editorRef.current;
+      if (el && !el.innerText.trim()) {
+        setDropCapChar("");
+        setDropCapIndex(0);
+        dropCapRef.current = { char: "", index: 0 };
+        contentRef.current = "";
+        setWords(0);
+      }
+    }
+  }, []);
 
   // ─ PDF export ───────────────────────────────────────────────────────────────
 
@@ -1357,7 +1426,8 @@ export default function App() {
       setShowTitleInput(!!doc.title);
       const el = editorRef.current;
       if (el) {
-        el.innerText = doc.content;
+        const { rest } = extractDropCap(doc.content);
+        el.innerText = rest;
         if (!isMobileRef.current && localStorage.getItem("inkk_visited")) el.focus();
       }
     }
@@ -1377,6 +1447,11 @@ export default function App() {
 
   const isEditor  = view === "editor";
   const menuClass = menuVisible ? "menu-visible" : "menu-hidden";
+
+  const dropCapList = dropCapImages[dropCapChar] || [];
+  const dropCapSrc  = dropCapChar && dropCapList.length > 0
+    ? `/drop_caps/${dropCapChar}/${dropCapList[dropCapIndex % dropCapList.length]}.png`
+    : null;
 
   const activeDoc    = docs.find(d => d.id === activeId);
   const liveRevCount = activeDoc?.revisionCount || 0;
@@ -1556,17 +1631,32 @@ export default function App() {
             add title
           </button>
         )}
-        <div
-          id="text"
-          ref={editorRef}
-          className={font === "arial" ? "font-arial" : ""}
-          contentEditable
-          suppressContentEditableWarning
-          spellCheck={false}
-          autoCorrect="off"
-          autoCapitalize="off"
-          onInput={onInput}
-        />
+        <div id="writing-area">
+          {dropCapSrc && (
+            <img
+              id="drop-cap-editor"
+              src={dropCapSrc}
+              alt={dropCapChar.toUpperCase()}
+              draggable={false}
+              onClick={cycleDropCap}
+              onMouseDown={e => e.preventDefault()}
+              title="Click to change drop cap"
+            />
+          )}
+          <div
+            id="text"
+            ref={editorRef}
+            className={font === "arial" ? "font-arial" : ""}
+            contentEditable
+            suppressContentEditableWarning
+            spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="off"
+            onInput={onInput}
+            onKeyDown={onEditorKeyDown}
+          />
+          {dropCapSrc && <div style={{ clear: "both" }} />}
+        </div>
       </div>
 
       {/* ── views ── */}
