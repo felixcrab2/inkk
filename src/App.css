@@ -143,6 +143,24 @@ body {
 }
 #publish-btn:hover { opacity: 0.8; }
 
+#pdf-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  font-family: "EB Garamond", serif;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  padding: 5px 12px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+#pdf-btn:hover { color: var(--text); border-color: #aaa; }
+
 .btn-label { font-family: "EB Garamond", serif; }
 
 /* ─── Publish dropdown ────────────────────────────────────────────────────── */
