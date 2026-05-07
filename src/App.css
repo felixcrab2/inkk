@@ -499,19 +499,6 @@ body.focus-mode #text-container {
   min-width: 200px;
 }
 
-#drop-cap-editor {
-  float: left;
-  height: 5.4rem;
-  width: auto;
-  margin-right: 10px;
-  margin-bottom: 2px;
-  cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
-  display: block;
-}
-#drop-cap-editor:hover { opacity: 0.75; }
-
 #text {
   width: 100%;
   min-width: 0;
@@ -1124,15 +1111,6 @@ body.focus-mode #text-container {
 
 #reading-text.font-arial { font-family: Arial, sans-serif; }
 
-#reading-text::first-letter {
-  font-family: "Cormorant Garamond", serif;
-  font-style: italic;
-  font-size: 4em;
-  float: left;
-  line-height: 0.82;
-  margin-right: 7px;
-  padding-top: 3px;
-}
 
 /* ─── Auth modal ──────────────────────────────────────────────────────────── */
 #auth-overlay {

@@ -53,12 +53,6 @@ function docTitle(content) {
   return first.length > 0 ? first : "Untitled";
 }
 
-function extractDropCap(content) {
-  const fc = (content || "")[0] || "";
-  if (/[a-zA-Z]/.test(fc)) return { char: fc.toLowerCase(), rest: (content || "").slice(1) };
-  return { char: "", rest: content || "" };
-}
-
 function wordCount(content) {
   const t = (content || "").trim();
   return t ? t.split(/\s+/).length : 0;
@@ -69,15 +63,6 @@ function isMobile() {
     typeof navigator !== "undefined" &&
     (navigator.maxTouchPoints > 0 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent))
   );
-}
-
-async function fetchImageDimensions(url) {
-  return new Promise(resolve => {
-    const img = new window.Image();
-    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
-    img.onerror = () => resolve(null);
-    img.src = url;
-  });
 }
 
 async function fetchBase64(url) {
@@ -867,9 +852,6 @@ export default function App() {
   const [publishMenuOpen, setPublishMenuOpen] = useState(false);
   const [showTitleInput, setShowTitleInput] = useState(() => !!initDocs.find(d => d.id === initActiveId)?.title);
   const [profile, setProfile]         = useState(null);
-  const [dropCapChar, setDropCapChar]   = useState(() => extractDropCap(initDocs.find(d => d.id === initActiveId)?.content || "").char);
-  const [dropCapIndex, setDropCapIndex] = useState(0);
-  const [dropCapImages, setDropCapImages] = useState({});
   const [usernameModalOpen, setUsernameModalOpen] = useState(false);
   const [viewingUser, setViewingUser] = useState(null);
 
@@ -892,24 +874,11 @@ export default function App() {
   const saveHintShownRef       = useRef(!!localStorage.getItem("inkk_save_hint"));
   const docsRef                = useRef(initDocs);
   const profileRef             = useRef(null);
-  const dropCapRef             = useRef({ char: extractDropCap(initDocs.find(d => d.id === initActiveId)?.content || "").char, index: 0 });
-  const dropCapImagesRef       = useRef({});
-  const dropCapIndicesRef      = useRef({});   // { [docId]: { char, index } }
-  const activeIdRef            = useRef(initActiveId);
   const syncedUserRef          = useRef(null);
 
   useEffect(() => { userRef.current = user; }, [user]);
   useEffect(() => { docsRef.current = docs; }, [docs]);
   useEffect(() => { profileRef.current = profile; }, [profile]);
-  useEffect(() => { dropCapImagesRef.current = dropCapImages; }, [dropCapImages]);
-  useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
-
-  useEffect(() => {
-    fetch("/drop_caps/manifest.json")
-      .then(r => r.json())
-      .then(data => setDropCapImages(data))
-      .catch(() => {});
-  }, []);
   useEffect(() => { localStorage.setItem("inkk_font", font); }, [font]);
 
   useEffect(() => {
@@ -936,14 +905,8 @@ export default function App() {
     if (!el) return;
     titleRef.current = doc.title || "";
     if (titleEditorRef.current) titleEditorRef.current.value = doc.title || "";
-    const { char, rest } = extractDropCap(doc.content);
-    const saved = dropCapIndicesRef.current[doc.id];
-    const restoredIndex = (saved && saved.char === char) ? saved.index : 0;
-    setDropCapChar(char);
-    setDropCapIndex(restoredIndex);
-    dropCapRef.current = { char, index: restoredIndex };
     contentRef.current = doc.content;
-    el.innerText = rest;
+    el.innerText = doc.content;
     setWords(wordCount(doc.content));
     writingBaseRef.current = doc.writingTimeSecs || 0;
     writingFlushRef.current = 0;
@@ -1150,28 +1113,9 @@ export default function App() {
     }
     const el = editorRef.current;
     if (!el) return;
-    let editorText = el.innerText;
+    const editorText = el.innerText;
 
-    // First ever character typed — promote it to drop cap
-    if (!dropCapRef.current.char && editorText.length > 0) {
-      const fc = editorText[0];
-      if (/[a-zA-Z]/.test(fc)) {
-        const char = fc.toLowerCase();
-        setDropCapChar(char);
-        setDropCapIndex(0);
-        dropCapRef.current = { char, index: 0 };
-        editorText = editorText.slice(1);
-        el.innerText = editorText;
-        // restore cursor to start
-        const range = document.createRange();
-        range.selectNodeContents(el);
-        range.collapse(true);
-        const sel = window.getSelection();
-        if (sel) { sel.removeAllRanges(); sel.addRange(range); }
-      }
-    }
-
-    const fullContent = (dropCapRef.current.char || "") + editorText.replace(/\n+$/, "");
+    const fullContent = editorText.replace(/\n+$/, "");
     contentRef.current = fullContent;
     setWords(wordCount(fullContent));
     setMenuVisible(false);
@@ -1233,39 +1177,6 @@ export default function App() {
     }, 500);
   }, [activeId]);
 
-  // ─ drop cap ─────────────────────────────────────────────────────────────────
-
-  const cycleDropCap = useCallback(() => {
-    const { char, index } = dropCapRef.current;
-    if (!char) return;
-    const images = dropCapImagesRef.current[char];
-    if (!images || images.length === 0) return;
-    const next = (index + 1) % images.length;
-    setDropCapIndex(next);
-    dropCapRef.current = { char, index: next };
-    dropCapIndicesRef.current[activeIdRef.current] = { char, index: next };
-  }, []);
-
-  const onEditorKeyDown = useCallback((e) => {
-    if (e.key === "Backspace" && dropCapRef.current.char) {
-      const el = editorRef.current;
-      if (el && el.innerText.replace(/\n/g, "") === "") {
-        e.preventDefault();
-        const letter = dropCapRef.current.char.toUpperCase();
-        setDropCapChar("");
-        setDropCapIndex(0);
-        dropCapRef.current = { char: "", index: 0 };
-        contentRef.current = "";
-        setWords(0);
-        el.innerText = letter;
-        const range = document.createRange();
-        range.selectNodeContents(el);
-        range.collapse(false);
-        const sel = window.getSelection();
-        if (sel) { sel.removeAllRanges(); sel.addRange(range); }
-      }
-    }
-  }, []);
 
   // ─ PDF export ───────────────────────────────────────────────────────────────
 
@@ -1378,59 +1289,8 @@ export default function App() {
     for (let pi = 0; pi < bodyParas.length; pi++) {
       const para = bodyParas[pi];
 
-      if (pi === 0 && para.length > 0) {
-        // ── drop cap ────────────────────────────────────────────────────────
-        const DROP_LINES = 3;
-        const restPara   = para.slice(1);
-
-        const { char: dcChar, index: dcIndex } = dropCapRef.current;
-        const dcList   = dropCapImagesRef.current[dcChar] || [];
-        const dcImgSrc = dcChar && dcList.length > 0
-          ? `/drop_caps/${dcChar}/${dcList[dcIndex % dcList.length]}.png`
-          : null;
-
-        let dropW = 0;
-
-        if (dcImgSrc) {
-          try {
-            const dims = await fetchImageDimensions(dcImgSrc);
-            if (dims) {
-              const dropH = DROP_LINES * LH;
-              const imgW  = dims.w * (dropH / dims.h);
-              const dcB64 = await fetchBase64(dcImgSrc);
-              pdf.addImage("data:image/png;base64," + dcB64, "PNG", mx, y - 10, imgW, dropH);
-              dropW = imgW + 6;
-            }
-          } catch {}
-        }
-
-        if (!dropW) {
-          const DROP_FS  = 62;
-          const dropChar = para[0].toUpperCase();
-          pdf.setFontSize(DROP_FS);
-          setC(C_BLACK);
-          dropW = pdf.getTextWidth(dropChar) + 5;
-          pdf.text(dropChar, mx, y + (DROP_LINES - 1) * LH);
-          pdf.setFontSize(BFS);
-        }
-
-        pdf.setFontSize(BFS);
-        setC(C_BLACK);
-        const indentX    = mx + dropW;
-        const indentW    = tW - dropW;
-        const indented   = restPara.split("\n").flatMap(r => pdf.splitTextToSize(r || " ", indentW));
-        const beside     = indented.slice(0, DROP_LINES);
-        const after      = indented.slice(DROP_LINES);
-
-        for (let i = 0; i < beside.length; i++) {
-          if (beside[i].trim()) pdf.text(beside[i], indentX, y + i * LH);
-        }
-        y += Math.max(beside.length, DROP_LINES) * LH;
-        renderLines(after, mx);
-      } else {
-        const lines = para.split("\n").flatMap(r => pdf.splitTextToSize(r || " ", tW));
-        renderLines(lines, mx);
-      }
+      const lines = para.split("\n").flatMap(r => pdf.splitTextToSize(r || " ", tW));
+      renderLines(lines, mx);
 
       if (pi < bodyParas.length - 1) y += PGAP;
     }
@@ -1476,8 +1336,7 @@ export default function App() {
       setShowTitleInput(!!doc.title);
       const el = editorRef.current;
       if (el) {
-        const { rest } = extractDropCap(doc.content);
-        el.innerText = rest;
+        el.innerText = doc.content;
         if (!isMobileRef.current && localStorage.getItem("inkk_visited")) el.focus();
       }
     }
@@ -1497,11 +1356,6 @@ export default function App() {
 
   const isEditor  = view === "editor";
   const menuClass = menuVisible ? "menu-visible" : "menu-hidden";
-
-  const dropCapList = dropCapImages[dropCapChar] || [];
-  const dropCapSrc  = dropCapChar && dropCapList.length > 0
-    ? `/drop_caps/${dropCapChar}/${dropCapList[dropCapIndex % dropCapList.length]}.png`
-    : null;
 
   const activeDoc    = docs.find(d => d.id === activeId);
   const liveRevCount = activeDoc?.revisionCount || 0;
@@ -1682,17 +1536,6 @@ export default function App() {
           </button>
         )}
         <div id="writing-area">
-          {dropCapSrc && (
-            <img
-              id="drop-cap-editor"
-              src={dropCapSrc}
-              alt={dropCapChar.toUpperCase()}
-              draggable={false}
-              onClick={cycleDropCap}
-              onMouseDown={e => e.preventDefault()}
-              title="Click to change drop cap"
-            />
-          )}
           <div
             id="text"
             ref={editorRef}
@@ -1703,9 +1546,7 @@ export default function App() {
             autoCorrect="off"
             autoCapitalize="off"
             onInput={onInput}
-            onKeyDown={onEditorKeyDown}
           />
-          {dropCapSrc && <div style={{ clear: "both" }} />}
         </div>
       </div>
 
