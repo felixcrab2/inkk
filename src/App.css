@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=EB+Garamond&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400&display=swap");
 
 /* ─── Design tokens ───────────────────────────────────────────────────────── */
 :root {
@@ -24,7 +24,7 @@ html, body, #root {
 
 body {
   background: var(--bg);
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior: none;
@@ -54,7 +54,7 @@ body {
 }
 
 #landing-headline {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 2.2rem;
   color: var(--text);
   letter-spacing: -0.01em;
@@ -72,7 +72,7 @@ body {
 }
 
 #landing-subtitle {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 1rem;
   color: var(--muted);
   line-height: 1.7;
@@ -101,7 +101,7 @@ body {
 #top-bar-right { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 
 #brand {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 1.15rem;
   font-weight: 500;
   color: var(--text);
@@ -132,7 +132,7 @@ body {
   background: var(--text);
   color: var(--bg);
   border: none;
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.82rem;
   letter-spacing: 0.04em;
   padding: 5px 12px;
@@ -150,7 +150,7 @@ body {
   background: none;
   color: var(--muted);
   border: 1px solid var(--border);
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.82rem;
   letter-spacing: 0.04em;
   padding: 5px 12px;
@@ -161,7 +161,7 @@ body {
 }
 #pdf-btn:hover { color: var(--text); border-color: #aaa; }
 
-.btn-label { font-family: "EB Garamond", serif; }
+.btn-label { font-family: "Cormorant Garamond", serif; }
 
 /* ─── Publish dropdown ────────────────────────────────────────────────────── */
 #publish-menu-wrap {
@@ -196,7 +196,7 @@ body {
   border: none;
   border-radius: 5px;
   font-size: 0.82rem;
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   letter-spacing: 0.02em;
   color: var(--text);
   cursor: pointer;
@@ -238,7 +238,7 @@ body {
 .nav-tab.active { color: var(--text); }
 
 .nav-label {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.68rem;
   letter-spacing: 0.05em;
 }
@@ -249,7 +249,7 @@ body {
   border-radius: 50%;
   background: var(--text);
   color: var(--bg);
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.75rem;
   display: flex;
   align-items: center;
@@ -313,7 +313,7 @@ body.focus-mode #text-container {
   border: none;
   border-bottom: 1px solid var(--border);
   width: 100%;
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.9rem;
   color: var(--muted);
   text-align: left;
@@ -341,7 +341,7 @@ body.focus-mode #text-container {
 
 .doc-item-title {
   display: block;
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.93rem;
   color: var(--text);
   white-space: nowrap;
@@ -352,7 +352,7 @@ body.focus-mode #text-container {
 
 .doc-item-meta {
   display: block;
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.72rem;
   color: var(--subtle);
   margin-top: 1px;
@@ -397,7 +397,7 @@ body.focus-mode #text-container {
   gap: 6px;
   background: none;
   border: none;
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.82rem;
   color: var(--muted);
   cursor: pointer;
@@ -423,7 +423,7 @@ body.focus-mode #text-container {
 }
 
 #hs-status-label {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.72rem;
   color: #c0bfbc;
   letter-spacing: 0.05em;
@@ -431,7 +431,7 @@ body.focus-mode #text-container {
 }
 
 #hs-status-sub {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.65rem;
   color: #d0ceca;
   letter-spacing: 0.04em;
@@ -463,7 +463,7 @@ body.focus-mode #text-container {
   background: none;
   border: none;
   outline: none;
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 1.5rem;
   color: var(--text);
   padding: 0 8px;
@@ -478,7 +478,7 @@ body.focus-mode #text-container {
 #add-title-btn {
   background: none;
   border: none;
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.78rem;
   color: #d0ceca;
   cursor: pointer;
@@ -495,7 +495,7 @@ body.focus-mode #text-container {
   min-width: 200px;
   white-space: pre-wrap;
   overflow-wrap: break-word;
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 1.2rem;
   line-height: 1.55;
   color: var(--text);
@@ -548,7 +548,7 @@ body.focus-mode #text-container {
 }
 
 #feed-title {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 1.5rem;
   font-weight: 400;
   color: var(--text);
@@ -559,7 +559,7 @@ body.focus-mode #text-container {
 #hs-link {
   background: none;
   border: none;
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.82rem;
   color: #bbbab6;
   cursor: pointer;
@@ -576,7 +576,7 @@ body.focus-mode #text-container {
 }
 
 .feed-empty {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 1rem;
   color: var(--subtle);
   text-align: center;
@@ -603,7 +603,7 @@ body.focus-mode #text-container {
 }
 
 .pub-author-btn {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.82rem;
   color: var(--muted);
   background: none;
@@ -613,12 +613,12 @@ body.focus-mode #text-container {
   transition: color 0.15s;
 }
 .pub-author-btn:hover { color: var(--text); text-decoration: underline; }
-.pub-dot    { font-family: "EB Garamond", serif; font-size: 0.82rem; color: #d0ceca; }
-.pub-date   { font-family: "EB Garamond", serif; font-size: 0.82rem; color: var(--subtle); }
-.pub-read-time { font-family: "EB Garamond", serif; font-size: 0.82rem; color: var(--subtle); }
+.pub-dot    { font-family: "Cormorant Garamond", serif; font-size: 0.82rem; color: #d0ceca; }
+.pub-date   { font-family: "Cormorant Garamond", serif; font-size: 0.82rem; color: var(--subtle); }
+.pub-read-time { font-family: "Cormorant Garamond", serif; font-size: 0.82rem; color: var(--subtle); }
 
 .pub-card-title {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 1.25rem;
   font-weight: 400;
   color: var(--text);
@@ -627,7 +627,7 @@ body.focus-mode #text-container {
 }
 
 .pub-card-preview {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.93rem;
   color: #999;
   margin: 0 0 8px;
@@ -635,7 +635,7 @@ body.focus-mode #text-container {
 }
 
 .pub-card-words {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.78rem;
   color: var(--subtle);
 }
@@ -643,7 +643,7 @@ body.focus-mode #text-container {
 .pub-remove {
   background: none;
   border: none;
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.78rem;
   color: #d0ceca;
   cursor: pointer;
@@ -672,7 +672,7 @@ body.focus-mode #text-container {
 .hs-badge-dot[data-status="strong"]    { background: #3a3a3a; }
 
 .hs-badge-text {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.78rem;
   color: #aaa;
   letter-spacing: 0.02em;
@@ -708,7 +708,7 @@ body.focus-mode #text-container {
 }
 
 #profile-signin-title {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 1.4rem;
   font-weight: 400;
   color: var(--text);
@@ -716,7 +716,7 @@ body.focus-mode #text-container {
 }
 
 #profile-signin-sub {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.97rem;
   color: var(--muted);
   line-height: 1.6;
@@ -728,7 +728,7 @@ body.focus-mode #text-container {
   background: var(--text);
   color: var(--bg);
   border: none;
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 1rem;
   padding: 11px;
   cursor: pointer;
@@ -744,7 +744,7 @@ body.focus-mode #text-container {
   background: none;
   color: var(--muted);
   border: 1px solid var(--border);
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 1rem;
   padding: 11px;
   cursor: pointer;
@@ -769,7 +769,7 @@ body.focus-mode #text-container {
   border-radius: 50%;
   background: var(--text);
   color: var(--bg);
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 1.2rem;
   display: flex;
   align-items: center;
@@ -778,13 +778,13 @@ body.focus-mode #text-container {
 }
 
 #profile-email {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.97rem;
   color: var(--text);
 }
 
 #profile-joined {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.8rem;
   color: var(--subtle);
   margin-top: 2px;
@@ -811,14 +811,14 @@ body.focus-mode #text-container {
 .stat-chip-icon { font-size: 0.85rem; }
 
 .stat-chip-value {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 1rem;
   color: var(--text);
   font-weight: 400;
 }
 
 .stat-chip-label {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.78rem;
   color: var(--muted);
   letter-spacing: 0.02em;
@@ -827,7 +827,7 @@ body.focus-mode #text-container {
 #profile-section-label {
   width: 100%;
   max-width: 520px;
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.8rem;
   color: var(--subtle);
   letter-spacing: 0.06em;
@@ -846,7 +846,7 @@ body.focus-mode #text-container {
   max-width: 520px;
   background: none;
   border: none;
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.9rem;
   color: var(--subtle);
   cursor: pointer;
@@ -859,7 +859,7 @@ body.focus-mode #text-container {
 #signout-btn:hover { color: var(--text); }
 
 #profile-username {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 1.1rem;
   color: var(--text);
   letter-spacing: 0.01em;
@@ -897,7 +897,7 @@ body.focus-mode #text-container {
   flex: 1;
   background: none;
   border: none;
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 1rem;
   color: var(--text);
   outline: none;
@@ -944,7 +944,7 @@ body.focus-mode #text-container {
   border-radius: 50%;
   background: var(--text);
   color: var(--bg);
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 1rem;
   display: flex;
   align-items: center;
@@ -953,13 +953,13 @@ body.focus-mode #text-container {
 }
 
 .user-card-username {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.97rem;
   color: var(--text);
 }
 
 .user-card-name {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.82rem;
   color: var(--muted);
   margin-top: 1px;
@@ -995,7 +995,7 @@ body.focus-mode #text-container {
   border-radius: 50%;
   background: var(--text);
   color: var(--bg);
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 1.2rem;
   display: flex;
   align-items: center;
@@ -1004,13 +1004,13 @@ body.focus-mode #text-container {
 }
 
 #user-profile-username {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 1.1rem;
   color: var(--text);
 }
 
 #user-profile-name {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.85rem;
   color: var(--muted);
   margin-top: 2px;
@@ -1054,7 +1054,7 @@ body.focus-mode #text-container {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.82rem;
   color: #aaa;
   letter-spacing: 0.02em;
@@ -1079,7 +1079,7 @@ body.focus-mode #text-container {
 #reading-copy:hover { color: var(--text); }
 
 #reading-headline {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 1.9rem;
   font-weight: 400;
   color: var(--text);
@@ -1093,7 +1093,7 @@ body.focus-mode #text-container {
 #reading-text {
   white-space: pre-wrap;
   overflow-wrap: break-word;
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 1.18rem;
   line-height: 1.65;
   color: var(--text);
@@ -1108,7 +1108,7 @@ body.focus-mode #text-container {
   line-height: 0.74;
   margin-right: 6px;
   padding-top: 5px;
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
 }
 
 /* ─── Auth modal ──────────────────────────────────────────────────────────── */
@@ -1145,7 +1145,7 @@ body.focus-mode #text-container {
 
 #auth-tabs button {
   background: none; border: none;
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 1.05rem; color: #ccc;
   cursor: pointer; padding: 0;
   letter-spacing: 0.01em; transition: color 0.15s;
@@ -1155,7 +1155,7 @@ body.focus-mode #text-container {
 #auth-modal form { display: flex; flex-direction: column; }
 
 #auth-modal input {
-  font-family: "EB Garamond", serif; font-size: 1rem;
+  font-family: "Cormorant Garamond", serif; font-size: 1rem;
   border: none; border-bottom: 1px solid #e0ded9;
   background: transparent; padding: 8px 0; margin-bottom: 14px;
   outline: none; color: var(--text); transition: border-color 0.15s;
@@ -1164,13 +1164,13 @@ body.focus-mode #text-container {
 #auth-modal input:focus { border-bottom-color: #888; }
 
 .auth-error {
-  font-family: "EB Garamond", serif; font-size: 0.85rem;
+  font-family: "Cormorant Garamond", serif; font-size: 0.85rem;
   color: #b94040; margin: -6px 0 10px;
 }
 
 #auth-submit {
   background: var(--text); color: var(--bg);
-  border: none; font-family: "EB Garamond", serif;
+  border: none; font-family: "Cormorant Garamond", serif;
   font-size: 1rem; letter-spacing: 0.03em;
   padding: 10px; cursor: pointer; margin-top: 2px;
   transition: opacity 0.15s; border-radius: 2px;
@@ -1186,13 +1186,13 @@ body.focus-mode #text-container {
   left: 0; right: 0; top: 50%; height: 1px; background: #e8e5e1;
 }
 #auth-divider span {
-  position: relative; font-family: "EB Garamond", serif;
+  position: relative; font-family: "Cormorant Garamond", serif;
   font-size: 0.8rem; color: #ccc; background: var(--bg); padding: 0 10px;
 }
 
 #google-btn {
   background: none; border: 1px solid #dedad4;
-  font-family: "EB Garamond", serif; font-size: 1rem;
+  font-family: "Cormorant Garamond", serif; font-size: 1rem;
   color: #555; padding: 9px; cursor: pointer;
   letter-spacing: 0.02em; transition: border-color 0.15s, color 0.15s;
   border-radius: 2px;
@@ -1200,19 +1200,19 @@ body.focus-mode #text-container {
 #google-btn:hover { border-color: #aaa; color: var(--text); }
 
 #auth-message {
-  font-family: "EB Garamond", serif; font-size: 1rem;
+  font-family: "Cormorant Garamond", serif; font-size: 1rem;
   color: #666; text-align: center; padding: 24px 0; line-height: 1.6;
 }
 
 /* ─── Human Signal modal ──────────────────────────────────────────────────── */
 #hs-modal-title {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 1.15rem; color: var(--text);
   margin-bottom: 20px; letter-spacing: 0.01em;
 }
 
 #hs-modal-body {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.97rem; color: #666;
   line-height: 1.7; margin: 0;
 }
@@ -1232,7 +1232,7 @@ body.focus-mode #text-container {
 }
 
 .toast {
-  font-family: "EB Garamond", serif;
+  font-family: "Cormorant Garamond", serif;
   font-size: 0.9rem;
   color: var(--bg);
   background: var(--text);

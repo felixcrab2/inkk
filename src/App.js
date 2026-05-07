@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
-import "@fontsource/eb-garamond/400.css";
+import "@fontsource/cormorant-garamond/400.css";
 import { jsPDF } from "jspdf";
-import garamondTTF from "./assets/EBGaramond-Regular.ttf";
+import cormorantTTF from "./assets/CormorantGaramond-Regular.ttf";
 import { supabase } from "./supabase";
 import {
   Menu, ArrowLeft, PenLine, Globe, User,
@@ -1190,10 +1190,10 @@ export default function App() {
 
     // page geometry
     const pdf = new jsPDF({ unit: "pt", format: "a4" });
-    const b64 = await fetchBase64(garamondTTF);
-    pdf.addFileToVFS("EBGaramond-Regular.ttf", b64);
-    pdf.addFont("EBGaramond-Regular.ttf", "EBGaramond", "normal");
-    pdf.setFont("EBGaramond", "normal");
+    const b64 = await fetchBase64(cormorantTTF);
+    pdf.addFileToVFS("CormorantGaramond-Regular.ttf", b64);
+    pdf.addFont("CormorantGaramond-Regular.ttf", "CormorantGaramond", "normal");
+    pdf.setFont("CormorantGaramond", "normal");
 
     const pW = pdf.internal.pageSize.getWidth();   // 595.28
     const pH = pdf.internal.pageSize.getHeight();  // 841.89
@@ -1212,7 +1212,7 @@ export default function App() {
 
     let pageNum = 1;
     const drawFooter = () => {
-      pdf.setFont("EBGaramond", "normal");
+      pdf.setFont("CormorantGaramond", "normal");
       pdf.setFontSize(8);
       setC(C_FAINT);
       pdf.text("inkk.", mx, footerY);
@@ -1222,7 +1222,7 @@ export default function App() {
     const newPage = () => {
       drawFooter();
       pdf.addPage();
-      pdf.setFont("EBGaramond", "normal");
+      pdf.setFont("CormorantGaramond", "normal");
     };
 
     // ── title block ──────────────────────────────────────────────────────────
