@@ -138,6 +138,15 @@ function pubPreview(content) {
   return body.length > 140 ? body.slice(0, 140).trimEnd() + "…" : body;
 }
 
+function openingLine(content) {
+  const lines = (content || "").trim().split("\n").filter(l => l.trim());
+  const body = lines.slice(1).join(" ").trim();
+  if (!body) return "";
+  const m = body.match(/^(.{20,160}?[.!?])(?:\s|$)/);
+  if (m) return m[1];
+  return body.length > 140 ? body.slice(0, 140).trimEnd() + "…" : body;
+}
+
 function formatJoined(isoOrDate) {
   if (!isoOrDate) return "";
   return new Date(isoOrDate).toLocaleDateString("en-GB", { month: "long", year: "numeric" });
@@ -619,7 +628,7 @@ function PublishModal({ doc, user, profile, onConfirm, onClose }) {
 
 // ─── Feed ─────────────────────────────────────────────────────────────────────
 
-function Feed({ onRead, onHsModal, onAuthorClick }) {
+function Feed({ onRead, onHsModal, onAuthorClick, dropCapImages }) {
   const [pubs, setPubs]       = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -638,32 +647,35 @@ function Feed({ onRead, onHsModal, onAuthorClick }) {
         {!loading && pubs.length === 0 && (
           <p className="feed-empty">nothing published yet — be the first.</p>
         )}
-        {pubs.map(pub => (
-          <article key={pub.id} className="pub-card" onClick={() => onRead(pub)}>
-            <div className="pub-card-meta">
-              <button className="pub-author-btn" onClick={e => { e.stopPropagation(); if (pub.user_id) onAuthorClick(pub.user_id); }}>
-                {pub.author_name}
-              </button>
-              <span className="pub-dot">·</span>
-              <span className="pub-date">{formatDate(pub.published_at)}</span>
-              <span className="pub-dot">·</span>
-              <span className="pub-read-time">{readingTime(pub.content)}</span>
-            </div>
-            <h2 className="pub-card-title">{pub.title}</h2>
-            {pubPreview(pub.content) && (
-              <p className="pub-card-preview">{pubPreview(pub.content)}</p>
-            )}
-            {(pub.writing_time_seconds > 0 || pub.revision_count > 0) ? (
-              <HumanSignalBadge
-                writingTimeSecs={pub.writing_time_seconds}
-                revisionCount={pub.revision_count}
-                content={pub.content}
-              />
-            ) : (
-              <span className="pub-card-words">{wordCount(pub.content)} words</span>
-            )}
-          </article>
-        ))}
+        {pubs.map((pub, i) => {
+          const hook = openingLine(pub.content);
+          const avatarLetter = pub.author_name?.[0] || "?";
+          return (
+            <article key={pub.id} className="pub-card" style={{ "--card-index": i }} onClick={() => onRead(pub)}>
+              <div className="pub-card-meta">
+                <DropCapAvatar letter={avatarLetter} avatarData={pub.avatar_data} dropCapImages={dropCapImages} size={22} />
+                <button className="pub-author-btn" onClick={e => { e.stopPropagation(); if (pub.user_id) onAuthorClick(pub.user_id); }}>
+                  {pub.author_name}
+                </button>
+                <span className="pub-dot">·</span>
+                <span className="pub-date">{formatDate(pub.published_at)}</span>
+                <span className="pub-dot">·</span>
+                <span className="pub-read-time">{readingTime(pub.content)}</span>
+              </div>
+              <h2 className="pub-card-title">{pub.title}</h2>
+              {hook && <p className="pub-card-opening">{hook}</p>}
+              {(pub.writing_time_seconds > 0 || pub.revision_count > 0) ? (
+                <HumanSignalBadge
+                  writingTimeSecs={pub.writing_time_seconds}
+                  revisionCount={pub.revision_count}
+                  content={pub.content}
+                />
+              ) : (
+                <span className="pub-card-words">{wordCount(pub.content)} words</span>
+              )}
+            </article>
+          );
+        })}
       </div>
     </div>
   );
@@ -1724,6 +1736,7 @@ export default function App() {
           onRead={openReading}
           onHsModal={() => setHsModalOpen(true)}
           onAuthorClick={openUserProfile}
+          dropCapImages={dropCapImages}
         />
       )}
       {view === "profile" && (

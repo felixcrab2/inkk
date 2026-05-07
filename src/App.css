@@ -466,15 +466,14 @@ body.focus-mode #text-container {
   border: none;
   outline: none;
   font-family: "Cormorant Garamond", serif;
-  font-weight: 600;
-  font-size: 1.5rem;
+  font-weight: 400;
+  font-size: 1.85rem;
   color: var(--text);
   padding: 0 8px;
   margin-bottom: 28px;
-  line-height: 1.3;
-  letter-spacing: 0.02em;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
   text-align: center;
-  text-transform: uppercase;
 }
 #title-input::placeholder { color: #d8d5d0; }
 #title-input.font-arial { font-family: Arial, sans-serif; letter-spacing: -0.01em; }
@@ -545,24 +544,26 @@ body.focus-mode #text-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 36px;
-  padding-bottom: 24px;
+  padding-top: 40px;
+  padding-bottom: 40px;
   animation: viewIn 0.2s ease forwards;
 }
 
 #feed-header {
   width: 100%;
   max-width: 560px;
-  padding: 0 24px 24px;
+  padding: 0 24px 28px;
 }
 
 #feed-title {
   font-family: "Cormorant Garamond", serif;
-  font-size: 1.5rem;
+  font-size: 1.85rem;
   font-weight: 400;
+  font-style: italic;
   color: var(--text);
-  margin: 0 0 6px;
+  margin: 0 0 8px;
   letter-spacing: 0.01em;
+  line-height: 1.2;
 }
 
 #hs-link {
@@ -594,53 +595,64 @@ body.focus-mode #text-container {
 }
 
 /* ─── Publication cards ───────────────────────────────────────────────────── */
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .pub-card {
-  padding: 20px 0;
+  padding: 28px 0;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
-  transition: opacity 0.15s;
+  animation: cardIn 0.4s ease both;
+  animation-delay: calc(var(--card-index, 0) * 0.05s);
 }
 .pub-card:first-of-type { border-top: 1px solid var(--border); }
-.pub-card:hover { opacity: 0.6; }
+.pub-card:hover .pub-card-title { color: #666; }
+.pub-card:hover .pub-card-opening { color: #bbb; }
 
 .pub-card-meta {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 7px;
-  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 11px;
 }
 
 .pub-author-btn {
   font-family: "Cormorant Garamond", serif;
-  font-size: 0.82rem;
-  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--text);
   background: none;
   border: none;
   padding: 0;
   cursor: pointer;
   transition: color 0.15s;
 }
-.pub-author-btn:hover { color: var(--text); text-decoration: underline; }
-.pub-dot    { font-family: "Cormorant Garamond", serif; font-size: 0.82rem; color: #d0ceca; }
+.pub-author-btn:hover { color: var(--muted); text-decoration: underline; }
+.pub-dot    { font-family: "Cormorant Garamond", serif; font-size: 0.82rem; color: #d8d5d0; }
 .pub-date   { font-family: "Cormorant Garamond", serif; font-size: 0.82rem; color: var(--subtle); }
 .pub-read-time { font-family: "Cormorant Garamond", serif; font-size: 0.82rem; color: var(--subtle); }
 
 .pub-card-title {
   font-family: "Cormorant Garamond", serif;
-  font-size: 1.25rem;
+  font-size: 1.6rem;
   font-weight: 400;
   color: var(--text);
-  margin: 0 0 5px;
-  line-height: 1.3;
+  margin: 0 0 8px;
+  line-height: 1.2;
+  letter-spacing: 0.005em;
+  transition: color 0.2s;
 }
 
-.pub-card-preview {
+.pub-card-opening {
   font-family: "Cormorant Garamond", serif;
-  font-size: 0.93rem;
-  color: #999;
-  margin: 0 0 8px;
-  line-height: 1.5;
+  font-size: 1rem;
+  font-style: italic;
+  color: var(--muted);
+  margin: 0 0 12px;
+  line-height: 1.6;
+  transition: color 0.2s;
 }
 
 .pub-card-words {
@@ -1299,7 +1311,7 @@ body.focus-mode #text-container {
 /* ─── Mobile ──────────────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
   #text { font-size: 1.05rem; max-width: 88vw; }
-  #title-input { font-size: 1.25rem; width: 88vw; max-width: 88vw; }
+  #title-input { font-size: 1.5rem; width: 88vw; max-width: 88vw; }
   #text-container { padding-left: 0; padding-right: 0; }
   #reading-inner { padding: 32px 20px 20vh; }
   #reading-headline { font-size: 1.5rem; }
