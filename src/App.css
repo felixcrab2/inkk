@@ -101,7 +101,7 @@ body {
 #top-bar-right { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 
 #brand {
-  font-family: "Cormorant Garamond", serif;
+  font-family: "EB Garamond", serif;
   font-size: 1.15rem;
   font-weight: 500;
   color: var(--text);
@@ -279,6 +279,8 @@ body.focus-mode #hs-editor-status {
 body.focus-mode #text-container {
   top: 0 !important;
   bottom: 0 !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
 }
 
 /* ─── Document panel ──────────────────────────────────────────────────────── */
@@ -442,7 +444,7 @@ body.focus-mode #text-container {
 #text-container {
   position: fixed;
   top: var(--top-bar);
-  bottom: var(--bottom-nav);
+  bottom: calc(var(--bottom-nav) + 60px);
   left: 0;
   right: 0;
   overflow-y: auto;
@@ -452,8 +454,8 @@ body.focus-mode #text-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0px, transparent 50px, black 90px, black 100%);
-  mask-image: linear-gradient(to bottom, transparent 0px, transparent 50px, black 90px, black 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0px, transparent 50px, black 90px, black calc(100% - 36px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0px, transparent 50px, black 90px, black calc(100% - 36px), transparent 100%);
 }
 
 #title-input {
@@ -464,12 +466,13 @@ body.focus-mode #text-container {
   border: none;
   outline: none;
   font-family: "Cormorant Garamond", serif;
+  font-weight: 600;
   font-size: 1.5rem;
   color: var(--text);
   padding: 0 8px;
   margin-bottom: 28px;
   line-height: 1.3;
-  letter-spacing: -0.03em;
+  letter-spacing: 0.02em;
   text-align: center;
 }
 #title-input::placeholder { color: #d8d5d0; }
@@ -1103,12 +1106,13 @@ body.focus-mode #text-container {
 #reading-text.font-arial { font-family: Arial, sans-serif; }
 
 #reading-text::first-letter {
-  font-size: 4.4em;
-  float: left;
-  line-height: 0.74;
-  margin-right: 6px;
-  padding-top: 5px;
   font-family: "Cormorant Garamond", serif;
+  font-style: italic;
+  font-size: 4em;
+  float: left;
+  line-height: 0.82;
+  margin-right: 7px;
+  padding-top: 3px;
 }
 
 /* ─── Auth modal ──────────────────────────────────────────────────────────── */
