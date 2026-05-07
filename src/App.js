@@ -273,6 +273,41 @@ async function updateAvatar(userId, avatarData) {
   return error ? error.message : null;
 }
 
+async function fetchPublicationById(id) {
+  if (!supabase || !id) return null;
+  const { data } = await supabase
+    .from("publications")
+    .select("id, title, content, published_at, author_name, author_username, user_id, writing_time_seconds, revision_count")
+    .eq("id", id).maybeSingle();
+  return data || null;
+}
+
+async function fetchProfileByUsername(username) {
+  if (!supabase || !username) return null;
+  const { data } = await supabase
+    .from("profiles").select("id, username, display_name, avatar_data")
+    .eq("username", username).maybeSingle();
+  return data || null;
+}
+
+function viewToPath(view, pub, userProfile) {
+  if (view === "feed")        return "/feed";
+  if (view === "search")      return "/people";
+  if (view === "profile")     return "/profile";
+  if (view === "reading" && pub)          return `/read/${pub.id}`;
+  if (view === "userProfile" && userProfile) return `/u/${userProfile.username}`;
+  return "/";
+}
+
+function pathToView(path) {
+  if (path.startsWith("/read/"))  return "reading";
+  if (path.startsWith("/u/"))     return "userProfile";
+  if (path === "/feed")   return "feed";
+  if (path === "/people") return "search";
+  if (path === "/profile") return "profile";
+  return "editor";
+}
+
 async function searchProfiles(query) {
   if (!supabase || !query.trim()) return [];
   const q = query.trim();
@@ -917,7 +952,7 @@ export default function App() {
   const [words, setWords]             = useState(() => wordCount(initDocs.find(d => d.id === initActiveId)?.content));
   const [user, setUser]               = useState(null);
   const [authOpen, setAuthOpen]       = useState(false);
-  const [view, setView]               = useState("editor");
+  const [view, setView]               = useState(() => pathToView(window.location.pathname));
   const [readingPub, setReadingPub]   = useState(null);
   const [publishedDocIds, setPublishedDocIds] = useState(new Set());
   const [publishModalDoc, setPublishModalDoc] = useState(null);
@@ -948,7 +983,6 @@ export default function App() {
   const saveTimerRef = useRef(null);
   const rafRef       = useRef(null);
   const userRef      = useRef(null);
-  const prevViewRef  = useRef("editor");
 
   const writingBaseRef         = useRef(initDocs.find(d => d.id === initActiveId)?.writingTimeSecs || 0);
   const writingSessionStartRef = useRef(null);
@@ -991,6 +1025,36 @@ export default function App() {
       addToast("Could not save picture.");
     }
   }, [addToast]);
+
+  const navigate = useCallback((newView, opts = {}) => {
+    const { pub, userProfile } = opts;
+    const url = viewToPath(newView, pub, userProfile);
+    if (window.location.pathname !== url)
+      window.history.pushState({ view: newView, pubId: pub?.id, username: userProfile?.username }, "", url);
+    setView(newView);
+    if (pub       !== undefined) setReadingPub(pub);
+    if (userProfile !== undefined) setViewingUser(userProfile);
+  }, []);
+
+  useEffect(() => {
+    const handler = async (e) => {
+      const s = e.state || {};
+      const newView = s.view || "editor";
+      setView(newView);
+      if (newView !== "reading")     setReadingPub(null);
+      if (newView !== "userProfile") setViewingUser(null);
+      if (newView === "reading" && s.pubId) {
+        const pub = await fetchPublicationById(s.pubId);
+        if (pub) setReadingPub(pub);
+      }
+      if (newView === "userProfile" && s.username) {
+        const prof = await fetchProfileByUsername(s.username);
+        if (prof) setViewingUser(prof);
+      }
+    };
+    window.addEventListener("popstate", handler);
+    return () => window.removeEventListener("popstate", handler);
+  }, []);
 
   const IDLE_MS = 1200;
 
@@ -1157,15 +1221,13 @@ export default function App() {
     return errMsg;
   }, [publishModalDoc, publishedDocIds, profile, addToast]);
 
-  const openUserProfile = useCallback(async (userIdOrProfile, from) => {
+  const openUserProfile = useCallback(async (userIdOrProfile) => {
     const prof = typeof userIdOrProfile === "string"
       ? await fetchProfile(userIdOrProfile)
       : userIdOrProfile;
     if (!prof) { addToast("This writer hasn't set up their profile."); return; }
-    prevViewRef.current = from || view;
-    setViewingUser(prof);
-    setView("userProfile");
-  }, [view, addToast]);
+    navigate("userProfile", { userProfile: prof });
+  }, [navigate, addToast]);
 
   // ─ sign out ─────────────────────────────────────────────────────────────────
 
@@ -1411,8 +1473,7 @@ export default function App() {
         if (publishModalDoc) { setPublishModalDoc(null); return; }
         if (usernameModalOpen) return;
         setPanelOpen(false); setAuthOpen(false); setHsModalOpen(false);
-        if (view === "userProfile") { setView(prevViewRef.current || "search"); setViewingUser(null); return; }
-        if (view !== "editor") { setView("editor"); setReadingPub(null); }
+        if (view !== "editor") { window.history.back(); return; }
       }
     };
     window.addEventListener("keydown", handler);
@@ -1436,6 +1497,20 @@ export default function App() {
         if (!isMobileRef.current && localStorage.getItem("inkk_visited")) el.focus();
       }
     }
+    // Establish initial history state so popstate can always restore view
+    const initPath = window.location.pathname;
+    const initView = pathToView(initPath);
+    window.history.replaceState({ view: initView, pubId: initPath.startsWith("/read/") ? initPath.slice(6) : undefined, username: initPath.startsWith("/u/") ? initPath.slice(3) : undefined }, "", initPath);
+    // If landing directly on a reading or user-profile URL, load the data
+    if (initView === "reading") {
+      const pubId = initPath.slice(6);
+      fetchPublicationById(pubId).then(pub => { if (pub) setReadingPub(pub); });
+    }
+    if (initView === "userProfile") {
+      const username = initPath.slice(3);
+      fetchProfileByUsername(username).then(prof => { if (prof) setViewingUser(prof); });
+    }
+
     mountedRef.current = true;
     return () => {
       [idleTimerRef, saveTimerRef].forEach(r => { if (r.current) clearTimeout(r.current); });
@@ -1460,15 +1535,12 @@ export default function App() {
   const hasContent   = words > 0;
   const isPublished  = publishedDocIds.has(activeId);
 
-  const openReading = useCallback((pub, from) => {
-    prevViewRef.current = from || view;
-    setReadingPub(pub);
-    setView("reading");
-  }, [view]);
+  const openReading = useCallback((pub) => {
+    navigate("reading", { pub });
+  }, [navigate]);
 
   const goBack = useCallback(() => {
-    setView(prevViewRef.current || "editor");
-    setReadingPub(null);
+    window.history.back();
   }, []);
 
   return (
@@ -1649,9 +1721,9 @@ export default function App() {
       {/* ── views ── */}
       {view === "feed" && (
         <Feed
-          onRead={pub => openReading(pub, "feed")}
+          onRead={openReading}
           onHsModal={() => setHsModalOpen(true)}
-          onAuthorClick={userId => openUserProfile(userId, "feed")}
+          onAuthorClick={openUserProfile}
         />
       )}
       {view === "profile" && (
@@ -1661,7 +1733,7 @@ export default function App() {
           localDocs={docs}
           streak={streak}
           dropCapImages={dropCapImages}
-          onRead={pub => openReading(pub, "profile")}
+          onRead={openReading}
           onUnpublish={docId => setPublishedDocIds(prev => { const s = new Set(prev); s.delete(docId); return s; })}
           onSignIn={() => setAuthOpen(true)}
           onSignOut={signOut}
@@ -1669,31 +1741,31 @@ export default function App() {
         />
       )}
       {view === "search" && (
-        <SearchView onViewUser={p => openUserProfile(p, "search")} dropCapImages={dropCapImages} />
+        <SearchView onViewUser={openUserProfile} dropCapImages={dropCapImages} />
       )}
       {view === "userProfile" && viewingUser && (
-        <UserProfileView profile={viewingUser} onRead={pub => openReading(pub, "userProfile")} dropCapImages={dropCapImages} />
+        <UserProfileView profile={viewingUser} onRead={openReading} dropCapImages={dropCapImages} />
       )}
       {view === "reading" && readingPub && <ReadingView pub={readingPub} font={font} />}
 
       {/* ── bottom nav ── */}
       {view !== "reading" && view !== "userProfile" && (
         <nav id="bottom-nav" className={isEditor ? menuClass : ""}>
-          <button className={`nav-tab ${isEditor ? "active" : ""}`} onClick={() => setView("editor")}>
+          <button className={`nav-tab ${isEditor ? "active" : ""}`} onClick={() => navigate("editor")}>
             <PenLine size={18} strokeWidth={1.75} />
             <span className="nav-label">Write</span>
           </button>
-          <button className={`nav-tab ${view === "feed" ? "active" : ""}`} onClick={() => setView("feed")}>
+          <button className={`nav-tab ${view === "feed" ? "active" : ""}`} onClick={() => navigate("feed")}>
             <Globe size={18} strokeWidth={1.75} />
             <span className="nav-label">Feed</span>
           </button>
-          <button className={`nav-tab ${view === "search" ? "active" : ""}`} onClick={() => setView("search")}>
+          <button className={`nav-tab ${view === "search" ? "active" : ""}`} onClick={() => navigate("search")}>
             <Search size={18} strokeWidth={1.75} />
             <span className="nav-label">People</span>
           </button>
           <button
             className={`nav-tab ${view === "profile" ? "active" : ""}`}
-            onClick={() => setView("profile")}
+            onClick={() => navigate("profile")}
           >
             {user ? (
               <DropCapAvatar

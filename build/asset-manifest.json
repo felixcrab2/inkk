@@ -1,7 +1,7 @@
 {
   "files": {
     "main.css": "/static/css/main.aed73af1.css",
-    "main.js": "/static/js/main.47716e2e.js",
+    "main.js": "/static/js/main.b079711f.js",
     "static/js/239.d2863414.chunk.js": "/static/js/239.d2863414.chunk.js",
     "static/js/977.a1aca4e4.chunk.js": "/static/js/977.a1aca4e4.chunk.js",
     "static/js/732.d8915e0d.chunk.js": "/static/js/732.d8915e0d.chunk.js",
@@ -52,13 +52,13 @@
     "static/media/eb-garamond-vietnamese-400-normal.woff2": "/static/media/eb-garamond-vietnamese-400-normal.92880281b2c4a1ac7022.woff2",
     "index.html": "/index.html",
     "main.aed73af1.css.map": "/static/css/main.aed73af1.css.map",
-    "main.47716e2e.js.map": "/static/js/main.47716e2e.js.map",
+    "main.b079711f.js.map": "/static/js/main.b079711f.js.map",
     "239.d2863414.chunk.js.map": "/static/js/239.d2863414.chunk.js.map",
     "977.a1aca4e4.chunk.js.map": "/static/js/977.a1aca4e4.chunk.js.map",
     "732.d8915e0d.chunk.js.map": "/static/js/732.d8915e0d.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.aed73af1.css",
-    "static/js/main.47716e2e.js"
+    "static/js/main.b079711f.js"
   ]
 }
