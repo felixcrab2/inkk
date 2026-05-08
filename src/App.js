@@ -90,7 +90,7 @@ function caretRangeAt(x, y) {
   return r;
 }
 
-async function compressImage(file, maxDim = 900) {
+async function compressImage(file, maxDim = 1600) {
   return new Promise(resolve => {
     const reader = new FileReader();
     reader.onload = e => {
@@ -102,7 +102,7 @@ async function compressImage(file, maxDim = 900) {
         const canvas = document.createElement("canvas");
         canvas.width = w; canvas.height = h;
         canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL("image/jpeg", 0.78));
+        resolve(canvas.toDataURL("image/jpeg", 0.88));
       };
       img.src = e.target.result;
     };
@@ -134,7 +134,7 @@ function dropCapSrc(letter, images) {
   return list?.length ? `/drop_caps/${l}/${list[0]}.png` : null;
 }
 
-async function compressAvatar(file, size = 120) {
+async function compressAvatar(file, size = 240) {
   return new Promise(resolve => {
     const reader = new FileReader();
     reader.onload = e => {
@@ -145,7 +145,7 @@ async function compressAvatar(file, size = 120) {
         const ctx = canvas.getContext("2d");
         const s = Math.min(img.width, img.height);
         ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size);
-        resolve(canvas.toDataURL("image/jpeg", 0.78));
+        resolve(canvas.toDataURL("image/jpeg", 0.88));
       };
       img.src = e.target.result;
     };
@@ -1166,7 +1166,7 @@ export default function App() {
       const cloudDocs = await fetchCloudDocs();
       const saved = loadState();
       const localDocs = saved?.docs || [];
-      const hasLocalContent = localDocs.some(d => d.content.trim());
+      const hasLocalContent = localDocs.some(d => stripHtml(d.content).trim());
       let merged = (hasLocalContent || !cloudDocs.length)
         ? mergeDocs(localDocs, cloudDocs) : cloudDocs;
       if (!merged.length) merged = [createDoc()];
@@ -1179,7 +1179,7 @@ export default function App() {
       }));
       const cloudIds = new Set(cloudDocs.map(d => d.id));
       for (const doc of merged)
-        if (!cloudIds.has(doc.id) && doc.content.trim())
+        if (!cloudIds.has(doc.id) && stripHtml(doc.content).trim())
           await pushDocToCloud(doc, signedInUser.id);
       const savedActiveId = saved?.activeId;
       const newActiveId = merged.find(d => d.id === savedActiveId) ? savedActiveId : merged[0].id;
@@ -1615,7 +1615,9 @@ export default function App() {
     // Establish initial history state so popstate can always restore view
     const initPath = window.location.pathname;
     const initView = pathToView(initPath);
-    window.history.replaceState({ view: initView, pubId: initPath.startsWith("/read/") ? initPath.slice(6) : undefined, username: initPath.startsWith("/u/") ? initPath.slice(3) : undefined }, "", initPath);
+    // Preserve hash — Supabase reads #access_token from it during OAuth callback
+    const initUrl = initPath + window.location.search + window.location.hash;
+    window.history.replaceState({ view: initView, pubId: initPath.startsWith("/read/") ? initPath.slice(6) : undefined, username: initPath.startsWith("/u/") ? initPath.slice(3) : undefined }, "", initUrl);
     // If landing directly on a reading or user-profile URL, load the data
     if (initView === "reading") {
       const pubId = initPath.slice(6);
