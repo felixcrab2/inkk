@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&display=swap");
 
 /* ─── Design tokens ───────────────────────────────────────────────────────── */
 :root {
@@ -466,8 +466,8 @@ body.focus-mode #text-container {
   border: none;
   outline: none;
   font-family: "Cormorant Garamond", serif;
-  font-weight: 400;
-  font-size: 1.85rem;
+  font-weight: 500;
+  font-size: 1.65rem;
   color: var(--text);
   padding: 0 8px;
   margin-bottom: 28px;
@@ -517,6 +517,15 @@ body.focus-mode #text-container {
 }
 
 #text.font-arial { font-family: Arial, sans-serif; }
+
+#text img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 14px auto;
+  border-radius: 4px;
+  cursor: default;
+}
 
 #text:empty::after {
   content: "";
@@ -1123,7 +1132,6 @@ body.focus-mode #text-container {
 .hs-badge + #reading-text { margin-top: 28px; }
 
 #reading-text {
-  white-space: pre-wrap;
   overflow-wrap: break-word;
   font-family: "Cormorant Garamond", serif;
   font-size: 1.18rem;
@@ -1131,8 +1139,16 @@ body.focus-mode #text-container {
   color: var(--text);
   margin-top: 24px;
 }
-
 #reading-text.font-arial { font-family: Arial, sans-serif; }
+
+#reading-text div { min-height: 1em; }
+#reading-text img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 24px auto;
+  border-radius: 4px;
+}
 
 
 /* ─── Auth modal ──────────────────────────────────────────────────────────── */
@@ -1311,7 +1327,7 @@ body.focus-mode #text-container {
 /* ─── Mobile ──────────────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
   #text { font-size: 1.05rem; max-width: 88vw; }
-  #title-input { font-size: 1.5rem; width: 88vw; max-width: 88vw; }
+  #title-input { font-size: 1.35rem; width: 88vw; max-width: 88vw; }
   #text-container { padding-left: 0; padding-right: 0; }
   #reading-inner { padding: 32px 20px 20vh; }
   #reading-headline { font-size: 1.5rem; }

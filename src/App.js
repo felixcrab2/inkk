@@ -48,13 +48,75 @@ function initState() {
   return { docs, activeId: validId };
 }
 
+function stripHtml(html) {
+  if (!html) return "";
+  return html
+    .replace(/<\/div>/gi, "\n").replace(/<\/p>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<img[^>]*>/gi, " ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function renderHtml(content) {
+  if (!content) return "";
+  if (/<(div|br|img|p)\b/i.test(content)) {
+    const d = document.createElement("div");
+    d.innerHTML = content;
+    d.querySelectorAll("script,style,link,meta,iframe,object,embed,form").forEach(n => n.remove());
+    d.querySelectorAll("*").forEach(el => {
+      for (const a of [...el.attributes])
+        if (a.name.startsWith("on") || (a.name === "href" && /javascript:/i.test(a.value))) el.removeAttribute(a.name);
+    });
+    return d.innerHTML;
+  }
+  return content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
+}
+
+function setEditorHtml(el, content) {
+  if (!content) { el.innerHTML = ""; return; }
+  if (/<(div|br|img|p)\b/i.test(content)) { el.innerHTML = content; }
+  else { el.innerText = content; }
+}
+
+function caretRangeAt(x, y) {
+  if (document.caretRangeFromPoint) return document.caretRangeFromPoint(x, y);
+  const pos = document.caretPositionFromPoint?.(x, y);
+  if (!pos) return null;
+  const r = document.createRange();
+  r.setStart(pos.offsetNode, pos.offset);
+  r.collapse(true);
+  return r;
+}
+
+async function compressImage(file, maxDim = 900) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new window.Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.78));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 function docTitle(content) {
-  const first = (content || "").trim().split("\n")[0].trim();
+  const first = stripHtml(content || "").trim().split("\n")[0].trim();
   return first.length > 0 ? first : "Untitled";
 }
 
 function wordCount(content) {
-  const t = (content || "").trim();
+  const t = stripHtml(content || "").trim();
   return t ? t.split(/\s+/).length : 0;
 }
 
@@ -133,13 +195,13 @@ function formatDate(iso) {
 }
 
 function pubPreview(content) {
-  const lines = (content || "").trim().split("\n").filter(l => l.trim());
+  const lines = stripHtml(content || "").trim().split("\n").filter(l => l.trim());
   const body = lines.slice(1).join(" ").trim();
   return body.length > 140 ? body.slice(0, 140).trimEnd() + "…" : body;
 }
 
 function openingLine(content) {
-  const lines = (content || "").trim().split("\n").filter(l => l.trim());
+  const lines = stripHtml(content || "").trim().split("\n").filter(l => l.trim());
   const body = lines.slice(1).join(" ").trim();
   if (!body) return "";
   const m = body.match(/^(.{20,160}?[.!?])(?:\s|$)/);
@@ -915,7 +977,7 @@ function ReadingView({ pub, font }) {
   }, []);
 
   const copyText = useCallback(() => {
-    navigator.clipboard.writeText(pub.title + "\n\n" + pub.content).then(() => {
+    navigator.clipboard.writeText(pub.title + "\n\n" + stripHtml(pub.content)).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -944,7 +1006,7 @@ function ReadingView({ pub, font }) {
               content={pub.content}
             />
           )}
-          <div id="reading-text" className={font === "arial" ? "font-arial" : ""}>{pub.content}</div>
+          <div id="reading-text" className={font === "arial" ? "font-arial" : ""} dangerouslySetInnerHTML={{ __html: renderHtml(pub.content) }} />
         </div>
       </div>
     </>
@@ -1078,7 +1140,7 @@ export default function App() {
     titleRef.current = doc.title || "";
     if (titleEditorRef.current) titleEditorRef.current.value = doc.title || "";
     contentRef.current = doc.content;
-    el.innerText = doc.content;
+    setEditorHtml(el, doc.content);
     setWords(wordCount(doc.content));
     writingBaseRef.current = doc.writingTimeSecs || 0;
     writingFlushRef.current = 0;
@@ -1217,7 +1279,7 @@ export default function App() {
     if (e) e.stopPropagation();
     if (!userRef.current) { setAuthOpen(true); return; }
     const content = doc.id === activeId ? contentRef.current : doc.content;
-    if (!content?.trim()) return;
+    if (!stripHtml(content || "").trim()) return;
     setPublishModalDoc({ ...doc, content });
   }, [activeId]);
 
@@ -1283,9 +1345,7 @@ export default function App() {
     }
     const el = editorRef.current;
     if (!el) return;
-    const editorText = el.innerText;
-
-    const fullContent = editorText.replace(/\n+$/, "");
+    const fullContent = el.innerHTML;
     contentRef.current = fullContent;
     setWords(wordCount(fullContent));
     setMenuVisible(false);
@@ -1316,7 +1376,7 @@ export default function App() {
         saveState(next, capturedId);
         return next;
       });
-      if (capturedContent.trim()) {
+      if (stripHtml(capturedContent).trim()) {
         const newStreak = touchStreak();
         setStreak(newStreak);
       }
@@ -1348,11 +1408,54 @@ export default function App() {
   }, [activeId]);
 
 
+  const handleEditorDrop = useCallback(async (e) => {
+    const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith("image/"));
+    if (!files.length) return;
+    e.preventDefault();
+    const range = caretRangeAt(e.clientX, e.clientY);
+    for (const file of files) {
+      const src = await compressImage(file);
+      const img = document.createElement("img");
+      img.src = src;
+      if (range) { range.insertNode(img); range.collapse(false); }
+      else { editorRef.current?.appendChild(img); }
+    }
+    onInput();
+  }, [onInput]);
+
+  const handleEditorPaste = useCallback(async (e) => {
+    const items = Array.from(e.clipboardData?.items || []);
+    const imageItem = items.find(item => item.type.startsWith("image/"));
+    if (imageItem) {
+      e.preventDefault();
+      const file = imageItem.getAsFile();
+      if (!file) return;
+      const src = await compressImage(file);
+      const img = document.createElement("img");
+      img.src = src;
+      const sel = window.getSelection();
+      if (sel?.rangeCount) {
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        range.insertNode(img);
+        range.collapse(false);
+      } else {
+        editorRef.current?.appendChild(img);
+      }
+      onInput();
+      return;
+    }
+    // Strip formatting on paste — insert as plain text only
+    e.preventDefault();
+    const text = e.clipboardData?.getData("text/plain") || "";
+    if (text) document.execCommand("insertText", false, text);
+  }, [onInput]);
+
   // ─ PDF export ───────────────────────────────────────────────────────────────
 
   const exportToPdf = useCallback(async () => {
     const text = contentRef.current || "";
-    if (!text.trim()) return;
+    if (!stripHtml(text).trim()) return;
     try {
 
     // metadata
@@ -1445,7 +1548,7 @@ export default function App() {
     setC(C_BLACK);
 
     // if using the old first-line-as-title pattern, strip it from body
-    const bodyText  = text.trim();
+    const bodyText  = stripHtml(text).trim();
     const bodyParas = bodyText.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
 
     const renderLines = (lines, startX) => {
@@ -1505,7 +1608,7 @@ export default function App() {
       setShowTitleInput(!!doc.title);
       const el = editorRef.current;
       if (el) {
-        el.innerText = doc.content;
+        setEditorHtml(el, doc.content);
         if (!isMobileRef.current && localStorage.getItem("inkk_visited")) el.focus();
       }
     }
@@ -1726,6 +1829,9 @@ export default function App() {
             autoCorrect="off"
             autoCapitalize="off"
             onInput={onInput}
+            onDrop={handleEditorDrop}
+            onDragOver={e => { if (Array.from(e.dataTransfer?.items || []).some(i => i.type.startsWith("image/"))) e.preventDefault(); }}
+            onPaste={handleEditorPaste}
           />
         </div>
       </div>
