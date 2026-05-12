@@ -1326,16 +1326,54 @@ body.focus-mode #text-container {
 
 /* ─── Mobile ──────────────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
-  #text { font-size: 1.05rem; max-width: 88vw; }
-  #title-input { font-size: 1.35rem; width: 88vw; max-width: 88vw; }
-  #text-container { padding-left: 0; padding-right: 0; }
-  #reading-inner { padding: 32px 20px 20vh; }
+  /* ── Editor ── */
+  #text-container {
+    padding-top: 9vh;
+    padding-bottom: 18vh;
+    padding-left: 0;
+    padding-right: 0;
+    /* softer fade at top so less space feels wasted */
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black 40px, black calc(100% - 28px), transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0px, black 40px, black calc(100% - 28px), transparent 100%);
+  }
+  #writing-area {
+    width: calc(100% - 56px);
+    max-width: none;
+    min-width: 0;
+  }
+  #title-input {
+    width: 100%;
+    max-width: none;
+    font-size: 1.5rem;
+  }
+  #text {
+    width: 100%;
+    max-width: none;
+    font-size: 1.12rem;
+    line-height: 1.65;
+    padding: 0 0 8px;
+  }
+
+  /* ── Reading ── */
+  #reading-inner { padding: 32px 28px 20vh; }
   #reading-headline { font-size: 1.5rem; }
-  #reading-text { font-size: 1.05rem; }
+  #reading-text { font-size: 1.08rem; }
+
+  /* ── Feed ── */
   #feed-list, #feed-header { max-width: 100%; }
+  #feed-header { padding-left: 20px; padding-right: 20px; }
+  #feed-list { padding-left: 20px; padding-right: 20px; }
+  .pub-card-title { font-size: 1.35rem; }
+
+  /* ── Profile ── */
   #profile-container { padding: 28px 20px 24px; }
-  #landing-headline { font-size: 1.75rem; }
+
+  /* ── Nav / top bar ── */
   .btn-label { display: none; }
   #publish-btn { padding: 6px 9px; }
   #doc-panel { width: 240px; }
+
+  /* ── Landing ── */
+  #landing-headline { font-size: 1.75rem; }
+  #landing-inner { padding: 0 28px; }
 }
