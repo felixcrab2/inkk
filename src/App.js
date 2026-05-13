@@ -1680,7 +1680,7 @@ export default function App() {
           )}
         </div>
         <div id="top-bar-center">
-          <span id="brand">inkk.</span>
+          <span id="brand" onClick={() => navigate("editor")} style={{ cursor: view === "editor" ? "default" : "pointer" }}>inkk.</span>
         </div>
         <div id="top-bar-right">
           {isEditor && supabase && hasContent && (
