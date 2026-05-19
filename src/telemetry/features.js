@@ -1,0 +1,215 @@
+// Pure feature extraction from a telemetry event window.
+// Inputs are arrays of event objects (see recorder.js shape).
+// Output is a flat feature object consumed by score.js.
+//
+// All functions are side-effect-free and synchronous so they can be unit
+// tested in plain Node.
+
+const ACTIVE_GAP_MS    = 5000;       // gaps larger than this aren't counted as active typing
+const IKI_CUTOFF_MS    = 3000;       // discard inter-key gaps larger than this from IKI stats
+const BURST_GAP_MS     = 400;        // max IKI inside a burst
+const BURST_MIN_MS     = 5000;       // a "burst" must span at least this much typing
+const BURST_MIN_CHARS  = 8;          // ...or at least this many chars
+const REV_CARET_JUMP   = 20;         // caret jump backward considered a revision intent
+const REV_FOLLOWUP_MS  = 3000;       // edit must follow caret jump within this window
+const TYPO_WINDOW_MS   = 1500;       // insert-then-delete pair window
+const DWELL_MAX_MS     = 800;        // keyup later than this from keydown is ignored
+
+function quantile(sorted, q) {
+  if (!sorted.length) return 0;
+  const i = (sorted.length - 1) * q;
+  const lo = Math.floor(i), hi = Math.ceil(i);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
+}
+
+function stats(arr) {
+  if (!arr.length) return { n: 0, mean: 0, std: 0, median: 0, iqr: 0, cv: 0 };
+  const sorted = [...arr].sort((a, b) => a - b);
+  const n = sorted.length;
+  const mean = sorted.reduce((s, v) => s + v, 0) / n;
+  const variance = sorted.reduce((s, v) => s + (v - mean) ** 2, 0) / n;
+  const std = Math.sqrt(variance);
+  const median = quantile(sorted, 0.5);
+  const iqr = quantile(sorted, 0.75) - quantile(sorted, 0.25);
+  const cv = mean > 0 ? std / mean : 0;
+  return { n, mean, std, median, iqr, cv };
+}
+
+// Goodness-of-fit between observed pause distribution and a log-normal
+// shape. Returns [0, 1] where 1 is a strong match. We use the simple test:
+// log-transform pauses → check whether they're roughly bell-shaped via the
+// |skewness| of the log distribution (low skew → log-normal-ish).
+function logNormalShape(pauses) {
+  if (pauses.length < 5) return 0;
+  const logs = pauses.filter(p => p > 0).map(p => Math.log(p));
+  if (logs.length < 5) return 0;
+  const m = logs.reduce((s, v) => s + v, 0) / logs.length;
+  const v = logs.reduce((s, x) => s + (x - m) ** 2, 0) / logs.length;
+  if (v <= 0) return 0;
+  const s = Math.sqrt(v);
+  const skew = logs.reduce((acc, x) => acc + ((x - m) / s) ** 3, 0) / logs.length;
+  // bell-ish ~ |skew| <= 1; map smoothly.
+  return Math.max(0, 1 - Math.min(1, Math.abs(skew)));
+}
+
+export function extractFeatures(events, { words = 0 } = {}) {
+  const out = {
+    event_count: events.length,
+    words,
+    first_t: 0, last_t: 0,
+    total_time_ms: 0, active_time_ms: 0,
+
+    typed_chars: 0,           // chars added via typing (not paste)
+    deleted_chars: 0,
+    pasted_chars: 0,
+    typing_events: 0,
+    deletion_events: 0,
+    paste_events: 0,
+
+    iki: { n: 0, median: 0, mean: 0, std: 0, iqr: 0, cv: 0 },
+    dwell: { n: 0, mean: 0, std: 0 },
+    pause_count_500: 0,
+    pause_count_2000: 0,
+    pause_count_10000: 0,
+    pause_lognormal: 0,
+
+    burst_count: 0,
+    burst_total_ms: 0,
+
+    mid_revisions: 0,
+    typo_corrections: 0,
+
+    paste_ratio: 0,
+    deletion_ratio: 0,
+  };
+
+  if (!events?.length) return out;
+
+  const sorted = [...events].sort((a, b) => a.t - b.t);
+  out.first_t = sorted[0].t;
+  out.last_t  = sorted[sorted.length - 1].t;
+  out.total_time_ms = Math.max(0, out.last_t - out.first_t);
+
+  // ── counts ────────────────────────────────────────────────────────────────
+  for (const e of sorted) {
+    if (e.kind === "input")  { out.typing_events++;   out.typed_chars   += Math.max(0, e.len_delta || 0); }
+    if (e.kind === "delete") { out.deletion_events++; out.deleted_chars += Math.max(0, -(e.len_delta || 0)); }
+    if (e.kind === "paste")  { out.paste_events++;    out.pasted_chars  += Math.max(0, e.len_delta || 0); }
+  }
+
+  // ── IKI and active time ───────────────────────────────────────────────────
+  const editEvents = sorted.filter(e => e.kind === "input" || e.kind === "delete");
+  const ikis = [];
+  const pauses = [];
+  for (let i = 1; i < editEvents.length; i++) {
+    const gap = editEvents[i].t - editEvents[i - 1].t;
+    if (gap <= 0) continue;
+    if (gap < IKI_CUTOFF_MS) ikis.push(gap);
+    if (gap >= 500)    out.pause_count_500++;
+    if (gap >= 2000)   out.pause_count_2000++;
+    if (gap >= 10_000) out.pause_count_10000++;
+    if (gap >= 500)    pauses.push(gap);
+    if (gap < ACTIVE_GAP_MS) out.active_time_ms += gap;
+  }
+  out.iki = stats(ikis);
+  out.pause_lognormal = logNormalShape(pauses);
+
+  // ── Dwell time (keydown→keyup pairs by key_class) ─────────────────────────
+  const downs = new Map();   // key_class → queue of keydown timestamps
+  const dwells = [];
+  for (const e of sorted) {
+    if (e.kind === "keydown" && e.key_class) {
+      if (!downs.has(e.key_class)) downs.set(e.key_class, []);
+      downs.get(e.key_class).push(e.t);
+    } else if (e.kind === "keyup" && e.key_class && downs.get(e.key_class)?.length) {
+      const t0 = downs.get(e.key_class).shift();
+      const d = e.t - t0;
+      if (d >= 0 && d <= DWELL_MAX_MS) dwells.push(d);
+    }
+  }
+  out.dwell = (() => { const s = stats(dwells); return { n: s.n, mean: s.mean, std: s.std }; })();
+
+  // ── Bursts ────────────────────────────────────────────────────────────────
+  let burstStart = null, burstChars = 0;
+  for (let i = 0; i < editEvents.length; i++) {
+    const e = editEvents[i];
+    const prev = editEvents[i - 1];
+    const gap = prev ? (e.t - prev.t) : Infinity;
+    if (gap <= BURST_GAP_MS) {
+      if (burstStart === null) burstStart = prev.t;
+      burstChars += Math.abs(e.len_delta || 0);
+    } else {
+      if (burstStart !== null) {
+        const dur = prev.t - burstStart;
+        if (dur >= BURST_MIN_MS || burstChars >= BURST_MIN_CHARS) {
+          out.burst_count++;
+          out.burst_total_ms += dur;
+        }
+      }
+      burstStart = null; burstChars = 0;
+    }
+  }
+  if (burstStart !== null && editEvents.length) {
+    const dur = editEvents[editEvents.length - 1].t - burstStart;
+    if (dur >= BURST_MIN_MS || burstChars >= BURST_MIN_CHARS) {
+      out.burst_count++; out.burst_total_ms += dur;
+    }
+  }
+
+  // ── Mid-stream revisions (caret jump back, then edit) ─────────────────────
+  // Track running "tail" caret position implied by typing forward. A revision
+  // is a caret event whose position is well behind the tail AND is followed
+  // by an input/delete within REV_FOLLOWUP_MS.
+  let tailCaret = null;
+  let pendingJumpT = null, pendingJumpPos = null;
+  for (const e of sorted) {
+    if (e.kind === "input" && typeof e.caret_pos === "number") {
+      if (tailCaret === null || e.caret_pos > tailCaret) tailCaret = e.caret_pos;
+      if (pendingJumpT !== null && (e.t - pendingJumpT) <= REV_FOLLOWUP_MS) {
+        if (typeof pendingJumpPos === "number" && Math.abs(e.caret_pos - pendingJumpPos) <= REV_CARET_JUMP) {
+          out.mid_revisions++;
+        }
+      }
+      pendingJumpT = null;
+    } else if (e.kind === "delete" && typeof e.caret_pos === "number") {
+      if (pendingJumpT !== null && (e.t - pendingJumpT) <= REV_FOLLOWUP_MS) {
+        out.mid_revisions++;
+      }
+      pendingJumpT = null;
+    } else if (e.kind === "caret" && typeof e.caret_pos === "number") {
+      if (tailCaret !== null && (tailCaret - e.caret_pos) >= REV_CARET_JUMP) {
+        pendingJumpT = e.t;
+        pendingJumpPos = e.caret_pos;
+      } else {
+        pendingJumpT = null;
+      }
+    }
+  }
+
+  // ── Typo corrections: insert (+1) followed within window by delete near same caret ─
+  for (let i = 0; i < sorted.length; i++) {
+    const a = sorted[i];
+    if (a.kind !== "input" || (a.len_delta || 0) !== 1) continue;
+    for (let j = i + 1; j < sorted.length; j++) {
+      const b = sorted[j];
+      if ((b.t - a.t) > TYPO_WINDOW_MS) break;
+      if (b.kind === "delete" && Math.abs((b.len_delta || 0)) >= 1) {
+        if (a.caret_pos == null || b.caret_pos == null
+          || Math.abs((a.caret_pos + 1) - (b.caret_pos + Math.abs(b.len_delta || 1))) <= 2) {
+          out.typo_corrections++;
+          break;
+        }
+      }
+    }
+  }
+
+  // ── Ratios ────────────────────────────────────────────────────────────────
+  const grossIn = out.typed_chars + out.pasted_chars;
+  out.paste_ratio    = grossIn > 0 ? out.pasted_chars / grossIn : 0;
+  out.deletion_ratio = out.typed_chars > 0 ? out.deleted_chars / out.typed_chars : 0;
+
+  return out;
+}
+
+export const __test__ = { stats, logNormalShape };

@@ -1,0 +1,128 @@
+-- ─── Inkk telemetry / human-signal schema ──────────────────────────────────
+-- Idempotent. Safe to run on an existing database with documents/publications/profiles.
+-- Run as service-role / SQL editor in Supabase.
+
+-- 1. Profile: research opt-in
+alter table public.profiles
+  add column if not exists research_opt_in boolean not null default false;
+
+-- 2. Documents: cached process-level metrics
+alter table public.documents
+  add column if not exists total_writing_secs real     not null default 0,
+  add column if not exists keystrokes        integer  not null default 0,
+  add column if not exists deletions         integer  not null default 0,
+  add column if not exists pastes            integer  not null default 0,
+  add column if not exists revision_count    integer  not null default 0,
+  add column if not exists human_score       smallint,
+  add column if not exists score_tier        text,
+  add column if not exists score_features    jsonb;
+
+-- 3. Publications: snapshot the same metrics at publish time
+alter table public.publications
+  add column if not exists keystrokes        integer,
+  add column if not exists deletions         integer,
+  add column if not exists pastes            integer,
+  add column if not exists human_score       smallint,
+  add column if not exists score_tier        text,
+  add column if not exists score_features    jsonb;
+
+-- 4. Writing sessions — one row per continuous writing session
+create table if not exists public.writing_sessions (
+  id            uuid primary key,
+  user_id       uuid not null references auth.users(id) on delete cascade,
+  doc_id        uuid not null,
+  started_at    bigint not null,             -- epoch ms
+  ended_at      bigint,                      -- epoch ms (null while open)
+  event_count   integer not null default 0,
+  chars_added   integer not null default 0,
+  chars_deleted integer not null default 0,
+  keystrokes    integer not null default 0,
+  pastes        integer not null default 0,
+  features      jsonb,
+  score         smallint,
+  created_at    timestamptz not null default now()
+);
+create index if not exists writing_sessions_user_doc_idx
+  on public.writing_sessions(user_id, doc_id, started_at desc);
+
+alter table public.writing_sessions enable row level security;
+
+drop policy if exists "ws_select_own" on public.writing_sessions;
+create policy "ws_select_own" on public.writing_sessions
+  for select using (auth.uid() = user_id);
+
+drop policy if exists "ws_insert_own" on public.writing_sessions;
+create policy "ws_insert_own" on public.writing_sessions
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "ws_update_own" on public.writing_sessions;
+create policy "ws_update_own" on public.writing_sessions
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "ws_delete_own" on public.writing_sessions;
+create policy "ws_delete_own" on public.writing_sessions
+  for delete using (auth.uid() = user_id);
+
+-- 5. Writing events — append-only fine-grained event stream
+-- Only synced when profile.research_opt_in = true (enforced client-side AND below).
+create table if not exists public.writing_events (
+  id            uuid primary key,
+  user_id       uuid not null references auth.users(id) on delete cascade,
+  doc_id        uuid not null,
+  session_id    uuid not null,
+  t             bigint not null,                -- epoch ms client-side
+  kind          text not null,                  -- keydown|keyup|input|delete|paste|drop|caret|focus|blur|visibility|session_start|session_end|doc_switch
+  key_class     text,                           -- letter|digit|punct|space|nav|edit|modifier|other  (raw key NEVER stored for letter/digit)
+  input_type    text,                           -- InputEvent.inputType
+  len_delta     integer,                        -- chars added/removed
+  caret_pos     integer,
+  selection_len integer,
+  payload       jsonb,
+  created_at    timestamptz not null default now()
+);
+
+create index if not exists writing_events_user_doc_t_idx
+  on public.writing_events(user_id, doc_id, t);
+create index if not exists writing_events_session_idx
+  on public.writing_events(session_id);
+
+alter table public.writing_events enable row level security;
+
+drop policy if exists "we_select_own" on public.writing_events;
+create policy "we_select_own" on public.writing_events
+  for select using (auth.uid() = user_id);
+
+-- Server-side enforcement of opt-in: insert only allowed when caller is opted in.
+drop policy if exists "we_insert_optin" on public.writing_events;
+create policy "we_insert_optin" on public.writing_events
+  for insert with check (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid() and p.research_opt_in = true
+    )
+  );
+
+drop policy if exists "we_delete_own" on public.writing_events;
+create policy "we_delete_own" on public.writing_events
+  for delete using (auth.uid() = user_id);
+
+-- 6. RPC: delete all of caller's events (used by Profile → "Delete my research data")
+create or replace function public.delete_my_writing_events()
+returns void
+language sql
+security invoker
+as $$
+  delete from public.writing_events where user_id = auth.uid();
+  delete from public.writing_sessions where user_id = auth.uid();
+$$;
+
+-- 7. View: aggregate per-user counts (used by Profile)
+create or replace view public.my_writing_event_counts as
+  select user_id,
+         count(*) as event_count,
+         min(t)   as first_t,
+         max(t)   as last_t
+  from public.writing_events
+  where user_id = auth.uid()
+  group by user_id;

@@ -12,12 +12,42 @@ import {
   Share2, Check, Download, Maximize2, Minimize2,
   Copy, CheckCheck, Plus, Trash2, Type, Search,
 } from "lucide-react";
+import { createRecorder } from "./telemetry/recorder";
+import { extractFeatures } from "./telemetry/features";
+import { computeScore } from "./telemetry/score";
+import {
+  startSync, stopSync,
+  setResearchOptIn as remoteSetResearchOptIn,
+  getResearchOptIn,
+  deleteMyEvents, dumpMyEvents,
+} from "./telemetry/sync";
+import { claimAnonymous as claimAnonymousEvents } from "./telemetry/store";
+import { HumanSignalLine, HumanSignalBadge, HumanSignalPanel } from "./components/HumanSignal";
 
 // ─── local storage ────────────────────────────────────────────────────────────
 
 function createDoc() {
   const now = Date.now();
-  return { id: crypto.randomUUID(), title: "", content: "", updatedAt: now, createdAt: now, writingTimeSecs: 0, revisionCount: 0 };
+  return {
+    id: crypto.randomUUID(), title: "", content: "",
+    updatedAt: now, createdAt: now,
+    writingTimeSecs: 0, revisionCount: 0,
+    keystrokes: 0, deletions: 0, pastes: 0,
+    humanScore: null, scoreTier: null, scoreFeatures: null,
+  };
+}
+
+const DOC_DEFAULTS = {
+  title: "", writingTimeSecs: 0, revisionCount: 0,
+  keystrokes: 0, deletions: 0, pastes: 0,
+  humanScore: null, scoreTier: null, scoreFeatures: null,
+};
+
+function normaliseDoc(d) {
+  return {
+    ...DOC_DEFAULTS, ...d,
+    createdAt: d.createdAt || d.updatedAt || Date.now(),
+  };
 }
 
 function loadState() {
@@ -37,13 +67,7 @@ function initState() {
     const doc = createDoc();
     return { docs: [doc], activeId: doc.id };
   }
-  const docs = saved.docs.map(d => ({
-    ...d,
-    title: d.title ?? "",
-    createdAt: d.createdAt || d.updatedAt || Date.now(),
-    writingTimeSecs: d.writingTimeSecs || 0,
-    revisionCount: d.revisionCount || 0,
-  }));
+  const docs = saved.docs.map(normaliseDoc);
   const validId = docs.find(d => d.id === saved.activeId) ? saved.activeId : docs[0].id;
   return { docs, activeId: validId };
 }
@@ -170,11 +194,9 @@ function formatWritingTime(secs) {
   return `${Math.round(secs / 60)} min`;
 }
 
-function humanSignalStatus(writingTimeSecs, revisionCount) {
-  if (!writingTimeSecs && !revisionCount) return "quiet";
-  if (writingTimeSecs < 90 || revisionCount < 2) return "beginning";
-  if (writingTimeSecs < 480 || revisionCount < 5) return "building";
-  return "strong";
+// Tier helper used by the PDF export.
+function tierFromScore(score) {
+  return score?.tier || "Faint";
 }
 
 function readingTime(content) {
@@ -239,11 +261,20 @@ async function fetchCloudDocs() {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("documents")
-    .select("id, content, updated_at");
+    .select("id, content, updated_at, total_writing_secs, revision_count, keystrokes, deletions, pastes, human_score, score_tier, score_features");
   if (error || !data) return [];
   return data.map(r => ({
-    id: r.id, content: r.content,
+    id: r.id,
+    content: r.content,
     updatedAt: new Date(r.updated_at).getTime(),
+    writingTimeSecs: r.total_writing_secs ?? 0,
+    revisionCount: r.revision_count ?? 0,
+    keystrokes: r.keystrokes ?? 0,
+    deletions: r.deletions ?? 0,
+    pastes: r.pastes ?? 0,
+    humanScore: r.human_score,
+    scoreTier: r.score_tier,
+    scoreFeatures: r.score_features || null,
   }));
 }
 
@@ -253,6 +284,14 @@ async function pushDocToCloud(doc, userId) {
     id: doc.id, user_id: userId,
     content: doc.content,
     updated_at: new Date(doc.updatedAt).toISOString(),
+    total_writing_secs: doc.writingTimeSecs || 0,
+    revision_count:     doc.revisionCount  || 0,
+    keystrokes:         doc.keystrokes     || 0,
+    deletions:          doc.deletions      || 0,
+    pastes:             doc.pastes         || 0,
+    human_score:        doc.humanScore     ?? null,
+    score_tier:         doc.scoreTier      ?? null,
+    score_features:     doc.scoreFeatures  ?? null,
   });
 }
 
@@ -273,11 +312,13 @@ function mergeDocs(local, cloud) {
 
 // ─── publications ─────────────────────────────────────────────────────────────
 
+const PUB_SELECT = "id, title, content, published_at, author_name, author_username, user_id, writing_time_seconds, revision_count, human_score, score_tier, score_features, keystrokes, deletions, pastes";
+
 async function fetchFeed() {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("publications")
-    .select("id, title, content, published_at, author_name, author_username, user_id, writing_time_seconds, revision_count")
+    .select(PUB_SELECT)
     .order("published_at", { ascending: false })
     .limit(50);
   if (error || !data) return [];
@@ -288,7 +329,7 @@ async function fetchMyPublications(userId) {
   if (!supabase || !userId) return [];
   const { data, error } = await supabase
     .from("publications")
-    .select("id, doc_id, title, content, published_at, writing_time_seconds, revision_count")
+    .select("id, doc_id, " + PUB_SELECT.replace(/^id, /, ""))
     .eq("user_id", userId)
     .order("published_at", { ascending: false });
   if (error || !data) return [];
@@ -306,6 +347,12 @@ async function doPublish(doc, user, title, authorName, authorUsername) {
     published_at: new Date().toISOString(),
     writing_time_seconds: Math.round(doc.writingTimeSecs || 0),
     revision_count: doc.revisionCount || 0,
+    keystrokes:     doc.keystrokes     || 0,
+    deletions:      doc.deletions      || 0,
+    pastes:         doc.pastes         || 0,
+    human_score:    doc.humanScore     ?? null,
+    score_tier:     doc.scoreTier      ?? null,
+    score_features: doc.scoreFeatures  ?? null,
   };
   let error;
   if (existing) {
@@ -348,7 +395,7 @@ async function fetchPublicationById(id) {
   if (!supabase || !id) return null;
   const { data } = await supabase
     .from("publications")
-    .select("id, title, content, published_at, author_name, author_username, user_id, writing_time_seconds, revision_count")
+    .select(PUB_SELECT)
     .eq("id", id).maybeSingle();
   return data || null;
 }
@@ -395,7 +442,7 @@ async function fetchUserPublications(userId) {
   if (!supabase || !userId) return [];
   const { data, error } = await supabase
     .from("publications")
-    .select("id, title, content, published_at, author_name, writing_time_seconds, revision_count")
+    .select(PUB_SELECT)
     .eq("user_id", userId)
     .order("published_at", { ascending: false });
   if (error || !data) return [];
@@ -522,19 +569,29 @@ function HumanSignalModal({ onClose }) {
   );
 }
 
-// ─── HumanSignalBadge ─────────────────────────────────────────────────────────
+// ─── Build a score-shape from publication/document record fields ─────────────
 
-function HumanSignalBadge({ writingTimeSecs, revisionCount, content }) {
-  if (!writingTimeSecs && !revisionCount) return null;
-  const status = humanSignalStatus(writingTimeSecs, revisionCount);
-  return (
-    <div className="hs-badge">
-      <span className="hs-badge-dot" data-status={status} />
-      <span className="hs-badge-text">
-        Human Signal · {formatWritingTime(writingTimeSecs)} · {revisionCount} rev · {wordCount(content)}w
-      </span>
-    </div>
-  );
+function scoreFromRecord(rec) {
+  if (!rec) return null;
+  // Prefer the new schema fields if present.
+  if (rec.human_score != null && rec.score_tier) {
+    return {
+      score: rec.human_score,
+      tier:  rec.score_tier,
+      confidence: 1,
+      contributors: rec.score_features?.contributors || [],
+      paste_ratio: rec.score_features?.paste_ratio || 0,
+    };
+  }
+  // Legacy fallback for older publications (writing_time_seconds + revision_count).
+  const wt = rec.writing_time_seconds || 0;
+  const rv = rec.revision_count || 0;
+  if (!wt && !rv) return null;
+  let tier = "Faint";
+  if (wt >= 480 || rv >= 5)      tier = "Strong";
+  else if (wt >= 90 || rv >= 2)  tier = "Developing";
+  const score = Math.min(100, Math.round((Math.min(wt, 600) / 600) * 60 + Math.min(rv, 10) * 4));
+  return { score, tier, confidence: 0.5, contributors: [], paste_ratio: 0, legacy: true };
 }
 
 // ─── AuthModal ────────────────────────────────────────────────────────────────
@@ -726,15 +783,12 @@ function Feed({ onRead, onHsModal, onAuthorClick, dropCapImages }) {
               </div>
               <h2 className="pub-card-title">{pub.title}</h2>
               {hook && <p className="pub-card-opening">{hook}</p>}
-              {(pub.writing_time_seconds > 0 || pub.revision_count > 0) ? (
-                <HumanSignalBadge
-                  writingTimeSecs={pub.writing_time_seconds}
-                  revisionCount={pub.revision_count}
-                  content={pub.content}
-                />
-              ) : (
-                <span className="pub-card-words">{wordCount(pub.content)} words</span>
-              )}
+              {(() => {
+                const sc = scoreFromRecord(pub);
+                return sc
+                  ? <HumanSignalBadge score={sc} />
+                  : <span className="pub-card-words">{wordCount(pub.content)} words</span>;
+              })()}
             </article>
           );
         })}
@@ -745,10 +799,13 @@ function Feed({ onRead, onHsModal, onAuthorClick, dropCapImages }) {
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
-function Profile({ user, profile, localDocs, streak, dropCapImages, onRead, onUnpublish, onSignIn, onSignOut, onAvatarChange }) {
+function Profile({ user, profile, localDocs, streak, dropCapImages, onRead, onUnpublish, onSignIn, onSignOut, onAvatarChange, researchOptIn, onToggleOptIn, onDownloadData, onDeleteData }) {
   const [pubs, setPubs]           = useState([]);
   const [loading, setLoading]     = useState(!!user);
   const [uploading, setUploading] = useState(false);
+  const [optBusy, setOptBusy]     = useState(false);
+  const [delBusy, setDelBusy]     = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
   const fileInputRef              = useRef(null);
 
   useEffect(() => {
@@ -849,17 +906,56 @@ function Profile({ user, profile, localDocs, streak, dropCapImages, onRead, onUn
             {pubPreview(pub.content) && (
               <p className="pub-card-preview">{pubPreview(pub.content)}</p>
             )}
-            {(pub.writing_time_seconds > 0 || pub.revision_count > 0) ? (
-              <HumanSignalBadge
-                writingTimeSecs={pub.writing_time_seconds}
-                revisionCount={pub.revision_count}
-                content={pub.content}
-              />
-            ) : (
-              <span className="pub-card-words">{wordCount(pub.content)} words</span>
-            )}
+            {(() => {
+              const sc = scoreFromRecord(pub);
+              return sc
+                ? <HumanSignalBadge score={sc} />
+                : <span className="pub-card-words">{wordCount(pub.content)} words</span>;
+            })()}
           </article>
         ))}
+      </div>
+
+      <div id="research-section">
+        <div id="research-head">
+          <div id="research-title">Research mode</div>
+          <p id="research-blurb">
+            Inkk is studying how humans write — the rhythm, pauses, and revisions behind a piece of text.
+            Opt in to share your anonymised writing patterns (never your text characters for letters or digits) with the research dataset.
+          </p>
+          <label className="research-toggle">
+            <input
+              type="checkbox"
+              checked={!!researchOptIn}
+              disabled={optBusy}
+              onChange={async (e) => {
+                setOptBusy(true);
+                await onToggleOptIn(e.target.checked);
+                setOptBusy(false);
+              }}
+            />
+            <span className="research-toggle-track" aria-hidden="true"><span className="research-toggle-thumb" /></span>
+            <span className="research-toggle-label">{researchOptIn ? "Participating" : "Not participating"}</span>
+          </label>
+        </div>
+        {researchOptIn && (
+          <div id="research-controls">
+            <button className="research-btn" onClick={onDownloadData}>Download my data</button>
+            {!confirmDel ? (
+              <button className="research-btn research-btn-danger" onClick={() => setConfirmDel(true)}>Delete my data</button>
+            ) : (
+              <div className="research-confirm">
+                <span>Delete all your captured writing-process data?</span>
+                <button className="research-btn" onClick={() => setConfirmDel(false)}>Cancel</button>
+                <button
+                  className="research-btn research-btn-danger"
+                  disabled={delBusy}
+                  onClick={async () => { setDelBusy(true); await onDeleteData(); setDelBusy(false); setConfirmDel(false); }}
+                >{delBusy ? "Deleting…" : "Yes, delete"}</button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <button id="signout-btn" onClick={onSignOut}>Sign out</button>
@@ -951,9 +1047,10 @@ function UserProfileView({ profile, onRead, dropCapImages }) {
             </div>
             <h2 className="pub-card-title">{pub.title}</h2>
             {pubPreview(pub.content) && <p className="pub-card-preview">{pubPreview(pub.content)}</p>}
-            {(pub.writing_time_seconds > 0 || pub.revision_count > 0) && (
-              <HumanSignalBadge writingTimeSecs={pub.writing_time_seconds} revisionCount={pub.revision_count} content={pub.content} />
-            )}
+            {(() => {
+              const sc = scoreFromRecord(pub);
+              return sc ? <HumanSignalBadge score={sc} /> : null;
+            })()}
           </article>
         ))}
       </div>
@@ -967,7 +1064,7 @@ function ReadingView({ pub, font }) {
   const containerRef = useRef(null);
   const [progress, setProgress]   = useState(0);
   const [copied, setCopied]       = useState(false);
-  const hasHS = pub.writing_time_seconds > 0 || pub.revision_count > 0;
+  const pubScore = scoreFromRecord(pub);
 
   const handleScroll = useCallback(() => {
     const el = containerRef.current;
@@ -999,13 +1096,7 @@ function ReadingView({ pub, font }) {
             </button>
           </div>
           <h1 id="reading-headline">{pub.title}</h1>
-          {hasHS && (
-            <HumanSignalBadge
-              writingTimeSecs={pub.writing_time_seconds}
-              revisionCount={pub.revision_count}
-              content={pub.content}
-            />
-          )}
+          {pubScore && <HumanSignalBadge score={pubScore} />}
           <div id="reading-text" className={font === "arial" ? "font-arial" : ""} dangerouslySetInnerHTML={{ __html: renderHtml(pub.content) }} />
         </div>
       </div>
@@ -1033,9 +1124,6 @@ export default function App() {
   const [font, setFont]               = useState(() => localStorage.getItem("inkk_font") || "garamond");
   const [showLanding, setShowLanding] = useState(() => !localStorage.getItem("inkk_visited"));
   const [hsModalOpen, setHsModalOpen] = useState(false);
-  const [liveWritingTimeSecs, setLiveWritingTimeSecs] = useState(() =>
-    initDocs.find(d => d.id === initActiveId)?.writingTimeSecs || 0
-  );
   const [streak, setStreak]           = useState(() => loadStreak().count);
   const [toasts, setToasts]           = useState([]);
   const [focusMode, setFocusMode]     = useState(false);
@@ -1045,6 +1133,18 @@ export default function App() {
   const [dropCapImages, setDropCapImages] = useState({});
   const [usernameModalOpen, setUsernameModalOpen] = useState(false);
   const [viewingUser, setViewingUser] = useState(null);
+  const [liveScore, setLiveScore]     = useState(() => {
+    const d = initDocs.find(x => x.id === initActiveId);
+    if (!d?.humanScore || !d?.scoreTier) return null;
+    return {
+      score: d.humanScore, tier: d.scoreTier,
+      confidence: d.scoreFeatures?.confidence ?? 0.5,
+      contributors: d.scoreFeatures?.contributors || [],
+      paste_ratio: d.scoreFeatures?.paste_ratio || 0,
+    };
+  });
+  const [hsPanelOpen, setHsPanelOpen] = useState(false);
+  const [researchOptIn, setResearchOptIn] = useState(false);
 
   const editorRef      = useRef(null);
   const titleEditorRef = useRef(null);
@@ -1065,10 +1165,16 @@ export default function App() {
   const docsRef                = useRef(initDocs);
   const profileRef             = useRef(null);
   const syncedUserRef          = useRef(null);
+  const recorderRef            = useRef(null);
+  const activeIdRef            = useRef(initActiveId);
+  const optInRef               = useRef(false);
+  const scoreTimerRef          = useRef(null);
 
   useEffect(() => { userRef.current = user; }, [user]);
   useEffect(() => { docsRef.current = docs; }, [docs]);
   useEffect(() => { profileRef.current = profile; }, [profile]);
+  useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
+  useEffect(() => { optInRef.current = researchOptIn; }, [researchOptIn]);
   useEffect(() => { localStorage.setItem("inkk_font", font); }, [font]);
   useEffect(() => {
     fetch("/drop_caps/manifest.json").then(r => r.json()).then(setDropCapImages).catch(() => {});
@@ -1087,6 +1193,102 @@ export default function App() {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 2800);
+  }, []);
+
+  // ─── score recompute (debounced) ──────────────────────────────────────────
+  const recomputeScore = useCallback(() => {
+    const docId = activeIdRef.current;
+    if (!docId) return;
+    const rec = recorderRef.current;
+    if (!rec) return;
+    const { events } = rec.snapshot(docId);
+    if (events.length < 8) return;        // very early — don't touch existing score
+    const words = wordCount(contentRef.current || "");
+    const features = extractFeatures(events, { words });
+    const score = computeScore(features);
+
+    // Don't overwrite a previously-persisted high-confidence score with a
+    // low-confidence one (happens briefly after page reload before enough
+    // post-reload telemetry has accumulated).
+    const prevDoc = docsRef.current.find(d => d.id === docId);
+    const prevConf = prevDoc?.scoreFeatures?.confidence ?? 0;
+    if (prevDoc?.humanScore != null && score.confidence + 0.1 < prevConf) {
+      return;
+    }
+
+    setLiveScore({
+      score: score.score,
+      tier: score.tier,
+      confidence: score.confidence,
+      contributors: score.contributors,
+      paste_ratio: score.paste_ratio,
+    });
+
+    // Persist denormalised score + features to the active doc.
+    let nextDoc = null;
+    setDocs(prev => {
+      const next = prev.map(d => d.id !== docId ? d : ({
+        ...d,
+        humanScore: score.score,
+        scoreTier:  score.tier,
+        keystrokes: features.typing_events,
+        deletions:  features.deletion_events,
+        pastes:     features.paste_events,
+        revisionCount: features.mid_revisions + features.typo_corrections,
+        scoreFeatures: {
+          confidence: score.confidence,
+          contributors: score.contributors,
+          paste_ratio: score.paste_ratio,
+          iki_cv: features.iki?.cv ?? 0,
+          dwell_std: features.dwell?.std ?? 0,
+          burst_count: features.burst_count,
+          mid_revisions: features.mid_revisions,
+          typo_corrections: features.typo_corrections,
+          pause_count_500: features.pause_count_500,
+        },
+      }));
+      nextDoc = next.find(d => d.id === docId);
+      saveState(next, docId);
+      return next;
+    });
+    // Debounced cloud push (the save-timer also pushes content; here we push score too).
+    if (userRef.current && nextDoc) pushDocToCloud(nextDoc, userRef.current.id);
+  }, []);
+
+  const scheduleRecompute = useCallback(() => {
+    if (scoreTimerRef.current) clearTimeout(scoreTimerRef.current);
+    scoreTimerRef.current = setTimeout(recomputeScore, 700);
+  }, [recomputeScore]);
+
+  // ─── recorder lifecycle ───────────────────────────────────────────────────
+  useEffect(() => {
+    const rec = createRecorder({
+      getContext: () => ({
+        userId: userRef.current?.id || null,
+        docId:  activeIdRef.current || null,
+        optedIn: !!optInRef.current,
+      }),
+      onUpdate: () => scheduleRecompute(),
+    });
+    recorderRef.current = rec;
+    if (editorRef.current) rec.attach(editorRef.current);
+    return () => {
+      if (scoreTimerRef.current) clearTimeout(scoreTimerRef.current);
+      rec.detach();
+    };
+  }, [scheduleRecompute]);
+
+  // ─── cloud event sync ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!supabase) return;
+    startSync({
+      supabase,
+      getContext: () => ({
+        userId:  userRef.current?.id || null,
+        optedIn: !!optInRef.current,
+      }),
+    });
+    return () => stopSync();
   }, []);
 
   const handleAvatarChange = useCallback(async (avatarData) => {
@@ -1145,7 +1347,17 @@ export default function App() {
     writingBaseRef.current = doc.writingTimeSecs || 0;
     writingFlushRef.current = 0;
     writingSessionStartRef.current = null;
-    setLiveWritingTimeSecs(doc.writingTimeSecs || 0);
+    // Restore cached score for this doc if we have one.
+    if (doc.humanScore != null && doc.scoreTier) {
+      setLiveScore({
+        score: doc.humanScore, tier: doc.scoreTier,
+        confidence: doc.scoreFeatures?.confidence ?? 0.5,
+        contributors: doc.scoreFeatures?.contributors || [],
+        paste_ratio: doc.scoreFeatures?.paste_ratio || 0,
+      });
+    } else {
+      setLiveScore(null);
+    }
     const range = document.createRange();
     range.selectNodeContents(el);
     range.collapse(false);
@@ -1170,13 +1382,7 @@ export default function App() {
       let merged = (hasLocalContent || !cloudDocs.length)
         ? mergeDocs(localDocs, cloudDocs) : cloudDocs;
       if (!merged.length) merged = [createDoc()];
-      merged = merged.map(d => ({
-        ...d,
-        title: d.title ?? "",
-        createdAt: d.createdAt || d.updatedAt || Date.now(),
-        writingTimeSecs: d.writingTimeSecs || 0,
-        revisionCount: d.revisionCount || 0,
-      }));
+      merged = merged.map(normaliseDoc);
       const cloudIds = new Set(cloudDocs.map(d => d.id));
       for (const doc of merged)
         if (!cloudIds.has(doc.id) && stripHtml(doc.content).trim())
@@ -1191,6 +1397,13 @@ export default function App() {
       const prof = await fetchProfile(signedInUser.id);
       if (prof) setProfile(prof);
       else setUsernameModalOpen(true);
+      // Load research opt-in flag.
+      const opt = await getResearchOptIn(supabase, signedInUser.id);
+      optInRef.current = opt;
+      setResearchOptIn(opt);
+      recorderRef.current?.recordUserChange(signedInUser.id);
+      // Claim any pre-signed-in events captured on this device so they sync too.
+      claimAnonymousEvents(signedInUser.id);
     };
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -1198,7 +1411,12 @@ export default function App() {
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" && session?.user) syncOnLogin(session.user);
-      if (event === "SIGNED_OUT") { syncedUserRef.current = null; setUser(null); setPublishedDocIds(new Set()); setProfile(null); setUsernameModalOpen(false); }
+      if (event === "SIGNED_OUT") {
+        syncedUserRef.current = null;
+        setUser(null); setPublishedDocIds(new Set()); setProfile(null); setUsernameModalOpen(false);
+        setResearchOptIn(false); optInRef.current = false;
+        recorderRef.current?.recordUserChange(null);
+      }
     });
     return () => subscription.unsubscribe();
   }, [loadDocIntoEditor]);
@@ -1207,6 +1425,7 @@ export default function App() {
 
   const switchDoc = useCallback((id) => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    if (scoreTimerRef.current) { clearTimeout(scoreTimerRef.current); scoreTimerRef.current = null; }
     let timeToSave = writingBaseRef.current + writingFlushRef.current;
     if (writingSessionStartRef.current !== null) {
       timeToSave += (Date.now() - writingSessionStartRef.current) / 1000;
@@ -1221,7 +1440,20 @@ export default function App() {
       return flushed;
     });
     setSaveStatus("saved");
+    recorderRef.current?.recordDocSwitch(id);
     setActiveId(id);
+    // Hydrate liveScore from the target doc immediately.
+    const target = docsRef.current.find(d => d.id === id);
+    if (target?.humanScore != null && target?.scoreTier) {
+      setLiveScore({
+        score: target.humanScore, tier: target.scoreTier,
+        confidence: target.scoreFeatures?.confidence ?? 0.5,
+        contributors: target.scoreFeatures?.contributors || [],
+        paste_ratio:  target.scoreFeatures?.paste_ratio || 0,
+      });
+    } else {
+      setLiveScore(null);
+    }
     setPanelOpen(false);
   }, [activeId]);
 
@@ -1236,6 +1468,7 @@ export default function App() {
 
   const newDoc = useCallback(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    if (scoreTimerRef.current) { clearTimeout(scoreTimerRef.current); scoreTimerRef.current = null; }
     let timeToSave = writingBaseRef.current + writingFlushRef.current;
     if (writingSessionStartRef.current !== null) {
       timeToSave += (Date.now() - writingSessionStartRef.current) / 1000;
@@ -1251,7 +1484,9 @@ export default function App() {
       saveState(next, doc.id);
       return next;
     });
+    recorderRef.current?.recordDocSwitch(doc.id);
     setActiveId(doc.id);
+    setLiveScore(null);
     setPanelOpen(false);
   }, [activeId]);
 
@@ -1262,12 +1497,27 @@ export default function App() {
       if (prev.length === 1) {
         const fresh = createDoc();
         saveState([fresh], fresh.id);
+        recorderRef.current?.recordDocSwitch(fresh.id);
         setActiveId(fresh.id);
+        setLiveScore(null);
         return [fresh];
       }
       const next = prev.filter(d => d.id !== id);
       const newActive = id === activeId ? next[0].id : activeId;
-      if (id === activeId) setActiveId(newActive);
+      if (id === activeId) {
+        if (scoreTimerRef.current) { clearTimeout(scoreTimerRef.current); scoreTimerRef.current = null; }
+        recorderRef.current?.recordDocSwitch(newActive);
+        setActiveId(newActive);
+        const target = next.find(d => d.id === newActive);
+        if (target?.humanScore != null && target?.scoreTier) {
+          setLiveScore({
+            score: target.humanScore, tier: target.scoreTier,
+            confidence: target.scoreFeatures?.confidence ?? 0.5,
+            contributors: target.scoreFeatures?.contributors || [],
+            paste_ratio:  target.scoreFeatures?.paste_ratio || 0,
+          });
+        } else setLiveScore(null);
+      }
       saveState(next, newActive);
       return next;
     });
@@ -1311,6 +1561,37 @@ export default function App() {
     addToast("Signed out.");
   }, [addToast]);
 
+  // ─ research mode controls ──────────────────────────────────────────────────
+
+  const toggleResearchOptIn = useCallback(async (next) => {
+    if (!supabase || !userRef.current) { addToast("Sign in first."); return; }
+    const err = await remoteSetResearchOptIn(supabase, userRef.current.id, next);
+    if (err) { addToast("Could not update."); return; }
+    optInRef.current = next;
+    setResearchOptIn(next);
+    addToast(next ? "Joined the research study." : "Left the study.");
+  }, [addToast]);
+
+  const downloadResearchData = useCallback(async () => {
+    if (!supabase || !userRef.current) return;
+    const data = await dumpMyEvents(supabase, userRef.current.id);
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url;
+    a.download = `inkk-writing-events-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    addToast(`Downloaded ${data.length} events.`);
+  }, [addToast]);
+
+  const deleteResearchData = useCallback(async () => {
+    if (!supabase || !userRef.current) return;
+    const err = await deleteMyEvents(supabase);
+    if (err) addToast("Could not delete.");
+    else addToast("Research data deleted.");
+  }, [addToast]);
+
   // ─ typing ───────────────────────────────────────────────────────────────────
 
   const scheduleMenuReturn = useCallback(() => {
@@ -1351,9 +1632,6 @@ export default function App() {
     setMenuVisible(false);
 
     if (writingSessionStartRef.current === null) writingSessionStartRef.current = Date.now();
-    const liveTime = writingBaseRef.current + writingFlushRef.current +
-      (Date.now() - writingSessionStartRef.current) / 1000;
-    setLiveWritingTimeSecs(liveTime);
 
     scheduleMenuReturn();
     scrollToCursor();
@@ -1370,7 +1648,7 @@ export default function App() {
       setDocs(prev => {
         const next = prev.map(d =>
           d.id === capturedId
-            ? { ...d, title: capturedTitle, content: capturedContent, updatedAt: capturedUpdatedAt, writingTimeSecs: capturedTime, revisionCount: (d.revisionCount || 0) + 1 }
+            ? { ...d, title: capturedTitle, content: capturedContent, updatedAt: capturedUpdatedAt, writingTimeSecs: capturedTime }
             : d
         );
         saveState(next, capturedId);
@@ -1468,8 +1746,9 @@ export default function App() {
       : (u?.user_metadata?.full_name || u?.email?.split("@")[0] || "");
     const dateStr   = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
     const wtSecs    = sourceDoc?.writingTimeSecs || 0;
-    const revs      = sourceDoc?.revisionCount   || 0;
-    const hasHS     = wtSecs > 0 || revs > 0;
+    const docScore  = (sourceDoc?.humanScore != null && sourceDoc?.scoreTier)
+      ? { score: sourceDoc.humanScore, tier: sourceDoc.scoreTier } : null;
+    const hasHS     = !!docScore || wtSecs > 0;
 
     // page geometry
     const pdf = new jsPDF({ unit: "pt", format: "a4" });
@@ -1530,7 +1809,9 @@ export default function App() {
     if (hasHS) {
       pdf.setFontSize(8);
       setC(C_FAINT);
-      const hs = `Human Signal: ${humanSignalStatus(wtSecs, revs)}  ·  ${formatWritingTime(wtSecs)}  ·  ${revs} ${revs === 1 ? "revision" : "revisions"}  ·  ${wordCount(text)} words`;
+      const tier = tierFromScore(docScore);
+      const scoreStr = docScore?.score != null ? `  ·  ${docScore.score}/100` : "";
+      const hs = `Human Signal: ${tier}${scoreStr}  ·  ${formatWritingTime(wtSecs)}  ·  ${wordCount(text)} words`;
       pdf.text(hs, pW / 2, y, { align: "center" });
       y += 14;
     }
@@ -1645,9 +1926,6 @@ export default function App() {
   const isEditor  = view === "editor";
   const menuClass = menuVisible ? "menu-visible" : "menu-hidden";
 
-  const activeDoc    = docs.find(d => d.id === activeId);
-  const liveRevCount = activeDoc?.revisionCount || 0;
-  const hsStatus     = humanSignalStatus(liveWritingTimeSecs, liveRevCount);
   const sortedDocs   = [...docs].sort((a, b) => b.updatedAt - a.updatedAt);
   const hasContent   = words > 0;
   const isPublished  = publishedDocIds.has(activeId);
@@ -1784,15 +2062,18 @@ export default function App() {
         </div>
       )}
 
-      {/* ── human signal status (editor) ── */}
+      {/* ── human signal indicator (editor) ── */}
       {isEditor && hasContent && (
         <div id="hs-editor-status" className={menuClass}>
-          <span id="hs-status-label">Human Signal: {hsStatus}</span>
-          <span id="hs-status-sub">
-            {formatWritingTime(liveWritingTimeSecs)} · {liveRevCount} rev · {words}w · {saveStatus === "saving" ? "saving…" : "saved"}
-          </span>
+          <HumanSignalLine
+            score={liveScore}
+            words={words}
+            saveStatus={saveStatus}
+            onClick={() => setHsPanelOpen(true)}
+          />
         </div>
       )}
+      {hsPanelOpen && <HumanSignalPanel score={liveScore} onClose={() => setHsPanelOpen(false)} />}
 
       {/* ── editor (always mounted) ── */}
       <div
@@ -1859,6 +2140,10 @@ export default function App() {
           onSignIn={() => setAuthOpen(true)}
           onSignOut={signOut}
           onAvatarChange={handleAvatarChange}
+          researchOptIn={researchOptIn}
+          onToggleOptIn={toggleResearchOptIn}
+          onDownloadData={downloadResearchData}
+          onDeleteData={deleteResearchData}
         />
       )}
       {view === "search" && (
