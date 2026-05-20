@@ -2171,7 +2171,7 @@ export default function App() {
 
       await renderBookPdfPages({
         title: titleStr,
-        body: stripHtml(text).trim(),
+        html: text,
         async onPage(canvas, pageIndex /*, totalPages */) {
           if (pageIndex > 0) pdf.addPage([PAGE_W_PT, PAGE_H_PT]);
           const dataUrl = canvas.toDataURL("image/jpeg", 0.92);

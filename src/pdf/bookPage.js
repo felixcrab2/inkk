@@ -1,57 +1,66 @@
 // Book-page PDF renderer.
 //
-// Renders each page onto a very-high-DPI canvas with a real paper-texture
-// background and warm ink drawn in `multiply` blend mode. Text is fully
-// justified with classical book-style paragraph indentation. Each canvas
-// is embedded as a JPEG in a custom-sized PDF — the result is meant to be
-// shareable as a book-page image.
+// Parses the editor's HTML (paragraphs, line breaks and images), lays the
+// content out on a high-DPI canvas with classical book typography
+// (justified text, drop cap, paragraph indents, hard line breaks preserved),
+// and embeds each page as a JPEG inside a custom-sized PDF.
+//
+// All ink (text and images) is drawn under `multiply` blend mode, then a
+// second pass of the paper texture is applied in `soft-light` to bake the
+// page's fibres into both letters and photographs.
 
 import bookPaperTexture from "../assets/blankpage.jpg";
 
 const TEX_W = 1450;
 const TEX_H = 1930;
 
-// PDF page in points (1 pt = 1/72 in). Matches the texture's aspect so paper
-// doesn't get squashed.
 export const PAGE_W_PT = 480;                                      // ~6.67"
 export const PAGE_H_PT = Math.round(PAGE_W_PT * (TEX_H / TEX_W));  // ~639
 
-// Canvas render scale. 4× ≈ 288 dpi — text stays crisp at any export size.
+// Canvas scale. 4× ≈ 288 dpi — crisp at Instagram sizes.
 const PX = 4;
 const CW = PAGE_W_PT * PX;
 const CH = PAGE_H_PT * PX;
 
-// Warm ink — slightly lighter than pure black so the multiply blend with
-// cream paper feels like absorbed letterpress ink rather than printed toner.
+// Warm ink, slightly transparent under multiply for "absorbed letterpress".
 const INK_BODY    = "#241a12";
 const INK_TITLE   = "#1f1610";
 const INK_FOOTER  = "#7a6a58";
 const INK_HEADER  = "#a8967e";
 const INK_ALPHA   = 0.93;
 
-// Margins (pt). Generous, book-like; outer margin slightly wider than top.
-const M_X       = 64;
-const M_TOP     = 86;
-const M_BOT     = 70;
-const HEADER_Y  = 36;   // running header baseline (in pt, from top)
-const FOOTER_Y_FROM_BOTTOM = 32;
+// Margins (pt). Generous, book-like.
+const M_X       = 72;
+const M_TOP     = 96;
+const M_BOT     = 80;
+const HEADER_Y  = 40;   // running header baseline (pt from top)
+const FOOTER_FROM_BOTTOM = 34;
 
 // Typography (pt).
-const T_TITLE   = 13;     // first-page chapter heading — italic, small
-const T_HEADER  = 8.5;    // running header on subsequent pages
+const T_TITLE   = 13.5;
+const T_HEADER  = 8.5;
 const T_BODY    = 11.25;
-const T_DROPCAP = 38;
+const T_DROPCAP = 56;
 const T_FOOTER  = 9;
 
-// Leading and indents.
+// Drop cap spans this many body lines.
+const DROPCAP_LINES = 3;
+
 const LINE_H_PT      = T_BODY * 1.55;
 const LINE_H         = LINE_H_PT * PX;
-const PARA_GAP       = 4 * PX;          // tiny extra between paragraphs (most of the air comes from indent)
-const PARA_INDENT_PT = 16;              // first-line indent (~1.4em)
+const PARA_GAP       = 4 * PX;
+const PARA_INDENT_PT = 16;
 const PARA_INDENT    = PARA_INDENT_PT * PX;
 
-// Justification safety: collapse to left-aligned if gap-spacing would exceed
-// this multiple of the natural space width (avoids huge gaps on short lines).
+const IMG_VPAD_PT  = 12;
+const IMG_VPAD     = IMG_VPAD_PT * PX;
+const IMG_WIDTH_FRAC = 1.0;   // images fill the text measure (0–1)
+
+// Title wrap leading multiplier.
+const TITLE_LINE_MULT = 1.3;
+
+// Justification: collapse to flush-left if word gaps would exceed this
+// multiple of the natural space width.
 const MAX_GAP_RATIO  = 2.6;
 
 // ── helpers ───────────────────────────────────────────────────────────────
@@ -68,19 +77,100 @@ function loadTexture() {
   return textureCache;
 }
 
-function font(sizePt, italic = false, smallCaps = false) {
-  const variant = smallCaps ? "small-caps " : "";
-  return `${italic ? "italic " : ""}${variant}${sizePt * PX}px "Cormorant Garamond", "EB Garamond", Georgia, serif`;
+function loadImg(src) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload  = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
 }
 
-// Wrap a paragraph into lines, where the FIRST `narrowCount` lines may
-// have a reduced width (for drop-cap wrap, or first-line indent).
-function wrapPara(ctx, text, fullWidth, opts = {}) {
+function font(sizePt, italic = false) {
+  return `${italic ? "italic " : ""}${sizePt * PX}px "Cormorant Garamond", "EB Garamond", Georgia, serif`;
+}
+
+// Parse the editor HTML into an ordered list of blocks:
+//   { type: "text",  segments: ["seg-1 text", "seg-2 text", ...] }
+//   { type: "image", src }
+// Segments inside a text block are joined by hard line-breaks; blocks are
+// joined by paragraph breaks.
+function parseHtmlToBlocks(html) {
+  const container = document.createElement("div");
+  container.innerHTML = html || "";
+
+  const tokens = [];
+  function walk(node) {
+    if (node.nodeType === 3) {
+      if (node.nodeValue) tokens.push({ type: "text", text: node.nodeValue });
+      return;
+    }
+    if (node.nodeType !== 1) return;
+    const tag = node.tagName.toLowerCase();
+    if (tag === "img") {
+      const src = node.getAttribute("src");
+      if (src) tokens.push({ type: "image", src });
+      return;
+    }
+    if (tag === "br") { tokens.push({ type: "break" }); return; }
+    const block = tag === "div" || tag === "p" || tag === "h1" || tag === "h2" || tag === "h3" || tag === "li" || tag === "blockquote";
+    for (const child of node.childNodes) walk(child);
+    if (block) tokens.push({ type: "break" });
+  }
+  for (const child of container.childNodes) walk(child);
+
+  // Collapse into blocks.
+  const blocks = [];
+  let curText = [];
+  let curSegments = [];
+  let breaks = 0;
+
+  const flushSeg = () => {
+    if (curText.length) {
+      const merged = curText.join("").replace(/\s+/g, " ").trim();
+      if (merged) curSegments.push(merged);
+      curText = [];
+    }
+  };
+  const flushPara = () => {
+    flushSeg();
+    if (curSegments.length) {
+      blocks.push({ type: "text", segments: curSegments });
+      curSegments = [];
+    }
+  };
+
+  for (const tok of tokens) {
+    if (tok.type === "text") {
+      breaks = 0;
+      const parts = tok.text.split("\n");
+      for (let i = 0; i < parts.length; i++) {
+        if (parts[i]) curText.push(parts[i]);
+        if (i < parts.length - 1) flushSeg();
+      }
+    } else if (tok.type === "break") {
+      flushSeg();
+      breaks++;
+      if (breaks >= 2) { flushPara(); breaks = 0; }
+    } else if (tok.type === "image") {
+      breaks = 0;
+      flushPara();
+      blocks.push({ type: "image", src: tok.src });
+    }
+  }
+  flushPara();
+  return blocks;
+}
+
+// Wrap a single text segment into lines, supporting a narrower width for the
+// first `narrowCount` lines (used for drop cap and first-line indent).
+function wrapSegment(ctx, text, fullWidth, opts = {}) {
   const { narrowCount = 0, narrowWidth = fullWidth } = opts;
-  const widthFor = (idx) => idx < narrowCount ? narrowWidth : fullWidth;
+  const widthFor = (i) => i < narrowCount ? narrowWidth : fullWidth;
   const out = [];
   const words = text.split(/\s+/).filter(Boolean);
-  if (!words.length) return [{ text: "", width: fullWidth }];
+  if (!words.length) return out;
 
   let line = "";
   let idx = 0;
@@ -90,8 +180,8 @@ function wrapPara(ctx, text, fullWidth, opts = {}) {
       line = test;
     } else {
       if (line) { out.push({ text: line, width: widthFor(idx) }); idx++; }
-      // Word longer than the line width: break by character.
       if (ctx.measureText(w).width > widthFor(idx)) {
+        // Break overlong word by character.
         let chunk = "";
         for (const ch of w) {
           if (ctx.measureText(chunk + ch).width > widthFor(idx)) {
@@ -106,20 +196,15 @@ function wrapPara(ctx, text, fullWidth, opts = {}) {
     }
   }
   if (line) out.push({ text: line, width: widthFor(idx) });
-  // Mark the last line.
-  if (out.length) out[out.length - 1].lastOfPara = true;
-  if (out.length) out[0].firstOfPara = true;
+  if (out.length) out[out.length - 1].endOfSegment = true;
   return out;
 }
 
-// Draw one line, justified across `lineWidth` from `x`, unless it's the last
-// line of a paragraph or the spacing would look absurd — in which case draw it
-// flush-left.
 function drawLine(ctx, line, x, y) {
   const text = line.text;
   if (!text) return;
   const words = text.split(" ").filter(Boolean);
-  if (words.length <= 1 || line.lastOfPara) {
+  if (words.length <= 1 || line.endOfSegment) {
     ctx.fillText(text, x, y);
     return;
   }
@@ -138,51 +223,77 @@ function drawLine(ctx, line, x, y) {
   }
 }
 
-// Paginate the body. Page 1 may have less vertical room (chapter title).
-function paginate(items, firstPageHeight, otherPageHeight) {
+// Compute the height in canvas px an image will take given the available text
+// width. Capped to a fraction of the page height so a tall photo doesn't push
+// everything else out.
+function imageDims(image, fullWidth, maxHeightOnPage) {
+  if (!image || !image.naturalWidth) return { w: 0, h: 0 };
+  const w = fullWidth * IMG_WIDTH_FRAC;
+  let h = w * (image.naturalHeight / image.naturalWidth);
+  if (h > maxHeightOnPage) {
+    h = maxHeightOnPage;
+  }
+  return { w, h };
+}
+
+// Take a list of render items and pack into pages, respecting available
+// vertical space.
+function paginate(items, firstPageHeight, otherPageHeight, fullWidth) {
   const pages = [];
   let i = 0;
   let isFirst = true;
+
   while (i < items.length) {
     const avail = isFirst ? firstPageHeight : otherPageHeight;
     let used = 0;
     const taken = [];
     let firstOfPage = true;
+
     while (i < items.length) {
       const it = items[i];
-      const cost = it.type === "gap" ? PARA_GAP : LINE_H;
-      // Drop a leading paragraph gap at the very top of a page — it's just
-      // wasted whitespace.
+      let cost = 0;
+      if (it.type === "line")     cost = LINE_H;
+      else if (it.type === "gap") cost = PARA_GAP;
+      else if (it.type === "image") {
+        // Resize to fit remaining space if image is huge.
+        const { w, h } = imageDims(it.img, fullWidth, otherPageHeight - 2 * IMG_VPAD);
+        it._w = w; it._h = h;
+        cost = h + 2 * IMG_VPAD;
+      }
       if (firstOfPage && it.type === "gap") { i++; continue; }
-      if (used + cost > avail) break;
+      // If an image doesn't fit, bump to next page (unless it's so tall
+      // nothing fits anywhere — then accept and crop on this page).
+      if (it.type === "image" && used + cost > avail && taken.length) break;
+      if (it.type !== "image" && used + cost > avail) break;
       taken.push(it); used += cost; i++; firstOfPage = false;
     }
     pages.push(taken);
-    if (!taken.length) break;        // safety
+    if (!taken.length) break;
     isFirst = false;
   }
   return pages;
 }
 
-// ── public renderer ───────────────────────────────────────────────────────
+// ── page rendering ────────────────────────────────────────────────────────
 
-async function renderOnePage({ texture, drawInk, drawDecor }) {
+async function renderOnePage({ texture, drawInk }) {
   const canvas = document.createElement("canvas");
   canvas.width  = CW;
   canvas.height = CH;
   const ctx = canvas.getContext("2d");
 
-  // 1. Paper — full bleed.
+  // 1. Paper full-bleed.
   ctx.drawImage(texture, 0, 0, CW, CH);
 
-  // 2. Ink, drawn with multiply blend so it lives in the paper, not on top.
+  // 2. All ink (text + images) drawn under multiply blend, slightly
+  //    transparent.
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
   ctx.globalAlpha = INK_ALPHA;
   drawInk(ctx);
   ctx.restore();
 
-  // 3. Sparse grain on top for cohesion (very faint).
+  // 3. Sparse grain for cohesion.
   ctx.save();
   ctx.globalAlpha = 0.025;
   ctx.fillStyle = "#1a1410";
@@ -194,93 +305,146 @@ async function renderOnePage({ texture, drawInk, drawDecor }) {
   }
   ctx.restore();
 
-  // 4. A second pass of the paper texture in `soft-light` blend mode at very
-  // low opacity. This bakes the paper's fibres into the ink so the text looks
-  // a little uneven, like absorbed letterpress.
+  // 4. Paper-on-paper soft-light pass — bakes fibres into both letters and
+  //    photographs.
   ctx.save();
   ctx.globalCompositeOperation = "soft-light";
   ctx.globalAlpha = 0.45;
   ctx.drawImage(texture, 0, 0, CW, CH);
   ctx.restore();
 
-  if (drawDecor) drawDecor(ctx);
   return canvas;
 }
 
 /**
- * Render the book PDF for the given content.
+ * Render the book PDF for the given HTML body.
  *
  * @param {object} opts
- * @param {string} opts.title          — title (used as quiet chapter heading on page 1 and running header on page 2+)
- * @param {string} opts.body           — plain text body (paragraphs separated by blank lines)
- * @param {function} opts.onPage       — async fn(canvas, pageIndex, totalPages) called per page
+ * @param {string} opts.title          — used as a small italic chapter title
+ *                                       on page 1 (wraps) and a tiny running
+ *                                       header on subsequent pages.
+ * @param {string} opts.html           — editor HTML (paragraphs, line breaks,
+ *                                       images preserved).
+ * @param {function} opts.onPage       — async fn(canvas, pageIndex, totalPages)
  */
-export async function renderBookPdfPages({ title, body, onPage }) {
+export async function renderBookPdfPages({ title, html, onPage }) {
   await document.fonts.ready;
   const texture = await loadTexture();
 
+  // Measurement canvas (for wrap and layout calculations).
   const measure = document.createElement("canvas");
   measure.width = CW; measure.height = CH;
   const mctx = measure.getContext("2d");
 
-  const fullWidth   = (PAGE_W_PT - M_X * 2) * PX;
-  const bodyTop     = M_TOP * PX;
-  const bodyBottom  = (PAGE_H_PT - M_BOT) * PX;
+  const fullWidth  = (PAGE_W_PT - M_X * 2) * PX;
+  const bodyTop    = M_TOP * PX;
+  const bodyBottom = (PAGE_H_PT - M_BOT) * PX;
   const otherPageHeight = bodyBottom - bodyTop;
 
-  // Title block measurement (drives firstPageHeight).
-  const hasTitle = !!title && title.trim();
-  const titleBlockH = hasTitle ? (T_TITLE * PX * 1.5 + 28 * PX) : 0;
+  // ── Title (wrapped) ──────────────────────────────────────────────────────
+  const titleStr = (title || "").trim();
+  let titleLines = [];
+  let titleBlockH = 0;
+  if (titleStr) {
+    mctx.font = font(T_TITLE, true);
+    titleLines = wrapSegment(mctx, titleStr, fullWidth).map(l => l.text);
+    if (!titleLines.length) titleLines = [titleStr];
+    titleBlockH = titleLines.length * T_TITLE * PX * TITLE_LINE_MULT + 26 * PX;
+  }
   const firstPageHeight = otherPageHeight - titleBlockH;
 
-  // Drop-cap planning.
-  mctx.font = font(T_BODY);
-  const firstChar = (body.trim()[0] || "").toUpperCase();
-  const useDropCap = firstChar && /[A-Za-z]/.test(firstChar);
+  // ── Body: parse and preload images ───────────────────────────────────────
+  const blocks = parseHtmlToBlocks(html);
+  // Strip leading empty text blocks.
+  while (blocks.length && blocks[0].type === "text" && !blocks[0].segments.length) blocks.shift();
+
+  // Drop cap based on the first character of the first text block.
+  let firstChar = "";
+  let useDropCap = false;
+  if (blocks.length && blocks[0].type === "text" && blocks[0].segments.length) {
+    const first = blocks[0].segments[0];
+    const c = (first.match(/^\s*([A-Za-z])/) || [])[1];
+    if (c) {
+      firstChar = c.toUpperCase();
+      useDropCap = true;
+      // Remove the first letter from the first segment.
+      blocks[0] = {
+        type: "text",
+        segments: [
+          first.replace(/^\s*[A-Za-z]/, ""),
+          ...blocks[0].segments.slice(1),
+        ].map(s => s ?? ""),
+      };
+    }
+  }
+
   const dropCapW   = useDropCap ? T_DROPCAP * PX * 0.72 : 0;
   const dropCapH   = useDropCap ? T_DROPCAP * PX * 0.95 : 0;
-  const dropCapIndent = useDropCap ? dropCapW + 8 * PX : 0;
+  const dropCapIndent = useDropCap ? dropCapW + 10 * PX : 0;
 
-  // Wrap each paragraph.
-  const trimmed = body.trim();
-  const firstBodyText = useDropCap ? trimmed.slice(1) : trimmed;
-  const paraTexts = firstBodyText.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
-  if (!paraTexts.length) paraTexts.push("");
+  // Preload images so we can size them during pagination.
+  await Promise.all(blocks.filter(b => b.type === "image").map(async (b) => {
+    b.img = await loadImg(b.src);
+  }));
 
-  // Build an ordered list of `{type:"line", ...}` and `{type:"gap"}` items.
+  // Build render items.
   const items = [];
-  paraTexts.forEach((para, pi) => {
-    if (pi > 0) items.push({ type: "gap" });
-    const isFirstPara = pi === 0;
-    const wrapOpts = isFirstPara
-      ? (useDropCap
-        ? { narrowCount: 2, narrowWidth: fullWidth - dropCapIndent }
-        : {})
-      : { narrowCount: 1, narrowWidth: fullWidth - PARA_INDENT };
-    const lines = wrapPara(mctx, para, fullWidth, wrapOpts);
-    lines.forEach((ln, li) => {
-      items.push({
-        type: "line",
-        text: ln.text,
-        width: ln.width,
-        firstOfPara: li === 0,
-        lastOfPara: li === lines.length - 1,
-        paraIndex: pi,
-        lineInPara: li,
-        // First two body lines of the drop-cap paragraph are indented around the cap.
-        dropCapIndented: isFirstPara && useDropCap && li < 2,
-        // First line of every paragraph except the dropcap one is indented.
-        indented: !isFirstPara && li === 0,
+  blocks.forEach((block, bi) => {
+    if (block.type === "image") {
+      if (block.img) items.push({ type: "image", img: block.img });
+      return;
+    }
+    // text block
+    if (bi > 0) items.push({ type: "gap" });
+    let dropCapLinesLeft = (bi === 0 && useDropCap) ? DROPCAP_LINES : 0;
+    const isFirstParaForIndent = bi > 0;
+    block.segments.forEach((seg, si) => {
+      // For segment 0 of a paragraph (not first paragraph) → first-line indent.
+      const wantsParaIndent = si === 0 && isFirstParaForIndent;
+      const wrapOpts = {};
+      if (dropCapLinesLeft > 0) {
+        wrapOpts.narrowCount = dropCapLinesLeft;
+        wrapOpts.narrowWidth = fullWidth - dropCapIndent;
+      } else if (wantsParaIndent) {
+        wrapOpts.narrowCount = 1;
+        wrapOpts.narrowWidth = fullWidth - PARA_INDENT;
+      }
+      mctx.font = font(T_BODY);
+      const lines = wrapSegment(mctx, seg || "", fullWidth, wrapOpts);
+      lines.forEach((ln, li) => {
+        const item = {
+          type: "line",
+          text: ln.text,
+          width: ln.width,
+          endOfSegment: !!ln.endOfSegment,
+        };
+        if (li < (wrapOpts.narrowCount || 0)) {
+          // Apply indent visually.
+          if (dropCapLinesLeft > 0) {
+            item.indent = dropCapIndent;
+            dropCapLinesLeft = Math.max(0, dropCapLinesLeft - 1);
+          } else if (wantsParaIndent && li === 0) {
+            item.indent = PARA_INDENT;
+          }
+        } else if (dropCapLinesLeft > 0 && li >= (wrapOpts.narrowCount || 0)) {
+          // Should not happen with the above wrapOpts, but be defensive.
+          dropCapLinesLeft = 0;
+        }
+        items.push(item);
       });
+      // If segment wrapped into fewer lines than dropCapLinesLeft, we still
+      // need to consume those lines. Subtract by lines.length on top of what
+      // was applied above? Already handled in the loop.
     });
   });
 
-  const pages = paginate(items, firstPageHeight, otherPageHeight);
-  const totalPages = pages.length;
+  const pages = paginate(items, firstPageHeight, otherPageHeight, fullWidth);
+  const totalPages = pages.length || 1;
 
   for (let pi = 0; pi < totalPages; pi++) {
     const isFirst = pi === 0;
     const pageNum = pi + 1;
+    const pageItems = pages[pi] || [];
 
     const canvas = await renderOnePage({
       texture,
@@ -288,59 +452,81 @@ export async function renderBookPdfPages({ title, body, onPage }) {
         ctx.textBaseline = "alphabetic";
         let y = bodyTop;
 
-        // ── Page 1: small italic chapter title ───────────────────────────
-        if (isFirst && hasTitle) {
+        // ── Page 1: small italic chapter title (wrapped) ────────────────
+        if (isFirst && titleStr) {
           ctx.font = font(T_TITLE, true);
           ctx.fillStyle = INK_TITLE;
           ctx.textAlign = "center";
-          ctx.fillText(title.trim(), CW / 2, y + T_TITLE * PX);
-          y += T_TITLE * PX * 1.5 + 28 * PX;
+          for (const ln of titleLines) {
+            ctx.fillText(ln, CW / 2, y + T_TITLE * PX);
+            y += T_TITLE * PX * TITLE_LINE_MULT;
+          }
+          y += 18 * PX;       // space after title block
         }
 
-        // ── Subsequent pages: running header with title in italic ─────────
-        if (!isFirst && hasTitle) {
+        // ── Page 2+: tiny italic running header ─────────────────────────
+        if (!isFirst && titleStr) {
           ctx.font = font(T_HEADER, true);
           ctx.fillStyle = INK_HEADER;
           ctx.textAlign = "center";
-          ctx.fillText(title.trim(), CW / 2, HEADER_Y * PX);
+          // For long titles, truncate header — running header should be one line.
+          mctx.font = font(T_HEADER, true);
+          let hdr = titleStr;
+          if (mctx.measureText(hdr).width > fullWidth) {
+            while (hdr.length > 6 && mctx.measureText(hdr + "…").width > fullWidth) hdr = hdr.slice(0, -1);
+            hdr += "…";
+          }
+          ctx.fillText(hdr, CW / 2, HEADER_Y * PX);
         }
 
-        // ── Drop cap (page 1 only, before body) ──────────────────────────
+        // ── Drop cap (page 1 only) ──────────────────────────────────────
         if (isFirst && useDropCap) {
           ctx.font = font(T_DROPCAP);
           ctx.fillStyle = INK_TITLE;
           ctx.textAlign = "left";
-          // Drop cap baseline ≈ bottom of line 2 of body.
-          const capBaseline = y + Math.min(dropCapH, LINE_H * 2 - 2 * PX);
+          // Cap baseline ≈ bottom of body line (DROPCAP_LINES-1)+1 (so cap
+          // bottom aligns near the bottom of the last covered line).
+          const capBaseline = y + Math.min(dropCapH, LINE_H * DROPCAP_LINES - 4 * PX);
           ctx.fillText(firstChar, M_X * PX, capBaseline);
         }
 
-        // ── Body ─────────────────────────────────────────────────────────
+        // ── Body ────────────────────────────────────────────────────────
         ctx.font = font(T_BODY);
         ctx.fillStyle = INK_BODY;
         ctx.textAlign = "left";
         const leftX = M_X * PX;
         const baselineOffset = T_BODY * PX * 0.82;
 
-        for (const it of pages[pi]) {
-          if (it.type === "gap") { y += PARA_GAP; continue; }
-          let x = leftX;
-          let lineWidth = it.width;
-          if (it.dropCapIndented) {
-            x = leftX + dropCapIndent;
-          } else if (it.indented) {
-            x = leftX + PARA_INDENT;
+        for (const it of pageItems) {
+          if (it.type === "gap")   { y += PARA_GAP; continue; }
+          if (it.type === "image") {
+            const w = it._w, h = it._h;
+            const x = (CW - w) / 2;
+            // Slight desaturation/contrast as a film/print look; multiply
+            // blend (active on the surrounding save) bakes it into paper.
+            ctx.save();
+            ctx.filter = "saturate(0.78) brightness(1.02) contrast(0.95)";
+            ctx.drawImage(it.img, x, y + IMG_VPAD, w, h);
+            ctx.restore();
+            y += h + 2 * IMG_VPAD;
+            ctx.font = font(T_BODY);
+            ctx.fillStyle = INK_BODY;
+            ctx.textAlign = "left";
+            continue;
           }
-          drawLine(ctx, { text: it.text, width: lineWidth, lastOfPara: it.lastOfPara }, x, y + baselineOffset);
+          // line
+          const x = leftX + (it.indent || 0);
+          drawLine(ctx, { text: it.text, width: it.width, endOfSegment: it.endOfSegment }, x, y + baselineOffset);
           y += LINE_H;
         }
 
-        // ── Footer (centered italic page number only) ────────────────────
-        const footerBaseline = (PAGE_H_PT - FOOTER_Y_FROM_BOTTOM) * PX;
+        // ── Footer: pretty page number ──────────────────────────────────
+        const footerBaseline = (PAGE_H_PT - FOOTER_FROM_BOTTOM) * PX;
         ctx.font = font(T_FOOTER, true);
         ctx.fillStyle = INK_FOOTER;
         ctx.textAlign = "center";
-        ctx.fillText(String(pageNum), CW / 2, footerBaseline);
+        // En-spaces around dots for elegance.
+        ctx.fillText(`· ${pageNum} ·`, CW / 2, footerBaseline);
       },
     });
 
