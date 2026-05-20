@@ -186,10 +186,6 @@ function formatWritingTime(secs) {
   return `${Math.round(secs / 60)} min`;
 }
 
-// Tier helper used by the PDF export.
-function tierFromScore(score) {
-  return score?.tier || "Faint";
-}
 
 function readingTime(content) {
   const mins = Math.ceil(wordCount(content) / 220);
@@ -2170,36 +2166,16 @@ export default function App() {
     const text = contentRef.current || "";
     if (!stripHtml(text).trim()) return;
     try {
-      const sourceDoc = docsRef.current.find(d => d.id === activeId);
-      const prof      = profileRef.current;
-      const u         = userRef.current;
       const titleStr  = titleRef.current.trim() || docTitle(text);
-      const authorStr = prof?.username
-        ? `@${prof.username}`
-        : (u?.user_metadata?.full_name || u?.email?.split("@")[0] || "");
-      const dateStr   = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
-      const wtSecs    = sourceDoc?.writingTimeSecs || 0;
-      const docScore  = (sourceDoc?.humanScore != null && sourceDoc?.scoreTier)
-        ? { score: sourceDoc.humanScore, tier: sourceDoc.scoreTier } : null;
-
-      const humanSignal = (docScore || wtSecs > 0) ? {
-        tier:  docScore?.tier || tierFromScore(docScore),
-        score: docScore?.score ?? null,
-        words: wordCount(text),
-      } : null;
-
       const pdf = new jsPDF({ unit: "pt", format: [PAGE_W_PT, PAGE_H_PT], compress: true });
 
       await renderBookPdfPages({
         title: titleStr,
-        author: authorStr,
-        dateStr,
         body: stripHtml(text).trim(),
-        humanSignal,
         async onPage(canvas, pageIndex /*, totalPages */) {
           if (pageIndex > 0) pdf.addPage([PAGE_W_PT, PAGE_H_PT]);
-          const dataUrl = canvas.toDataURL("image/jpeg", 0.86);
-          pdf.addImage(dataUrl, "JPEG", 0, 0, PAGE_W_PT, PAGE_H_PT, undefined, "FAST");
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+          pdf.addImage(dataUrl, "JPEG", 0, 0, PAGE_W_PT, PAGE_H_PT, undefined, "MEDIUM");
         },
       });
 
@@ -2208,7 +2184,7 @@ export default function App() {
       console.error("PDF export failed:", err);
       addToast("PDF export failed.");
     }
-  }, [activeId, addToast]);
+  }, [addToast]);
 
   // ─ keyboard shortcuts ───────────────────────────────────────────────────────
 
