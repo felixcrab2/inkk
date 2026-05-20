@@ -21,19 +21,33 @@ function dotsRow(tier) {
   );
 }
 
-// Tiny live indicator that lives below the editor.
-export function HumanSignalLine({ score, words, saveStatus, onClick }) {
-  if (!score) return null;
+function saveStatusText({ saving, online, signedIn }) {
+  if (saving) return signedIn && online ? "saving…" : "saving locally…";
+  if (!signedIn)     return "saved on this device";
+  if (!online)       return "offline — saved locally, will sync";
+  return "saved";
+}
+
+// Tiny live indicator below the editor. Shows Human Signal tier (if scored),
+// word count, save status, and published status.
+export function HumanSignalLine({ score, words, saving, online, signedIn, published, hasContent, onClick }) {
+  const status = saveStatusText({ saving, online, signedIn });
+  const hasScore = !!score?.tier && (score.confidence ?? 0) > 0.05;
   return (
-    <button id="hs-line" className="hs-line" onClick={onClick} type="button">
-      <span className="hs-line-row">
-        <span className="hs-line-label">Human Signal —</span>
-        {dotsRow(score.tier)}
-        <span className="hs-line-tier">{score.tier}</span>
-      </span>
+    <button id="hs-line" className="hs-line" onClick={hasScore ? onClick : undefined} type="button" disabled={!hasScore}>
+      {hasScore && (
+        <span className="hs-line-row">
+          <span className="hs-line-label">Human Signal —</span>
+          {dotsRow(score.tier)}
+          <span className="hs-line-tier">{score.tier}</span>
+          {Number.isFinite(score.score) && <span className="hs-line-score">· {score.score}</span>}
+        </span>
+      )}
       <span className="hs-line-sub">
-        {Number.isFinite(score.score) && score.confidence > 0.05 ? `${score.score} · ` : ""}
-        {words}w · {saveStatus === "saving" ? "saving…" : "saved"}
+        <span className={`hs-status-dot ${saving ? "saving" : (online ? "ok" : "off")}`} aria-hidden="true" />
+        {hasContent ? `${words}w · ` : ""}
+        {status}
+        {published && <span className="hs-line-pub">· published</span>}
       </span>
     </button>
   );

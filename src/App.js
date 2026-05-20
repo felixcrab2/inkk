@@ -823,7 +823,7 @@ function Feed({ onRead, onHsModal, onAuthorClick, dropCapImages }) {
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
-function Profile({ user, profile, localDocs, streak, dropCapImages, onRead, onUnpublish, onSignIn, onSignOut, onAvatarChange, researchOptIn, onToggleOptIn, onDownloadData, onDeleteData }) {
+function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapImages, onRead, onUnpublish, onSignIn, onSignOut, onAvatarChange, onEditDoc, onNewDoc, onDeleteDoc, onPublishDoc, researchOptIn, onToggleOptIn, onDownloadData, onDeleteData }) {
   const [pubs, setPubs]           = useState([]);
   const [loading, setLoading]     = useState(!!user);
   const [uploading, setUploading] = useState(false);
@@ -832,6 +832,8 @@ function Profile({ user, profile, localDocs, streak, dropCapImages, onRead, onUn
   const [confirmDel, setConfirmDel] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms,   setShowTerms]   = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId]     = useState(null);
+  const [confirmUnpublishId, setConfirmUnpublishId] = useState(null);
   const fileInputRef              = useRef(null);
 
   useEffect(() => {
@@ -913,33 +915,124 @@ function Profile({ user, profile, localDocs, streak, dropCapImages, onRead, onUn
         </div>
       </div>
 
-      <div id="profile-section-label">Your writing</div>
+      {/* ── Drafts ─────────────────────────────────────────────────────── */}
+      {(() => {
+        const drafts = (localDocs || [])
+          .filter(d => !publishedDocIds?.has(d.id) && stripHtml(d.content).trim().length > 0)
+          .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+        return (
+          <>
+            <div className="profile-section-head">
+              <div id="profile-section-label">Drafts <span className="section-count">{drafts.length}</span></div>
+              <button className="section-action" onClick={onNewDoc}>+ New</button>
+            </div>
+            <p className="profile-section-sub">Saved on your device and synced to your account. Only you can see them.</p>
+
+            <div id="profile-list">
+              {drafts.length === 0 && (
+                <p className="feed-empty">No drafts yet. <button className="feed-empty-link" onClick={onNewDoc}>Start writing →</button></p>
+              )}
+              {drafts.map(d => {
+                const title = d.title || docTitle(d.content);
+                const preview = pubPreview(d.content);
+                const wc = wordCount(d.content);
+                const sc = d.humanScore != null && d.scoreTier ? { score: d.humanScore, tier: d.scoreTier, confidence: d.scoreFeatures?.confidence ?? 0.5, paste_ratio: d.scoreFeatures?.paste_ratio || 0, contributors: [] } : null;
+                const confirming = confirmDeleteId === d.id;
+                return (
+                  <article key={d.id} className="pub-card draft-card" onClick={() => !confirming && onEditDoc(d.id)}>
+                    <div className="pub-card-meta">
+                      <span className="draft-badge">Draft</span>
+                      <span className="pub-dot">·</span>
+                      <span className="pub-date">{formatDate(new Date(d.updatedAt).toISOString())}</span>
+                      <span className="pub-dot">·</span>
+                      <span className="pub-read-time">{wc} words</span>
+                      <div className="pub-card-actions">
+                        <button
+                          className="pub-mini-btn"
+                          title="Publish to feed"
+                          onClick={e => { e.stopPropagation(); onPublishDoc(d); }}
+                        >Publish</button>
+                        {!confirming ? (
+                          <button
+                            className="pub-mini-btn pub-mini-danger"
+                            onClick={e => { e.stopPropagation(); setConfirmDeleteId(d.id); }}
+                          >Delete</button>
+                        ) : (
+                          <span className="pub-confirm" onClick={e => e.stopPropagation()}>
+                            <span className="pub-confirm-text">Delete this draft?</span>
+                            <button className="pub-mini-btn" onClick={() => setConfirmDeleteId(null)}>Cancel</button>
+                            <button
+                              className="pub-mini-btn pub-mini-danger"
+                              onClick={() => { onDeleteDoc(d.id); setConfirmDeleteId(null); }}
+                            >Yes, delete</button>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <h2 className="pub-card-title">{title}</h2>
+                    {preview && <p className="pub-card-preview">{preview}</p>}
+                    {sc && <HumanSignalBadge score={sc} />}
+                  </article>
+                );
+              })}
+            </div>
+          </>
+        );
+      })()}
+
+      {/* ── Published ──────────────────────────────────────────────────── */}
+      <div className="profile-section-head" style={{ marginTop: 22 }}>
+        <div id="profile-section-label">Published <span className="section-count">{pubs.length}</span></div>
+      </div>
+      <p className="profile-section-sub">Visible to anyone on the feed.</p>
 
       <div id="profile-list">
         {loading && <p className="feed-empty">loading…</p>}
         {!loading && pubs.length === 0 && (
-          <p className="feed-empty">nothing published yet.</p>
+          <p className="feed-empty">Nothing published yet.</p>
         )}
-        {pubs.map(pub => (
-          <article key={pub.id} className="pub-card" onClick={() => onRead(pub)}>
-            <div className="pub-card-meta">
-              <span className="pub-date">{formatDate(pub.published_at)}</span>
-              <span className="pub-dot">·</span>
-              <span className="pub-read-time">{readingTime(pub.content)}</span>
-              <button className="pub-remove" onClick={e => handleUnpublish(pub, e)}>remove</button>
-            </div>
-            <h2 className="pub-card-title">{pub.title}</h2>
-            {pubPreview(pub.content) && (
-              <p className="pub-card-preview">{pubPreview(pub.content)}</p>
-            )}
-            {(() => {
-              const sc = scoreFromRecord(pub);
-              return sc
-                ? <HumanSignalBadge score={sc} />
-                : <span className="pub-card-words">{wordCount(pub.content)} words</span>;
-            })()}
-          </article>
-        ))}
+        {pubs.map(pub => {
+          const confirming = confirmUnpublishId === pub.id;
+          return (
+            <article key={pub.id} className="pub-card published-card" onClick={() => !confirming && onEditDoc(pub.doc_id)}>
+              <div className="pub-card-meta">
+                <span className="pub-badge-published">Published</span>
+                <span className="pub-dot">·</span>
+                <span className="pub-date">{formatDate(pub.published_at)}</span>
+                <span className="pub-dot">·</span>
+                <span className="pub-read-time">{readingTime(pub.content)}</span>
+                <div className="pub-card-actions">
+                  <button className="pub-mini-btn" onClick={e => { e.stopPropagation(); onRead(pub); }}>Read</button>
+                  {!confirming ? (
+                    <button
+                      className="pub-mini-btn pub-mini-danger"
+                      onClick={e => { e.stopPropagation(); setConfirmUnpublishId(pub.id); }}
+                    >Remove from feed</button>
+                  ) : (
+                    <span className="pub-confirm" onClick={e => e.stopPropagation()}>
+                      <span className="pub-confirm-text">Remove from public feed?</span>
+                      <button className="pub-mini-btn" onClick={() => setConfirmUnpublishId(null)}>Cancel</button>
+                      <button
+                        className="pub-mini-btn pub-mini-danger"
+                        onClick={async (e) => { await handleUnpublish(pub, e); setConfirmUnpublishId(null); }}
+                      >Yes, remove</button>
+                    </span>
+                  )}
+                </div>
+              </div>
+              <h2 className="pub-card-title">{pub.title}</h2>
+              {pubPreview(pub.content) && (
+                <p className="pub-card-preview">{pubPreview(pub.content)}</p>
+              )}
+              {(() => {
+                const sc = scoreFromRecord(pub);
+                return sc
+                  ? <HumanSignalBadge score={sc} />
+                  : <span className="pub-card-words">{wordCount(pub.content)} words</span>;
+              })()}
+            </article>
+          );
+        })}
       </div>
 
       <div id="research-section">
@@ -1148,6 +1241,9 @@ export default function App() {
   const [menuVisible, setMenuVisible] = useState(true);
   const [panelOpen, setPanelOpen]     = useState(false);
   const [saveStatus, setSaveStatus]   = useState("saved");
+  const [online, setOnline]           = useState(() =>
+    typeof navigator === "undefined" ? true : navigator.onLine
+  );
   const [words, setWords]             = useState(() => wordCount(initDocs.find(d => d.id === initActiveId)?.content));
   const [user, setUser]               = useState(null);
   const [authOpen, setAuthOpen]       = useState(false);
@@ -1179,6 +1275,8 @@ export default function App() {
   });
   const [hsPanelOpen, setHsPanelOpen] = useState(false);
   const [researchOptIn, setResearchOptIn] = useState(false);
+  const [panelConfirmDeleteId, setPanelConfirmDeleteId] = useState(null);
+  const [confirmUnpublishOpen, setConfirmUnpublishOpen] = useState(false);
 
   const editorRef      = useRef(null);
   const titleEditorRef = useRef(null);
@@ -1212,6 +1310,18 @@ export default function App() {
   useEffect(() => { localStorage.setItem("inkk_font", font); }, [font]);
   useEffect(() => {
     fetch("/drop_caps/manifest.json").then(r => r.json()).then(setDropCapImages).catch(() => {});
+  }, []);
+
+  // Online/offline — drives the "offline — saved locally" indicator.
+  useEffect(() => {
+    const on  = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener("online",  on);
+    window.addEventListener("offline", off);
+    return () => {
+      window.removeEventListener("online",  on);
+      window.removeEventListener("offline", off);
+    };
   }, []);
 
   useEffect(() => {
@@ -1912,7 +2022,7 @@ export default function App() {
       if ((e.metaKey || e.ctrlKey) && e.key === ".") { e.preventDefault(); if (view === "editor") setFocusMode(v => !v); }
       if (e.key === "Escape") {
         if (focusMode) { setFocusMode(false); return; }
-        if (publishMenuOpen) { setPublishMenuOpen(false); return; }
+        if (publishMenuOpen) { setPublishMenuOpen(false); setConfirmUnpublishOpen(false); return; }
         if (publishModalDoc) { setPublishModalDoc(null); return; }
         if (usernameModalOpen) return;
         setPanelOpen(false); setAuthOpen(false); setHsModalOpen(false);
@@ -1991,11 +2101,25 @@ export default function App() {
       {showLanding && <LandingScreen onDone={() => setShowLanding(false)} />}
 
       {/* ── top bar ── */}
+      {/* ── offline banner ── */}
+      {!online && (
+        <div id="offline-banner" role="status">
+          Offline · changes are saved on this device and will sync when you reconnect.
+        </div>
+      )}
+
       <header id="top-bar">
         <div id="top-bar-left">
           {isEditor && (
-            <button className={`icon-btn ${menuClass}`} onClick={() => setPanelOpen(v => !v)} title="Documents">
+            <button
+              className={`icon-btn icon-btn-labelled ${menuClass}`}
+              onClick={() => setPanelOpen(v => !v)}
+              title="Open documents"
+              aria-label="Open documents"
+            >
               <Menu size={18} />
+              <span className="icon-btn-label">Drafts</span>
+              {docs.length > 1 && <span className="icon-btn-count">{docs.length}</span>}
             </button>
           )}
           {(view === "reading" || view === "userProfile") && (
@@ -2005,7 +2129,7 @@ export default function App() {
           )}
         </div>
         <div id="top-bar-center">
-          <span id="brand" onClick={() => navigate("editor")} style={{ cursor: view === "editor" ? "default" : "pointer" }}>inkk.</span>
+          <span id="brand" onClick={() => navigate("editor")} style={{ cursor: "pointer" }} role="button" tabIndex={0}>inkk.</span>
         </div>
         <div id="top-bar-right">
           {isEditor && supabase && hasContent && (
@@ -2016,7 +2140,7 @@ export default function App() {
                 onClick={() => {
                   const doc = docs.find(d => d.id === activeId);
                   if (!doc) return;
-                  if (isPublished) setPublishMenuOpen(v => !v);
+                  if (isPublished) { setConfirmUnpublishOpen(false); setPublishMenuOpen(v => !v); }
                   else openPublishModal(doc);
                 }}
               >
@@ -2027,18 +2151,35 @@ export default function App() {
               </button>
               {isPublished && publishMenuOpen && (
                 <div id="publish-menu">
-                  <button className="publish-menu-item" onClick={() => {
-                    setPublishMenuOpen(false);
-                    const doc = docs.find(d => d.id === activeId);
-                    if (doc) openPublishModal(doc);
-                  }}>Update</button>
-                  <button className="publish-menu-item publish-menu-danger" onClick={() => {
-                    setPublishMenuOpen(false);
-                    doUnpublish(activeId).then(() => {
-                      setPublishedDocIds(prev => { const s = new Set(prev); s.delete(activeId); return s; });
-                      addToast("Removed from feed.");
-                    });
-                  }}>Remove from feed</button>
+                  {!confirmUnpublishOpen ? (
+                    <>
+                      <button className="publish-menu-item" onClick={() => {
+                        setPublishMenuOpen(false);
+                        const doc = docs.find(d => d.id === activeId);
+                        if (doc) openPublishModal(doc);
+                      }}>Update</button>
+                      <button
+                        className="publish-menu-item publish-menu-danger"
+                        onClick={() => setConfirmUnpublishOpen(true)}
+                      >Remove from feed</button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="publish-menu-prompt">Remove this piece from the public feed?</div>
+                      <button className="publish-menu-item" onClick={() => { setConfirmUnpublishOpen(false); setPublishMenuOpen(false); }}>Cancel</button>
+                      <button
+                        className="publish-menu-item publish-menu-danger"
+                        onClick={() => {
+                          setConfirmUnpublishOpen(false);
+                          setPublishMenuOpen(false);
+                          doUnpublish(activeId).then(() => {
+                            setPublishedDocIds(prev => { const s = new Set(prev); s.delete(activeId); return s; });
+                            addToast("Removed from feed.");
+                          });
+                        }}
+                      >Yes, remove</button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -2092,9 +2233,27 @@ export default function App() {
                     <Download size={11} />
                   </button>
                   {docs.length > 1 && (
-                    <button className="doc-delete" onClick={e => deleteDoc(d.id, e)}>
-                      <Trash2 size={11} />
-                    </button>
+                    panelConfirmDeleteId === d.id ? (
+                      <span className="doc-confirm" onClick={e => e.stopPropagation()}>
+                        <span className="doc-confirm-text">Delete?</span>
+                        <button
+                          className="doc-confirm-cancel"
+                          onClick={e => { e.stopPropagation(); setPanelConfirmDeleteId(null); }}
+                        >Cancel</button>
+                        <button
+                          className="doc-confirm-yes"
+                          onClick={e => { deleteDoc(d.id, e); setPanelConfirmDeleteId(null); }}
+                        >Delete</button>
+                      </span>
+                    ) : (
+                      <button
+                        className="doc-delete"
+                        title="Delete document"
+                        onClick={e => { e.stopPropagation(); setPanelConfirmDeleteId(d.id); }}
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    )
                   )}
                 </div>
               </div>
@@ -2110,12 +2269,16 @@ export default function App() {
       )}
 
       {/* ── human signal indicator (editor) ── */}
-      {isEditor && hasContent && (
+      {isEditor && (
         <div id="hs-editor-status" className={menuClass}>
           <HumanSignalLine
             score={liveScore}
             words={words}
-            saveStatus={saveStatus}
+            saving={saveStatus === "saving"}
+            online={online}
+            signedIn={!!user}
+            published={isPublished}
+            hasContent={hasContent}
             onClick={() => setHsPanelOpen(true)}
           />
         </div>
@@ -2180,6 +2343,7 @@ export default function App() {
           user={user}
           profile={profile}
           localDocs={docs}
+          publishedDocIds={publishedDocIds}
           streak={streak}
           dropCapImages={dropCapImages}
           onRead={openReading}
@@ -2187,6 +2351,10 @@ export default function App() {
           onSignIn={() => setAuthOpen(true)}
           onSignOut={signOut}
           onAvatarChange={handleAvatarChange}
+          onEditDoc={(id) => { switchDoc(id); navigate("editor"); }}
+          onNewDoc={() => { newDoc(); navigate("editor"); }}
+          onDeleteDoc={(id) => deleteDoc(id, { stopPropagation: () => {} })}
+          onPublishDoc={(d) => openPublishModal(d)}
           researchOptIn={researchOptIn}
           onToggleOptIn={toggleResearchOptIn}
           onDownloadData={downloadResearchData}
@@ -2262,7 +2430,7 @@ export default function App() {
       )}
 
       {/* ── publish menu backdrop ── */}
-      {publishMenuOpen && <div id="publish-menu-backdrop" onClick={() => setPublishMenuOpen(false)} />}
+      {publishMenuOpen && <div id="publish-menu-backdrop" onClick={() => { setPublishMenuOpen(false); setConfirmUnpublishOpen(false); }} />}
 
       {/* ── toasts ── */}
       <Toasts toasts={toasts} />
