@@ -1224,8 +1224,11 @@ body.focus-mode #text-container {
   color: var(--muted);
 }
 
+.research-toggle {
+  width: fit-content;
+}
 #research-legal-links {
-  display: inline-flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 8px;
   margin-top: 14px;
   font-family: "Cormorant Garamond", serif;
   font-size: 0.82rem;
@@ -1543,6 +1546,145 @@ body.focus-mode #text-container {
   margin-top: 24px;
 }
 #reading-text.font-arial { font-family: Arial, sans-serif; }
+
+/* ─── Feed card engagement row ──────────────────────────────────────────── */
+.pub-card-engagement {
+  display: flex; align-items: center; gap: 14px;
+  margin-top: 12px;
+}
+.engage-btn {
+  background: none; border: none; padding: 4px 6px;
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.82rem; color: var(--muted);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+.engage-btn:hover { color: var(--text); background: rgba(0,0,0,0.03); }
+.engage-like.liked { color: #a8424a; }
+.engage-like.liked:hover { color: #872f37; }
+
+/* ─── Reading footer (likes + comments) ─────────────────────────────────── */
+#reading-footer {
+  margin-top: 64px;
+  padding-top: 28px;
+  border-top: 1px solid var(--border);
+}
+.reading-actions {
+  display: flex; align-items: center; gap: 14px;
+  margin-bottom: 36px;
+}
+.reading-like {
+  background: none; border: 1px solid var(--border);
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.95rem;
+  color: var(--muted);
+  padding: 8px 16px; border-radius: 99px;
+  display: inline-flex; align-items: center; gap: 8px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.reading-like:hover { color: var(--text); border-color: #b8b6b2; }
+.reading-like.liked { color: #a8424a; border-color: rgba(168, 66, 74, 0.3); background: rgba(168, 66, 74, 0.04); }
+.reading-like.liked:hover { color: #872f37; }
+
+.reading-comments-title {
+  font-family: "Cormorant Garamond", serif;
+  font-weight: 400;
+  font-size: 1.1rem; color: var(--text);
+  letter-spacing: 0.01em;
+  margin: 0 0 18px;
+}
+
+.comment-form {
+  display: flex; flex-direction: column;
+  margin-bottom: 28px;
+  gap: 6px;
+}
+.comment-input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: "Cormorant Garamond", serif;
+  font-size: 1rem; color: var(--text);
+  resize: vertical;
+  min-height: 76px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.comment-input:focus { border-color: #b8b6b2; }
+.comment-form-row {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.comment-counter {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.78rem;
+  color: var(--subtle);
+}
+.comment-post {
+  background: var(--text); color: var(--bg);
+  border: none;
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.88rem; letter-spacing: 0.03em;
+  padding: 6px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.comment-post:hover { opacity: 0.85; }
+.comment-post:disabled { opacity: 0.4; cursor: not-allowed; }
+.comment-signin {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.92rem; color: var(--muted);
+  margin: 0 0 22px;
+}
+
+.comment-list { display: flex; flex-direction: column; gap: 20px; }
+.comment {
+  display: flex; gap: 12px;
+  align-items: flex-start;
+}
+.comment-body-wrap {
+  flex: 1; min-width: 0;
+}
+.comment-header {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 4px;
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.85rem;
+}
+.comment-author {
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+.comment-time {
+  color: var(--subtle);
+}
+.comment-delete {
+  margin-left: auto;
+  background: none; border: none;
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.78rem; font-style: italic;
+  color: var(--subtle); cursor: pointer;
+  padding: 2px 4px;
+}
+.comment-delete:hover { color: var(--muted); }
+.comment-delete-yes { color: #a8424a; }
+.comment-delete-yes:hover { color: #7a2a30; }
+.comment-confirm {
+  display: inline-flex; gap: 6px; align-items: center; margin-left: auto;
+}
+.comment-body {
+  margin: 0;
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.98rem; line-height: 1.55;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
 
 #reading-text div { min-height: 1em; }
 #reading-text img {

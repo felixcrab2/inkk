@@ -11,6 +11,7 @@ import {
   Menu, ArrowLeft, PenLine, Globe, User,
   Share2, Check, Download, Maximize2, Minimize2,
   Copy, CheckCheck, Plus, Trash2, Type, Search,
+  Heart, MessageCircle,
 } from "lucide-react";
 import { createRecorder } from "./telemetry/recorder";
 import { extractFeatures } from "./telemetry/features";
@@ -304,25 +305,92 @@ function mergeDocs(local, cloud) {
 // ─── publications ─────────────────────────────────────────────────────────────
 
 const PUB_SELECT = "id, title, content, published_at, author_name, author_username, user_id, writing_time_seconds, revision_count, human_score, score_tier, score_features, keystrokes, deletions, pastes";
+const PUB_SELECT_WITH_COUNTS = PUB_SELECT + ", like_count:likes(count), comment_count:comments(count)";
+
+function getRelCount(rel) {
+  if (!rel) return 0;
+  if (Array.isArray(rel)) return rel[0]?.count ?? 0;
+  return rel?.count ?? 0;
+}
+
+// ─── Likes ─────────────────────────────────────────────────────────────────
+async function fetchLikesForUser(userId) {
+  if (!supabase || !userId) return new Set();
+  const { data } = await supabase.from("likes").select("publication_id").eq("user_id", userId);
+  return new Set((data || []).map(r => r.publication_id));
+}
+
+async function togglePubLike(pubId, userId, currentlyLiked) {
+  if (!supabase || !userId) return "Not signed in.";
+  if (currentlyLiked) {
+    const { error } = await supabase.from("likes").delete().eq("user_id", userId).eq("publication_id", pubId);
+    return error?.message || null;
+  }
+  const { error } = await supabase.from("likes").insert({ user_id: userId, publication_id: pubId });
+  return error?.message || null;
+}
+
+// ─── Comments ──────────────────────────────────────────────────────────────
+async function fetchComments(pubId) {
+  if (!supabase || !pubId) return [];
+  const { data } = await supabase
+    .from("comments")
+    .select("id, user_id, body, created_at, updated_at, profiles!user_id(username, display_name, avatar_data)")
+    .eq("publication_id", pubId)
+    .order("created_at", { ascending: true });
+  return data || [];
+}
+
+async function addComment(pubId, userId, body) {
+  if (!supabase || !userId) return "Not signed in.";
+  const trimmed = (body || "").trim();
+  if (!trimmed) return "Empty comment.";
+  if (trimmed.length > 2000) return "Comment is too long (max 2000 chars).";
+  const { error } = await supabase.from("comments").insert({ user_id: userId, publication_id: pubId, body: trimmed });
+  return error?.message || null;
+}
+
+async function deleteCommentRow(commentId) {
+  if (!supabase || !commentId) return "Not signed in.";
+  const { error } = await supabase.from("comments").delete().eq("id", commentId);
+  return error?.message || null;
+}
+
+// Retry without the relation-count joins (likes/comments) if the schema
+// hasn't been migrated yet — so the feed keeps working.
+async function pubQuery(selectWithCounts, selectFallback, builderFn) {
+  let { data, error } = await builderFn(selectWithCounts);
+  if (error && /relation|schema|join|relationship|column/i.test(error.message || "")) {
+    ({ data, error } = await builderFn(selectFallback));
+  }
+  return { data, error };
+}
 
 async function fetchFeed() {
   if (!supabase) return [];
-  const { data, error } = await supabase
-    .from("publications")
-    .select(PUB_SELECT)
-    .order("published_at", { ascending: false })
-    .limit(50);
+  const { data, error } = await pubQuery(
+    PUB_SELECT_WITH_COUNTS, PUB_SELECT,
+    (sel) => supabase
+      .from("publications")
+      .select(sel)
+      .order("published_at", { ascending: false })
+      .limit(50),
+  );
   if (error || !data) return [];
   return data;
 }
 
 async function fetchMyPublications(userId) {
   if (!supabase || !userId) return [];
-  const { data, error } = await supabase
-    .from("publications")
-    .select("id, doc_id, " + PUB_SELECT.replace(/^id, /, ""))
-    .eq("user_id", userId)
-    .order("published_at", { ascending: false });
+  const { data, error } = await pubQuery(
+    "id, doc_id, " + PUB_SELECT_WITH_COUNTS.replace(/^id, /, ""),
+    "id, doc_id, " + PUB_SELECT.replace(/^id, /, ""),
+    (sel) => supabase
+      .from("publications")
+      .select(sel)
+      .eq("user_id", userId)
+      .order("published_at", { ascending: false }),
+  );
   if (error || !data) return [];
   return data;
 }
@@ -389,10 +457,10 @@ async function updateAvatar(userId, avatarData) {
 
 async function fetchPublicationById(id) {
   if (!supabase || !id) return null;
-  const { data } = await supabase
-    .from("publications")
-    .select(PUB_SELECT)
-    .eq("id", id).maybeSingle();
+  const { data } = await pubQuery(
+    PUB_SELECT_WITH_COUNTS, PUB_SELECT,
+    (sel) => supabase.from("publications").select(sel).eq("id", id).maybeSingle(),
+  );
   return data || null;
 }
 
@@ -436,11 +504,14 @@ async function searchProfiles(query) {
 
 async function fetchUserPublications(userId) {
   if (!supabase || !userId) return [];
-  const { data, error } = await supabase
-    .from("publications")
-    .select(PUB_SELECT)
-    .eq("user_id", userId)
-    .order("published_at", { ascending: false });
+  const { data, error } = await pubQuery(
+    PUB_SELECT_WITH_COUNTS, PUB_SELECT,
+    (sel) => supabase
+      .from("publications")
+      .select(sel)
+      .eq("user_id", userId)
+      .order("published_at", { ascending: false }),
+  );
   if (error || !data) return [];
   return data;
 }
@@ -761,13 +832,51 @@ function PublishModal({ doc, user, profile, onConfirm, onClose }) {
 
 // ─── Feed ─────────────────────────────────────────────────────────────────────
 
-function Feed({ onRead, onHsModal, onAuthorClick, dropCapImages }) {
+function Feed({ user, onRead, onHsModal, onAuthorClick, dropCapImages, onRequestAuth }) {
   const [pubs, setPubs]       = useState([]);
   const [loading, setLoading] = useState(true);
+  const [likedSet, setLikedSet] = useState(new Set());
+  const inflightLikes = useRef(new Set());
 
   useEffect(() => {
     fetchFeed().then(data => { setPubs(data); setLoading(false); });
   }, []);
+
+  useEffect(() => {
+    if (user) fetchLikesForUser(user.id).then(setLikedSet);
+    else      setLikedSet(new Set());
+  }, [user]);
+
+  const handleLike = useCallback(async (pub) => {
+    if (!user) { onRequestAuth?.(); return; }
+    if (inflightLikes.current.has(pub.id)) return;
+    inflightLikes.current.add(pub.id);
+    const wasLiked = likedSet.has(pub.id);
+    // Optimistic
+    setLikedSet(prev => {
+      const s = new Set(prev);
+      if (wasLiked) s.delete(pub.id); else s.add(pub.id);
+      return s;
+    });
+    setPubs(prev => prev.map(p => p.id !== pub.id ? p : {
+      ...p,
+      like_count: [{ count: Math.max(0, getRelCount(p.like_count) + (wasLiked ? -1 : 1)) }],
+    }));
+    const err = await togglePubLike(pub.id, user.id, wasLiked);
+    inflightLikes.current.delete(pub.id);
+    if (err) {
+      // Revert
+      setLikedSet(prev => {
+        const s = new Set(prev);
+        if (wasLiked) s.add(pub.id); else s.delete(pub.id);
+        return s;
+      });
+      setPubs(prev => prev.map(p => p.id !== pub.id ? p : {
+        ...p,
+        like_count: [{ count: Math.max(0, getRelCount(p.like_count) + (wasLiked ? 1 : -1)) }],
+      }));
+    }
+  }, [user, likedSet, onRequestAuth]);
 
   return (
     <div id="feed-container">
@@ -783,6 +892,9 @@ function Feed({ onRead, onHsModal, onAuthorClick, dropCapImages }) {
         {pubs.map((pub, i) => {
           const hook = openingLine(pub.content);
           const avatarLetter = pub.author_name?.[0] || "?";
+          const likeCount    = getRelCount(pub.like_count);
+          const commentCount = getRelCount(pub.comment_count);
+          const isLiked      = likedSet.has(pub.id);
           return (
             <article key={pub.id} className="pub-card" style={{ "--card-index": i }} onClick={() => onRead(pub)}>
               <div className="pub-card-meta">
@@ -803,6 +915,24 @@ function Feed({ onRead, onHsModal, onAuthorClick, dropCapImages }) {
                   ? <HumanSignalBadge score={sc} />
                   : <span className="pub-card-words">{wordCount(pub.content)} words</span>;
               })()}
+              <div className="pub-card-engagement">
+                <button
+                  className={`engage-btn engage-like${isLiked ? " liked" : ""}`}
+                  title={isLiked ? "Unlike" : "Like"}
+                  onClick={e => { e.stopPropagation(); handleLike(pub); }}
+                >
+                  <Heart size={14} strokeWidth={1.6} fill={isLiked ? "currentColor" : "none"} />
+                  <span>{likeCount}</span>
+                </button>
+                <button
+                  className="engage-btn engage-comment"
+                  title="Read & comment"
+                  onClick={e => { e.stopPropagation(); onRead(pub, { focus: "comments" }); }}
+                >
+                  <MessageCircle size={14} strokeWidth={1.6} />
+                  <span>{commentCount}</span>
+                </button>
+              </div>
             </article>
           );
         })}
@@ -1177,11 +1307,49 @@ function UserProfileView({ profile, onRead, dropCapImages }) {
 
 // ─── ReadingView ──────────────────────────────────────────────────────────────
 
-function ReadingView({ pub, font }) {
+function ReadingView({ pub, font, user, dropCapImages, focus, onRequestAuth }) {
   const containerRef = useRef(null);
-  const [progress, setProgress]   = useState(0);
-  const [copied, setCopied]       = useState(false);
+  const commentsRef  = useRef(null);
+  const [progress, setProgress] = useState(0);
+  const [copied, setCopied]     = useState(false);
+  const [likeCount, setLikeCount]       = useState(getRelCount(pub.like_count));
+  const [liked, setLiked]               = useState(false);
+  const [likeBusy, setLikeBusy]         = useState(false);
+  const [comments, setComments]         = useState([]);
+  const [commentsLoading, setCommentsLoading] = useState(true);
+  const [body, setBody]                 = useState("");
+  const [posting, setPosting]           = useState(false);
+  const [confirmDelId, setConfirmDelId] = useState(null);
   const pubScore = scoreFromRecord(pub);
+
+  useEffect(() => {
+    setLikeCount(getRelCount(pub.like_count));
+    setCommentsLoading(true);
+    fetchComments(pub.id).then(rows => { setComments(rows); setCommentsLoading(false); });
+    if (user) {
+      supabase
+        .from("likes")
+        .select("publication_id", { count: "exact", head: true })
+        .eq("user_id", user.id).eq("publication_id", pub.id)
+        .then(({ count }) => setLiked((count || 0) > 0));
+    } else {
+      setLiked(false);
+    }
+    supabase
+      .from("likes")
+      .select("publication_id", { count: "exact", head: true })
+      .eq("publication_id", pub.id)
+      .then(({ count }) => { if (count != null) setLikeCount(count); });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pub.id, user]);
+
+  // Optional scroll-to-comments when arriving via the comment-count button.
+  useEffect(() => {
+    if (focus === "comments" && commentsRef.current) {
+      const t = setTimeout(() => commentsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 250);
+      return () => clearTimeout(t);
+    }
+  }, [focus, commentsLoading]);
 
   const handleScroll = useCallback(() => {
     const el = containerRef.current;
@@ -1196,6 +1364,41 @@ function ReadingView({ pub, font }) {
       setTimeout(() => setCopied(false), 2000);
     });
   }, [pub]);
+
+  const toggleLike = useCallback(async () => {
+    if (!user) { onRequestAuth?.(); return; }
+    if (likeBusy) return;
+    setLikeBusy(true);
+    const wasLiked = liked;
+    setLiked(!wasLiked);
+    setLikeCount(c => Math.max(0, c + (wasLiked ? -1 : 1)));
+    const err = await togglePubLike(pub.id, user.id, wasLiked);
+    if (err) {
+      setLiked(wasLiked);
+      setLikeCount(c => Math.max(0, c + (wasLiked ? 1 : -1)));
+    }
+    setLikeBusy(false);
+  }, [user, liked, likeBusy, pub.id, onRequestAuth]);
+
+  const submitComment = useCallback(async (e) => {
+    e.preventDefault();
+    if (!user) { onRequestAuth?.(); return; }
+    if (!body.trim() || posting) return;
+    setPosting(true);
+    const err = await addComment(pub.id, user.id, body);
+    if (!err) {
+      setBody("");
+      const rows = await fetchComments(pub.id);
+      setComments(rows);
+    }
+    setPosting(false);
+  }, [user, body, posting, pub.id, onRequestAuth]);
+
+  const removeComment = useCallback(async (commentId) => {
+    const err = await deleteCommentRow(commentId);
+    if (!err) setComments(prev => prev.filter(c => c.id !== commentId));
+    setConfirmDelId(null);
+  }, []);
 
   return (
     <>
@@ -1215,6 +1418,86 @@ function ReadingView({ pub, font }) {
           <h1 id="reading-headline">{pub.title}</h1>
           {pubScore && <HumanSignalBadge score={pubScore} />}
           <div id="reading-text" className={font === "arial" ? "font-arial" : ""} dangerouslySetInnerHTML={{ __html: renderHtml(pub.content) }} />
+
+          {/* ── Like + Comments ──────────────────────────────────────────── */}
+          <div id="reading-footer">
+            <div className="reading-actions">
+              <button
+                className={`reading-like${liked ? " liked" : ""}`}
+                onClick={toggleLike}
+                disabled={likeBusy}
+              >
+                <Heart size={18} strokeWidth={1.6} fill={liked ? "currentColor" : "none"} />
+                <span>{likeCount} {likeCount === 1 ? "like" : "likes"}</span>
+              </button>
+            </div>
+
+            <div className="reading-comments" ref={commentsRef}>
+              <h3 className="reading-comments-title">{comments.length} {comments.length === 1 ? "comment" : "comments"}</h3>
+
+              {user ? (
+                <form className="comment-form" onSubmit={submitComment}>
+                  <textarea
+                    className="comment-input"
+                    placeholder="Leave a comment…"
+                    value={body}
+                    onChange={e => setBody(e.target.value)}
+                    maxLength={2000}
+                    rows={3}
+                  />
+                  <div className="comment-form-row">
+                    <span className="comment-counter">{body.length}/2000</span>
+                    <button type="submit" className="comment-post" disabled={!body.trim() || posting}>
+                      {posting ? "posting…" : "Post"}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <p className="comment-signin">
+                  <button className="tos-link" onClick={() => onRequestAuth?.()}>Sign in</button> to like and comment.
+                </p>
+              )}
+
+              {commentsLoading && <p className="feed-empty">loading…</p>}
+              {!commentsLoading && comments.length === 0 && (
+                <p className="feed-empty">No comments yet.</p>
+              )}
+
+              <div className="comment-list">
+                {comments.map(c => {
+                  const username = c.profiles?.username || "anonymous";
+                  const isMine   = user && c.user_id === user.id;
+                  const isConfirming = confirmDelId === c.id;
+                  return (
+                    <div key={c.id} className="comment">
+                      <DropCapAvatar
+                        letter={username[0]}
+                        avatarData={c.profiles?.avatar_data}
+                        dropCapImages={dropCapImages}
+                        size={28}
+                      />
+                      <div className="comment-body-wrap">
+                        <div className="comment-header">
+                          <span className="comment-author">@{username}</span>
+                          <span className="comment-time">{formatDate(c.created_at)}</span>
+                          {isMine && !isConfirming && (
+                            <button className="comment-delete" onClick={() => setConfirmDelId(c.id)}>delete</button>
+                          )}
+                          {isMine && isConfirming && (
+                            <span className="comment-confirm">
+                              <button className="comment-delete" onClick={() => setConfirmDelId(null)}>cancel</button>
+                              <button className="comment-delete comment-delete-yes" onClick={() => removeComment(c.id)}>yes, delete</button>
+                            </span>
+                          )}
+                        </div>
+                        <p className="comment-body">{c.body}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </>
@@ -1239,6 +1522,7 @@ export default function App() {
   const [authOpen, setAuthOpen]       = useState(false);
   const [view, setView]               = useState(() => pathToView(window.location.pathname));
   const [readingPub, setReadingPub]   = useState(null);
+  const [readingFocus, setReadingFocus] = useState(null);
   const [publishedDocIds, setPublishedDocIds] = useState(new Set());
   const [publishModalDoc, setPublishModalDoc] = useState(null);
   const [font, setFont]               = useState(() => localStorage.getItem("inkk_font") || "garamond");
@@ -1999,7 +2283,8 @@ export default function App() {
   const hasContent   = words > 0;
   const isPublished  = publishedDocIds.has(activeId);
 
-  const openReading = useCallback((pub) => {
+  const openReading = useCallback((pub, opts = {}) => {
+    setReadingFocus(opts.focus || null);
     navigate("reading", { pub });
   }, [navigate]);
 
@@ -2244,10 +2529,12 @@ export default function App() {
       {/* ── views ── */}
       {view === "feed" && (
         <Feed
+          user={user}
           onRead={openReading}
           onHsModal={() => setHsModalOpen(true)}
           onAuthorClick={openUserProfile}
           dropCapImages={dropCapImages}
+          onRequestAuth={() => setAuthOpen(true)}
         />
       )}
       {view === "profile" && (
@@ -2279,7 +2566,16 @@ export default function App() {
       {view === "userProfile" && viewingUser && (
         <UserProfileView profile={viewingUser} onRead={openReading} dropCapImages={dropCapImages} />
       )}
-      {view === "reading" && readingPub && <ReadingView pub={readingPub} font={font} />}
+      {view === "reading" && readingPub && (
+        <ReadingView
+          pub={readingPub}
+          font={font}
+          user={user}
+          dropCapImages={dropCapImages}
+          focus={readingFocus}
+          onRequestAuth={() => setAuthOpen(true)}
+        />
+      )}
 
       {/* ── bottom nav ── */}
       {view !== "reading" && view !== "userProfile" && (

@@ -137,3 +137,42 @@ create or replace view public.my_writing_event_counts as
   from public.writing_events
   where user_id = auth.uid()
   group by user_id;
+
+-- ── 8. Likes ─────────────────────────────────────────────────────────────
+-- Anyone signed in sees like counts; users insert/delete their own row.
+create table if not exists public.likes (
+  user_id        uuid not null references public.profiles(id) on delete cascade,
+  publication_id uuid not null references public.publications(id) on delete cascade,
+  created_at     timestamptz not null default now(),
+  primary key (user_id, publication_id)
+);
+create index if not exists likes_pub_idx on public.likes(publication_id);
+
+alter table public.likes enable row level security;
+drop policy if exists "likes_select_all"  on public.likes;
+create policy "likes_select_all"  on public.likes for select using (true);
+drop policy if exists "likes_insert_own"  on public.likes;
+create policy "likes_insert_own"  on public.likes for insert with check (auth.uid() = user_id);
+drop policy if exists "likes_delete_own"  on public.likes;
+create policy "likes_delete_own"  on public.likes for delete using (auth.uid() = user_id);
+
+-- ── 9. Comments ──────────────────────────────────────────────────────────
+create table if not exists public.comments (
+  id             uuid primary key default gen_random_uuid(),
+  user_id        uuid not null references public.profiles(id) on delete cascade,
+  publication_id uuid not null references public.publications(id) on delete cascade,
+  body           text not null check (length(body) between 1 and 2000),
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz
+);
+create index if not exists comments_pub_idx on public.comments(publication_id, created_at);
+
+alter table public.comments enable row level security;
+drop policy if exists "comments_select_all"  on public.comments;
+create policy "comments_select_all"  on public.comments for select using (true);
+drop policy if exists "comments_insert_own"  on public.comments;
+create policy "comments_insert_own"  on public.comments for insert with check (auth.uid() = user_id);
+drop policy if exists "comments_update_own"  on public.comments;
+create policy "comments_update_own"  on public.comments for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists "comments_delete_own"  on public.comments;
+create policy "comments_delete_own"  on public.comments for delete using (auth.uid() = user_id);
