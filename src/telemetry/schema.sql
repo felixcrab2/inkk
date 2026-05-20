@@ -2,9 +2,20 @@
 -- Idempotent. Safe to run on an existing database with documents/publications/profiles.
 -- Run as service-role / SQL editor in Supabase.
 
--- 1. Profile: research opt-in
+-- 1. Profile: research opt-in (default ON; users explicitly opt in via T&C at signup
+--    and may opt out from Settings). tos_accepted_at records when they agreed.
 alter table public.profiles
-  add column if not exists research_opt_in boolean not null default false;
+  add column if not exists research_opt_in boolean not null default true,
+  add column if not exists tos_accepted_at timestamptz,
+  add column if not exists tos_version     text;
+
+-- Re-assert the default for environments where the column was created earlier
+-- with `default false`. Existing rows are untouched.
+alter table public.profiles alter column research_opt_in set default true;
+
+-- Optional: opt-in existing accounts that have already accepted no T&C version yet.
+-- Uncomment for dev / single-user testing.
+-- update public.profiles set research_opt_in = true where tos_accepted_at is null;
 
 -- 2. Documents: cached process-level metrics
 alter table public.documents

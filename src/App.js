@@ -18,11 +18,12 @@ import { computeScore } from "./telemetry/score";
 import {
   startSync, stopSync,
   setResearchOptIn as remoteSetResearchOptIn,
-  getResearchOptIn,
   deleteMyEvents, dumpMyEvents,
+  flushNow as syncFlushNow,
 } from "./telemetry/sync";
-import { claimAnonymous as claimAnonymousEvents } from "./telemetry/store";
+import { claimAnonymous as claimAnonymousEvents, clearForUser as clearLocalForUser } from "./telemetry/store";
 import { HumanSignalLine, HumanSignalBadge, HumanSignalPanel } from "./components/HumanSignal";
+import { PrivacyModal, TermsModal, TOS_VERSION } from "./components/Legal";
 
 // ─── local storage ────────────────────────────────────────────────────────────
 
@@ -373,14 +374,19 @@ async function doUnpublish(docId) {
 async function fetchProfile(userId) {
   if (!supabase || !userId) return null;
   const { data } = await supabase
-    .from("profiles").select("id, username, display_name, avatar_data").eq("id", userId).maybeSingle();
+    .from("profiles").select("id, username, display_name, avatar_data, research_opt_in, tos_accepted_at").eq("id", userId).maybeSingle();
   return data || null;
 }
 
-async function upsertProfile(userId, username, displayName) {
+async function upsertProfile(userId, username, displayName, { tosAccepted = false, tosVersion = null } = {}) {
   if (!supabase || !userId) return "Not signed in.";
-  const { error } = await supabase
-    .from("profiles").upsert({ id: userId, username, display_name: displayName || null });
+  const row = { id: userId, username, display_name: displayName || null };
+  if (tosAccepted) {
+    row.research_opt_in = true;
+    row.tos_accepted_at = new Date().toISOString();
+    row.tos_version     = tosVersion;
+  }
+  const { error } = await supabase.from("profiles").upsert(row);
   return error ? error.message : null;
 }
 
@@ -655,6 +661,9 @@ function AuthModal({ onClose }) {
 function UsernameModal({ user, onDone }) {
   const [username, setUsername]       = useState("");
   const [displayName, setDisplayName] = useState(user.user_metadata?.full_name || "");
+  const [accepted, setAccepted]       = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms, setShowTerms]     = useState(false);
   const [error, setError]             = useState("");
   const [loading, setLoading]         = useState(false);
 
@@ -662,46 +671,61 @@ function UsernameModal({ user, onDone }) {
     e.preventDefault();
     const u = username.trim();
     if (u.length < 3) { setError("At least 3 characters."); return; }
+    if (!accepted)   { setError("Please review and accept the Terms & Privacy Policy to continue."); return; }
     setLoading(true); setError("");
-    const errMsg = await upsertProfile(user.id, u, displayName.trim());
+    const errMsg = await upsertProfile(user.id, u, displayName.trim(), { tosAccepted: true, tosVersion: TOS_VERSION });
     if (errMsg) {
       setError(errMsg.includes("unique") || errMsg.includes("duplicate") ? "Username taken." : errMsg);
       setLoading(false);
     } else {
-      onDone({ id: user.id, username: u, display_name: displayName.trim() });
+      onDone({ id: user.id, username: u, display_name: displayName.trim(), research_opt_in: true, tos_accepted_at: new Date().toISOString() });
     }
   };
 
   return (
-    <div id="auth-overlay">
-      <div id="auth-modal" onClick={e => e.stopPropagation()}>
-        <div id="auth-tabs">
-          <button className="active" style={{ cursor: "default" }}>choose a username</button>
+    <>
+      <div id="auth-overlay">
+        <div id="auth-modal" onClick={e => e.stopPropagation()}>
+          <div id="auth-tabs">
+            <button className="active" style={{ cursor: "default" }}>welcome to inkk</button>
+          </div>
+          <form onSubmit={submit}>
+            <input
+              type="text"
+              placeholder="username"
+              value={username}
+              onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+              required
+              autoFocus
+              maxLength={20}
+            />
+            <input
+              type="text"
+              placeholder="display name (optional)"
+              value={displayName}
+              onChange={e => setDisplayName(e.target.value)}
+              maxLength={50}
+            />
+            <label id="tos-consent">
+              <input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} />
+              <span id="tos-consent-text">
+                I agree to the{" "}
+                <button type="button" className="tos-link" onClick={() => setShowTerms(true)}>Terms</button>
+                {" "}and{" "}
+                <button type="button" className="tos-link" onClick={() => setShowPrivacy(true)}>Privacy Policy</button>
+                , including contributing my anonymised writing-process data to Inkk's research dataset. I can opt out anytime from my Profile.
+              </span>
+            </label>
+            {error && <p className="auth-error">{error}</p>}
+            <button id="auth-submit" type="submit" disabled={loading || username.length < 3 || !accepted}>
+              {loading ? "saving…" : "continue"}
+            </button>
+          </form>
         </div>
-        <form onSubmit={submit}>
-          <input
-            type="text"
-            placeholder="username"
-            value={username}
-            onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
-            required
-            autoFocus
-            maxLength={20}
-          />
-          <input
-            type="text"
-            placeholder="display name (optional)"
-            value={displayName}
-            onChange={e => setDisplayName(e.target.value)}
-            maxLength={50}
-          />
-          {error && <p className="auth-error">{error}</p>}
-          <button id="auth-submit" type="submit" disabled={loading || username.length < 3}>
-            {loading ? "saving…" : "continue"}
-          </button>
-        </form>
       </div>
-    </div>
+      {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
+      {showTerms   && <TermsModal   onClose={() => setShowTerms(false)} />}
+    </>
   );
 }
 
@@ -806,6 +830,8 @@ function Profile({ user, profile, localDocs, streak, dropCapImages, onRead, onUn
   const [optBusy, setOptBusy]     = useState(false);
   const [delBusy, setDelBusy]     = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms,   setShowTerms]   = useState(false);
   const fileInputRef              = useRef(null);
 
   useEffect(() => {
@@ -918,10 +944,10 @@ function Profile({ user, profile, localDocs, streak, dropCapImages, onRead, onUn
 
       <div id="research-section">
         <div id="research-head">
-          <div id="research-title">Research mode</div>
+          <div id="research-title">Privacy</div>
           <p id="research-blurb">
-            Inkk is studying how humans write — the rhythm, pauses, and revisions behind a piece of text.
-            Opt in to share your anonymised writing patterns (never your text characters for letters or digits) with the research dataset.
+            Inkk shares your anonymised writing-process data — the timing, pauses, and revisions behind a piece — with our research dataset.
+            We never store the letters or digits you type, only how you type them. You can turn this off at any time, and even after that you can keep using Inkk normally.
           </p>
           <label className="research-toggle">
             <input
@@ -935,8 +961,13 @@ function Profile({ user, profile, localDocs, streak, dropCapImages, onRead, onUn
               }}
             />
             <span className="research-toggle-track" aria-hidden="true"><span className="research-toggle-thumb" /></span>
-            <span className="research-toggle-label">{researchOptIn ? "Participating" : "Not participating"}</span>
+            <span className="research-toggle-label">{researchOptIn ? "Sharing on" : "Sharing off"}</span>
           </label>
+          <div id="research-legal-links">
+            <button type="button" className="tos-link" onClick={() => setShowPrivacy(true)}>Privacy Policy</button>
+            <span className="research-legal-dot">·</span>
+            <button type="button" className="tos-link" onClick={() => setShowTerms(true)}>Terms</button>
+          </div>
         </div>
         {researchOptIn && (
           <div id="research-controls">
@@ -959,6 +990,9 @@ function Profile({ user, profile, localDocs, streak, dropCapImages, onRead, onUn
       </div>
 
       <button id="signout-btn" onClick={onSignOut}>Sign out</button>
+
+      {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
+      {showTerms   && <TermsModal   onClose={() => setShowTerms(false)} />}
     </div>
   );
 }
@@ -1395,12 +1429,17 @@ export default function App() {
       const myPubs = await fetchMyPublications(signedInUser.id);
       setPublishedDocIds(new Set(myPubs.map(p => p.doc_id).filter(Boolean)));
       const prof = await fetchProfile(signedInUser.id);
-      if (prof) setProfile(prof);
-      else setUsernameModalOpen(true);
-      // Load research opt-in flag.
-      const opt = await getResearchOptIn(supabase, signedInUser.id);
-      optInRef.current = opt;
-      setResearchOptIn(opt);
+      if (prof) {
+        setProfile(prof);
+        const opt = !!prof.research_opt_in;
+        optInRef.current = opt;
+        setResearchOptIn(opt);
+      } else {
+        setUsernameModalOpen(true);
+        // New user — UsernameModal will set opt-in=true via T&C acceptance.
+        optInRef.current = false;
+        setResearchOptIn(false);
+      }
       recorderRef.current?.recordUserChange(signedInUser.id);
       // Claim any pre-signed-in events captured on this device so they sync too.
       claimAnonymousEvents(signedInUser.id);
@@ -1569,7 +1608,15 @@ export default function App() {
     if (err) { addToast("Could not update."); return; }
     optInRef.current = next;
     setResearchOptIn(next);
-    addToast(next ? "Joined the research study." : "Left the study.");
+    if (next) {
+      // Push the queued events right away so the user sees data flowing.
+      syncFlushNow();
+      addToast("Sharing turned on.");
+    } else {
+      // Drop pending local events so opt-out is immediate and complete.
+      await clearLocalForUser(userRef.current.id);
+      addToast("Sharing turned off.");
+    }
   }, [addToast]);
 
   const downloadResearchData = useCallback(async () => {
@@ -2196,7 +2243,15 @@ export default function App() {
       {authOpen && supabase && <AuthModal onClose={() => setAuthOpen(false)} />}
       {hsModalOpen && <HumanSignalModal onClose={() => setHsModalOpen(false)} />}
       {usernameModalOpen && user && (
-        <UsernameModal user={user} onDone={prof => { setProfile(prof); setUsernameModalOpen(false); }} />
+        <UsernameModal user={user} onDone={prof => {
+          setProfile(prof);
+          setUsernameModalOpen(false);
+          if (prof.research_opt_in) {
+            optInRef.current = true;
+            setResearchOptIn(true);
+            syncFlushNow();
+          }
+        }} />
       )}
 
       {/* ── focus mode exit ── */}
