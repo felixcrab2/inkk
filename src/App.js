@@ -5,8 +5,8 @@ import "@fontsource/cormorant-garamond/400.css";
 import "@fontsource/cormorant-garamond/600.css";
 import "@fontsource/cormorant-garamond/400-italic.css";
 import { jsPDF } from "jspdf";
-import cormorantTTF from "./assets/CormorantGaramond-Regular.ttf";
 import { supabase } from "./supabase";
+import { renderBookPdfPages, PAGE_W_PT, PAGE_H_PT } from "./pdf/bookPage";
 import {
   Menu, ArrowLeft, PenLine, Globe, User,
   Share2, Check, Download, Maximize2, Minimize2,
@@ -176,16 +176,6 @@ async function compressAvatar(file, size = 240) {
     };
     reader.readAsDataURL(file);
   });
-}
-
-async function fetchBase64(url) {
-  const res = await fetch(url);
-  const buf = await res.arrayBuffer();
-  const bytes = new Uint8Array(buf);
-  let bin = "";
-  for (let i = 0; i < bytes.length; i += 0x8000)
-    bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(bin);
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -1887,127 +1877,49 @@ export default function App() {
   }, [onInput]);
 
   // ─ PDF export ───────────────────────────────────────────────────────────────
+  //
+  // Renders every page onto a high-DPI canvas (paper texture + ink in
+  // multiply blend mode) and embeds each as a JPEG image in a custom-sized
+  // PDF, so the result is visually indistinguishable from a scanned book.
 
   const exportToPdf = useCallback(async () => {
     const text = contentRef.current || "";
     if (!stripHtml(text).trim()) return;
     try {
+      const sourceDoc = docsRef.current.find(d => d.id === activeId);
+      const prof      = profileRef.current;
+      const u         = userRef.current;
+      const titleStr  = titleRef.current.trim() || docTitle(text);
+      const authorStr = prof?.username
+        ? `@${prof.username}`
+        : (u?.user_metadata?.full_name || u?.email?.split("@")[0] || "");
+      const dateStr   = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+      const wtSecs    = sourceDoc?.writingTimeSecs || 0;
+      const docScore  = (sourceDoc?.humanScore != null && sourceDoc?.scoreTier)
+        ? { score: sourceDoc.humanScore, tier: sourceDoc.scoreTier } : null;
 
-    // metadata
-    const sourceDoc = docsRef.current.find(d => d.id === activeId);
-    const prof      = profileRef.current;
-    const u         = userRef.current;
-    const titleStr  = titleRef.current.trim() || docTitle(text);
-    const authorStr = prof?.username
-      ? `@${prof.username}`
-      : (u?.user_metadata?.full_name || u?.email?.split("@")[0] || "");
-    const dateStr   = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
-    const wtSecs    = sourceDoc?.writingTimeSecs || 0;
-    const docScore  = (sourceDoc?.humanScore != null && sourceDoc?.scoreTier)
-      ? { score: sourceDoc.humanScore, tier: sourceDoc.scoreTier } : null;
-    const hasHS     = !!docScore || wtSecs > 0;
+      const humanSignal = (docScore || wtSecs > 0) ? {
+        tier:  docScore?.tier || tierFromScore(docScore),
+        score: docScore?.score ?? null,
+        words: wordCount(text),
+      } : null;
 
-    // page geometry
-    const pdf = new jsPDF({ unit: "pt", format: "a4" });
-    const b64 = await fetchBase64(cormorantTTF);
-    pdf.addFileToVFS("CormorantGaramond-Regular.ttf", b64);
-    pdf.addFont("CormorantGaramond-Regular.ttf", "CormorantGaramond", "normal");
-    pdf.setFont("CormorantGaramond", "normal");
+      const pdf = new jsPDF({ unit: "pt", format: [PAGE_W_PT, PAGE_H_PT], compress: true });
 
-    const pW = pdf.internal.pageSize.getWidth();   // 595.28
-    const pH = pdf.internal.pageSize.getHeight();  // 841.89
-    const mx = 88;
-    const tW = pW - mx * 2;                        // 419.28
+      await renderBookPdfPages({
+        title: titleStr,
+        author: authorStr,
+        dateStr,
+        body: stripHtml(text).trim(),
+        humanSignal,
+        async onPage(canvas, pageIndex /*, totalPages */) {
+          if (pageIndex > 0) pdf.addPage([PAGE_W_PT, PAGE_H_PT]);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.86);
+          pdf.addImage(dataUrl, "JPEG", 0, 0, PAGE_W_PT, PAGE_H_PT, undefined, "FAST");
+        },
+      });
 
-    const bodyBottom = pH - 64;
-    const footerY    = pH - 34;
-
-    const C_BLACK = [26,  26,  26];
-    const C_MUTED = [140, 137, 133];
-    const C_FAINT = [185, 183, 179];
-    const C_RULE  = [210, 208, 204];
-
-    const setC = (rgb) => pdf.setTextColor(rgb[0], rgb[1], rgb[2]);
-
-    let pageNum = 1;
-    const drawFooter = () => {
-      pdf.setFont("CormorantGaramond", "normal");
-      pdf.setFontSize(8);
-      setC(C_FAINT);
-      pdf.text("inkk.", mx, footerY);
-      pdf.text(String(pageNum), pW / 2, footerY, { align: "center" });
-      pageNum++;
-    };
-    const newPage = () => {
-      drawFooter();
-      pdf.addPage();
-      pdf.setFont("CormorantGaramond", "normal");
-    };
-
-    // ── title block ──────────────────────────────────────────────────────────
-    let y = 108;
-
-    pdf.setFontSize(23);
-    setC(C_BLACK);
-    const titleLines = pdf.splitTextToSize(titleStr, tW);
-    for (const ln of titleLines) {
-      pdf.text(ln, pW / 2, y, { align: "center" });
-      y += 31;
-    }
-    y += 8;
-
-    // byline: author · date
-    pdf.setFontSize(9);
-    setC(C_MUTED);
-    const byline = [authorStr, dateStr].filter(Boolean).join("  ·  ");
-    if (byline) { pdf.text(byline, pW / 2, y, { align: "center" }); y += 16; }
-
-    // human signal
-    if (hasHS) {
-      pdf.setFontSize(8);
-      setC(C_FAINT);
-      const tier = tierFromScore(docScore);
-      const scoreStr = docScore?.score != null ? `  ·  ${docScore.score}/100` : "";
-      const hs = `Human Signal: ${tier}${scoreStr}  ·  ${formatWritingTime(wtSecs)}  ·  ${wordCount(text)} words`;
-      pdf.text(hs, pW / 2, y, { align: "center" });
-      y += 14;
-    }
-
-    // rule
-    y += 16;
-    pdf.setLineWidth(0.3);
-    pdf.setDrawColor(C_RULE[0], C_RULE[1], C_RULE[2]);
-    pdf.line(mx, y, pW - mx, y);
-    y += 32;
-
-    // ── body ─────────────────────────────────────────────────────────────────
-    const BFS = 12, LH = 18, PGAP = 12;
-    pdf.setFontSize(BFS);
-    setC(C_BLACK);
-
-    // if using the old first-line-as-title pattern, strip it from body
-    const bodyText  = stripHtml(text).trim();
-    const bodyParas = bodyText.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
-
-    const renderLines = (lines, startX) => {
-      for (const ln of lines) {
-        if (y > bodyBottom) { newPage(); y = 72; pdf.setFontSize(BFS); setC(C_BLACK); }
-        if (ln.trim()) pdf.text(ln, startX, y);
-        y += LH;
-      }
-    };
-
-    for (let pi = 0; pi < bodyParas.length; pi++) {
-      const para = bodyParas[pi];
-
-      const lines = para.split("\n").flatMap(r => pdf.splitTextToSize(r || " ", tW));
-      renderLines(lines, mx);
-
-      if (pi < bodyParas.length - 1) y += PGAP;
-    }
-
-    drawFooter();
-    pdf.save(`${titleStr.replace(/[^a-zA-Z0-9\s\-_]/g, "").trim() || "inkk"}.pdf`);
+      pdf.save(`${titleStr.replace(/[^a-zA-Z0-9\s\-_]/g, "").trim() || "inkk"}.pdf`);
     } catch (err) {
       console.error("PDF export failed:", err);
       addToast("PDF export failed.");

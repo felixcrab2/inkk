@@ -1,12 +1,12 @@
 {
   "files": {
     "main.css": "/static/css/main.505e8498.css",
-    "main.js": "/static/js/main.1305baca.js",
+    "main.js": "/static/js/main.bd6b2989.js",
     "static/js/239.d2863414.chunk.js": "/static/js/239.d2863414.chunk.js",
     "static/js/977.a1aca4e4.chunk.js": "/static/js/977.a1aca4e4.chunk.js",
     "static/js/732.d8915e0d.chunk.js": "/static/js/732.d8915e0d.chunk.js",
+    "static/media/blankpage.jpg": "/static/media/blankpage.8faa5ea629a90bcb2bc5.jpg",
     "static/media/eb-garamond-latin-ext-400-normal.woff": "/static/media/eb-garamond-latin-ext-400-normal.2b4a3086c09224bf2195.woff",
-    "static/media/CormorantGaramond-Regular.ttf": "/static/media/CormorantGaramond-Regular.9437d845cc201940ad6a.ttf",
     "static/media/eb-garamond-latin-ext-400-normal.woff2": "/static/media/eb-garamond-latin-ext-400-normal.a67631b8dd3b5a8e666a.woff2",
     "static/media/cormorant-garamond-latin-400-italic.woff": "/static/media/cormorant-garamond-latin-400-italic.aae4b07bf7b4dbde9b4b.woff",
     "static/media/cormorant-garamond-latin-600-normal.woff": "/static/media/cormorant-garamond-latin-600-normal.53d922b52431a18a848c.woff",
@@ -52,13 +52,13 @@
     "static/media/eb-garamond-vietnamese-400-normal.woff2": "/static/media/eb-garamond-vietnamese-400-normal.92880281b2c4a1ac7022.woff2",
     "index.html": "/index.html",
     "main.505e8498.css.map": "/static/css/main.505e8498.css.map",
-    "main.1305baca.js.map": "/static/js/main.1305baca.js.map",
+    "main.bd6b2989.js.map": "/static/js/main.bd6b2989.js.map",
     "239.d2863414.chunk.js.map": "/static/js/239.d2863414.chunk.js.map",
     "977.a1aca4e4.chunk.js.map": "/static/js/977.a1aca4e4.chunk.js.map",
     "732.d8915e0d.chunk.js.map": "/static/js/732.d8915e0d.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.505e8498.css",
-    "static/js/main.1305baca.js"
+    "static/js/main.bd6b2989.js"
   ]
 }
