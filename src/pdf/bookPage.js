@@ -25,9 +25,12 @@ const CH = PAGE_H_PT * PX;
 // Warm ink, slightly transparent under multiply for "absorbed letterpress".
 const INK_BODY    = "#241a12";
 const INK_TITLE   = "#1f1610";
-const INK_FOOTER  = "#7a6a58";
+const INK_FOOTER  = "#3e3326";
 const INK_HEADER  = "#a8967e";
 const INK_ALPHA   = 0.93;
+
+// Paper tone: slight desaturation pulls the yellow back without losing warmth.
+const PAPER_FILTER = "saturate(0.65) brightness(1.02)";
 
 // Margins (pt). Generous, book-like.
 const M_X       = 72;
@@ -41,7 +44,7 @@ const T_TITLE   = 13.5;
 const T_HEADER  = 8.5;
 const T_BODY    = 11.25;
 const T_DROPCAP = 56;
-const T_FOOTER  = 9;
+const T_FOOTER  = 10.5;
 
 // Drop cap spans this many body lines.
 const DROPCAP_LINES = 3;
@@ -282,8 +285,11 @@ async function renderOnePage({ texture, drawInk }) {
   canvas.height = CH;
   const ctx = canvas.getContext("2d");
 
-  // 1. Paper full-bleed.
+  // 1. Paper full-bleed — desaturated slightly to take the yellow back.
+  ctx.save();
+  ctx.filter = PAPER_FILTER;
   ctx.drawImage(texture, 0, 0, CW, CH);
+  ctx.restore();
 
   // 2. All ink (text + images) drawn under multiply blend, slightly
   //    transparent.
@@ -306,10 +312,11 @@ async function renderOnePage({ texture, drawInk }) {
   ctx.restore();
 
   // 4. Paper-on-paper soft-light pass — bakes fibres into both letters and
-  //    photographs.
+  //    photographs. Same desaturated paper tone for consistency.
   ctx.save();
   ctx.globalCompositeOperation = "soft-light";
   ctx.globalAlpha = 0.45;
+  ctx.filter = PAPER_FILTER;
   ctx.drawImage(texture, 0, 0, CW, CH);
   ctx.restore();
 
@@ -379,7 +386,6 @@ export async function renderBookPdfPages({ title, html, onPage }) {
   }
 
   const dropCapW   = useDropCap ? T_DROPCAP * PX * 0.72 : 0;
-  const dropCapH   = useDropCap ? T_DROPCAP * PX * 0.95 : 0;
   const dropCapIndent = useDropCap ? dropCapW + 10 * PX : 0;
 
   // Preload images so we can size them during pagination.
@@ -484,9 +490,11 @@ export async function renderBookPdfPages({ title, html, onPage }) {
           ctx.font = font(T_DROPCAP);
           ctx.fillStyle = INK_TITLE;
           ctx.textAlign = "left";
-          // Cap baseline ≈ bottom of body line (DROPCAP_LINES-1)+1 (so cap
-          // bottom aligns near the bottom of the last covered line).
-          const capBaseline = y + Math.min(dropCapH, LINE_H * DROPCAP_LINES - 4 * PX);
+          // Anchor the cap's BASELINE to body-line DROPCAP_LINES so the cap's
+          // top aligns with the body line's cap-height — preventing the cap
+          // from sitting visually lower than line 1.
+          const bodyBaselineOffset = T_BODY * PX * 0.82;
+          const capBaseline = y + bodyBaselineOffset + (DROPCAP_LINES - 1) * LINE_H;
           ctx.fillText(firstChar, M_X * PX, capBaseline);
         }
 
