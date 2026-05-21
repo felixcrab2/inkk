@@ -828,7 +828,7 @@ function PublishModal({ doc, user, profile, onConfirm, onClose }) {
 
 // ─── Feed ─────────────────────────────────────────────────────────────────────
 
-function Feed({ user, onRead, onHsModal, onAuthorClick, onRequestAuth }) {
+function Feed({ user, onRead, onHsModal, onAuthorClick, dropCapImages, onRequestAuth }) {
   const [pubs, setPubs]       = useState([]);
   const [loading, setLoading] = useState(true);
   const [likedSet, setLikedSet] = useState(new Set());
@@ -880,53 +880,54 @@ function Feed({ user, onRead, onHsModal, onAuthorClick, onRequestAuth }) {
         <h1 id="feed-title">Explore human writing.</h1>
         <button id="hs-link" onClick={onHsModal}>What is Human Signal?</button>
       </div>
-      <div id="feed-grid">
+      <div id="feed-list">
         {loading && <p className="feed-empty">loading…</p>}
         {!loading && pubs.length === 0 && (
           <p className="feed-empty">nothing published yet — be the first.</p>
         )}
         {pubs.map((pub, i) => {
           const hook = openingLine(pub.content);
+          const avatarLetter = pub.author_name?.[0] || "?";
           const likeCount    = getRelCount(pub.like_count);
           const commentCount = getRelCount(pub.comment_count);
           const isLiked      = likedSet.has(pub.id);
           return (
-            <article
-              key={pub.id}
-              className="grid-card"
-              style={{ "--card-index": i }}
-              onClick={() => onRead(pub)}
-            >
-              <div className="grid-card-inner">
-                <h2 className="grid-card-title">{pub.title}</h2>
-                {hook && <p className="grid-card-hook">{hook}</p>}
-                <div className="grid-card-footer">
-                  <button
-                    className="grid-card-author"
-                    onClick={e => { e.stopPropagation(); if (pub.user_id) onAuthorClick(pub.user_id); }}
-                  >
-                    {pub.author_name}
-                  </button>
-                  <span className="grid-card-date">{formatDate(pub.published_at)}</span>
-                </div>
-                <div className="grid-card-engagement">
-                  <button
-                    className={`engage-btn engage-like${isLiked ? " liked" : ""}`}
-                    title={isLiked ? "Unlike" : "Like"}
-                    onClick={e => { e.stopPropagation(); handleLike(pub); }}
-                  >
-                    <Heart size={13} strokeWidth={1.6} fill={isLiked ? "currentColor" : "none"} />
-                    <span>{likeCount}</span>
-                  </button>
-                  <button
-                    className="engage-btn engage-comment"
-                    title="Read & comment"
-                    onClick={e => { e.stopPropagation(); onRead(pub, { focus: "comments" }); }}
-                  >
-                    <MessageCircle size={13} strokeWidth={1.6} />
-                    <span>{commentCount}</span>
-                  </button>
-                </div>
+            <article key={pub.id} className="pub-card" style={{ "--card-index": i }} onClick={() => onRead(pub)}>
+              <div className="pub-card-meta">
+                <DropCapAvatar letter={avatarLetter} avatarData={pub.avatar_data} dropCapImages={dropCapImages} size={22} />
+                <button className="pub-author-btn" onClick={e => { e.stopPropagation(); if (pub.user_id) onAuthorClick(pub.user_id); }}>
+                  {pub.author_name}
+                </button>
+                <span className="pub-dot">·</span>
+                <span className="pub-date">{formatDate(pub.published_at)}</span>
+                <span className="pub-dot">·</span>
+                <span className="pub-read-time">{readingTime(pub.content)}</span>
+              </div>
+              <h2 className="pub-card-title">{pub.title}</h2>
+              {hook && <p className="pub-card-opening">{hook}</p>}
+              {(() => {
+                const sc = scoreFromRecord(pub);
+                return sc
+                  ? <HumanSignalBadge score={sc} />
+                  : <span className="pub-card-words">{wordCount(pub.content)} words</span>;
+              })()}
+              <div className="pub-card-engagement">
+                <button
+                  className={`engage-btn engage-like${isLiked ? " liked" : ""}`}
+                  title={isLiked ? "Unlike" : "Like"}
+                  onClick={e => { e.stopPropagation(); handleLike(pub); }}
+                >
+                  <Heart size={14} strokeWidth={1.6} fill={isLiked ? "currentColor" : "none"} />
+                  <span>{likeCount}</span>
+                </button>
+                <button
+                  className="engage-btn engage-comment"
+                  title="Read & comment"
+                  onClick={e => { e.stopPropagation(); onRead(pub, { focus: "comments" }); }}
+                >
+                  <MessageCircle size={14} strokeWidth={1.6} />
+                  <span>{commentCount}</span>
+                </button>
               </div>
             </article>
           );
@@ -2508,6 +2509,7 @@ export default function App() {
           onRead={openReading}
           onHsModal={() => setHsModalOpen(true)}
           onAuthorClick={openUserProfile}
+          dropCapImages={dropCapImages}
           onRequestAuth={() => setAuthOpen(true)}
         />
       )}
