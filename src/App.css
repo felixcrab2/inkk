@@ -455,7 +455,7 @@ body.focus-mode #text-container {
 /* ─── Human Signal editor status (wraps HumanSignalLine) ─────────────────── */
 #hs-editor-status {
   position: fixed;
-  bottom: calc(var(--bottom-nav) + 10px);
+  bottom: calc(var(--bottom-nav) + 12px);
   left: 50%;
   transform: translateX(-50%);
   z-index: 500;
@@ -463,7 +463,34 @@ body.focus-mode #text-container {
   display: flex;
   flex-direction: column;
   align-items: center;
+  max-width: calc(100% - 40px);
 }
+
+/* Plain writing-stats line — data about the piece, no score. */
+.writing-stats {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 7px;
+  padding: 6px 14px;
+  background: rgba(250, 249, 247, 0.78);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-radius: 99px;
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.ws-stat       { color: var(--text); }
+.ws-published  { font-variant: small-caps; letter-spacing: 0.08em; color: #6a5544; }
+.ws-sep        { color: var(--subtle); }
+.ws-status     { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-style: italic; }
+.ws-status .hs-status-dot           { background: #cfcdc8; }
+.ws-status.ok     .hs-status-dot    { background: #5a8a55; }
+.ws-status.saving .hs-status-dot    { background: #8a7a55; animation: hs-pulse 1.2s ease-in-out infinite; }
+.ws-status.off    .hs-status-dot    { background: #c48a3a; }
 
 /* ─── Editor ──────────────────────────────────────────────────────────────── */
 #text-container {
@@ -955,6 +982,32 @@ body.focus-mode #text-container {
   line-height: 1;
 }
 #avatar-upload-btn:hover { color: var(--text); border-color: #aaa; }
+
+#avatar-remove-btn {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: #a86060;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  line-height: 0;
+  padding: 0;
+}
+#avatar-remove-btn:hover {
+  color: #7a3030;
+  border-color: rgba(170, 90, 90, 0.5);
+  background: rgba(170, 90, 90, 0.08);
+}
+#avatar-remove-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 #profile-email {
   font-family: "Cormorant Garamond", serif;

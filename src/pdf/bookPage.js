@@ -490,11 +490,17 @@ export async function renderBookPdfPages({ title, html, onPage }) {
           ctx.font = font(T_DROPCAP);
           ctx.fillStyle = INK_TITLE;
           ctx.textAlign = "left";
-          // Anchor the cap's BASELINE to body-line DROPCAP_LINES so the cap's
-          // top aligns with the body line's cap-height — preventing the cap
-          // from sitting visually lower than line 1.
-          const bodyBaselineOffset = T_BODY * PX * 0.82;
-          const capBaseline = y + bodyBaselineOffset + (DROPCAP_LINES - 1) * LINE_H;
+          // Align the cap's visible TOP with the visible top of line 1 of
+          // body text. Body usually starts with lowercase (the cap took the
+          // first letter), so "top of line 1" = the x-height of line 1.
+          //   bodyAscent  ≈ T_BODY · 0.82  (canvas baseline of line 1)
+          //   bodyXHeight ≈ T_BODY · 0.48  (Cormorant has a modest x-height)
+          //   capAscent   ≈ T_DROPCAP · 0.72 (cap-height proportion)
+          const bodyAscent  = T_BODY * PX * 0.82;
+          const bodyXHeight = T_BODY * PX * 0.48;
+          const line1XHeightTop = y + bodyAscent - bodyXHeight;
+          const capAscent   = T_DROPCAP * PX * 0.72;
+          const capBaseline = line1XHeightTop + capAscent;
           ctx.fillText(firstChar, M_X * PX, capBaseline);
         }
 

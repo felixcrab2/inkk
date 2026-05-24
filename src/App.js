@@ -23,7 +23,7 @@ import {
   flushNow as syncFlushNow,
 } from "./telemetry/sync";
 import { claimAnonymous as claimAnonymousEvents, clearForUser as clearLocalForUser } from "./telemetry/store";
-import { HumanSignalLine, HumanSignalBadge, HumanSignalPanel } from "./components/HumanSignal";
+import { HumanSignalBadge } from "./components/HumanSignal";
 import { PrivacyModal, TermsModal, TOS_VERSION } from "./components/Legal";
 
 // ─── local storage ────────────────────────────────────────────────────────────
@@ -1057,6 +1057,14 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
   const totalWords = localDocs.reduce((sum, d) => sum + wordCount(d.content), 0);
   const avatarLetter = profile?.username?.[0] || user.email[0];
 
+  const hasCustomAvatar = !!profile?.avatar_data;
+  const handleRemoveAvatar = async () => {
+    if (!hasCustomAvatar || uploading) return;
+    setUploading(true);
+    await onAvatarChange(null);
+    setUploading(false);
+  };
+
   return (
     <div id="profile-container">
       <div id="profile-header">
@@ -1065,6 +1073,14 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
           <button id="avatar-upload-btn" onClick={() => fileInputRef.current?.click()} title="Change photo">
             {uploading ? "…" : "✎"}
           </button>
+          {hasCustomAvatar && (
+            <button
+              id="avatar-remove-btn"
+              onClick={handleRemoveAvatar}
+              title="Remove photo — revert to default"
+              disabled={uploading}
+            >×</button>
+          )}
           <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFileChange} />
         </div>
         <div id="profile-info">
@@ -1607,17 +1623,6 @@ export default function App() {
   const [dropCapImages, setDropCapImages] = useState({});
   const [usernameModalOpen, setUsernameModalOpen] = useState(false);
   const [viewingUser, setViewingUser] = useState(null);
-  const [liveScore, setLiveScore]     = useState(() => {
-    const d = initDocs.find(x => x.id === initActiveId);
-    if (!d?.humanScore || !d?.scoreTier) return null;
-    return {
-      score: d.humanScore, tier: d.scoreTier,
-      confidence: d.scoreFeatures?.confidence ?? 0.5,
-      contributors: d.scoreFeatures?.contributors || [],
-      paste_ratio: d.scoreFeatures?.paste_ratio || 0,
-    };
-  });
-  const [hsPanelOpen, setHsPanelOpen] = useState(false);
   const [researchOptIn, setResearchOptIn] = useState(false);
   const [liveStats, setLiveStats] = useState({ events: 0, sessionStartedAt: null });
   const [panelConfirmDeleteId, setPanelConfirmDeleteId] = useState(null);
@@ -1713,14 +1718,6 @@ export default function App() {
       return;
     }
 
-    setLiveScore({
-      score: score.score,
-      tier: score.tier,
-      confidence: score.confidence,
-      contributors: score.contributors,
-      paste_ratio: score.paste_ratio,
-    });
-
     // Persist denormalised score + features to the active doc.
     let nextDoc = null;
     setDocs(prev => {
@@ -1793,7 +1790,7 @@ export default function App() {
     const err = await updateAvatar(userRef.current.id, avatarData);
     if (!err) {
       setProfile(prev => prev ? { ...prev, avatar_data: avatarData } : prev);
-      addToast("Profile picture updated.");
+      addToast(avatarData ? "Profile picture updated." : "Profile picture removed.");
     } else {
       addToast("Could not save picture.");
     }
@@ -1844,17 +1841,6 @@ export default function App() {
     writingBaseRef.current = doc.writingTimeSecs || 0;
     writingFlushRef.current = 0;
     writingSessionStartRef.current = null;
-    // Restore cached score for this doc if we have one.
-    if (doc.humanScore != null && doc.scoreTier) {
-      setLiveScore({
-        score: doc.humanScore, tier: doc.scoreTier,
-        confidence: doc.scoreFeatures?.confidence ?? 0.5,
-        contributors: doc.scoreFeatures?.contributors || [],
-        paste_ratio: doc.scoreFeatures?.paste_ratio || 0,
-      });
-    } else {
-      setLiveScore(null);
-    }
     const range = document.createRange();
     range.selectNodeContents(el);
     range.collapse(false);
@@ -1944,18 +1930,6 @@ export default function App() {
     setSaveStatus("saved");
     recorderRef.current?.recordDocSwitch(id);
     setActiveId(id);
-    // Hydrate liveScore from the target doc immediately.
-    const target = docsRef.current.find(d => d.id === id);
-    if (target?.humanScore != null && target?.scoreTier) {
-      setLiveScore({
-        score: target.humanScore, tier: target.scoreTier,
-        confidence: target.scoreFeatures?.confidence ?? 0.5,
-        contributors: target.scoreFeatures?.contributors || [],
-        paste_ratio:  target.scoreFeatures?.paste_ratio || 0,
-      });
-    } else {
-      setLiveScore(null);
-    }
     setPanelOpen(false);
   }, [activeId]);
 
@@ -1988,7 +1962,6 @@ export default function App() {
     });
     recorderRef.current?.recordDocSwitch(doc.id);
     setActiveId(doc.id);
-    setLiveScore(null);
     setPanelOpen(false);
   }, [activeId]);
 
@@ -2001,7 +1974,6 @@ export default function App() {
         saveState([fresh], fresh.id);
         recorderRef.current?.recordDocSwitch(fresh.id);
         setActiveId(fresh.id);
-        setLiveScore(null);
         return [fresh];
       }
       const next = prev.filter(d => d.id !== id);
@@ -2010,15 +1982,6 @@ export default function App() {
         if (scoreTimerRef.current) { clearTimeout(scoreTimerRef.current); scoreTimerRef.current = null; }
         recorderRef.current?.recordDocSwitch(newActive);
         setActiveId(newActive);
-        const target = next.find(d => d.id === newActive);
-        if (target?.humanScore != null && target?.scoreTier) {
-          setLiveScore({
-            score: target.humanScore, tier: target.scoreTier,
-            confidence: target.scoreFeatures?.confidence ?? 0.5,
-            contributors: target.scoreFeatures?.contributors || [],
-            paste_ratio:  target.scoreFeatures?.paste_ratio || 0,
-          });
-        } else setLiveScore(null);
       }
       saveState(next, newActive);
       return next;
@@ -2525,22 +2488,43 @@ export default function App() {
         </div>
       )}
 
-      {/* ── human signal indicator (editor) ── */}
+      {/* ── writing stats (editor) ── data about the piece, no score ── */}
       {isEditor && (
         <div id="hs-editor-status" className={menuClass}>
-          <HumanSignalLine
-            score={liveScore}
-            words={words}
-            saving={saveStatus === "saving"}
-            online={online}
-            signedIn={!!user}
-            published={isPublished}
-            hasContent={hasContent}
-            onClick={() => setHsPanelOpen(true)}
-          />
+          {(() => {
+            const doc = docs.find(d => d.id === activeId);
+            const wtSecs = doc?.writingTimeSecs || 0;
+            const saving = saveStatus === "saving";
+            const statusText = saving
+              ? (user && online ? "saving…" : "saving locally…")
+              : (!user
+                ? "saved on this device"
+                : (online ? "saved" : "offline — saved locally, will sync"));
+            return (
+              <div className="writing-stats">
+                <span className="ws-stat">{words.toLocaleString()} {words === 1 ? "word" : "words"}</span>
+                {wtSecs >= 30 && (<>
+                  <span className="ws-sep">·</span>
+                  <span className="ws-stat">{formatWritingTime(wtSecs)} writing</span>
+                </>)}
+                {liveStats.events > 0 && researchOptIn && user && (<>
+                  <span className="ws-sep">·</span>
+                  <span className="ws-stat">{liveStats.events.toLocaleString()} events</span>
+                </>)}
+                {isPublished && (<>
+                  <span className="ws-sep">·</span>
+                  <span className="ws-stat ws-published">published</span>
+                </>)}
+                <span className="ws-sep">·</span>
+                <span className={`ws-status ${saving ? "saving" : (online ? "ok" : "off")}`}>
+                  <span className="hs-status-dot" aria-hidden="true" />
+                  {statusText}
+                </span>
+              </div>
+            );
+          })()}
         </div>
       )}
-      {hsPanelOpen && <HumanSignalPanel score={liveScore} onClose={() => setHsPanelOpen(false)} />}
 
       {/* ── Research participation indicator (only when opted in) ── */}
       {isEditor && user && researchOptIn && (
