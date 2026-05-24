@@ -717,14 +717,19 @@ body.focus-mode #text-container {
 .hs-badge {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   margin-top: 8px;
+}
+.hs-badge-mark {
+  color: #b8a892;
+  font-size: 0.7rem;
 }
 .hs-badge-text {
   font-family: "Cormorant Garamond", serif;
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   color: #a3a09a;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.06em;
+  font-variant: small-caps;
 }
 
 .hs-line {
@@ -1222,6 +1227,41 @@ body.focus-mode #text-container {
   font-family: "Cormorant Garamond", serif;
   font-size: 0.82rem;
   color: var(--muted);
+}
+
+/* ─── Contribution card (Profile / future Studio) ────────────────────────── */
+#contribution-card {
+  width: 100%;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 22px 16px 24px;
+  margin-bottom: 22px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.01), rgba(0,0,0,0.00));
+}
+#contribution-num {
+  font-family: "Cormorant Garamond", serif;
+  font-weight: 400;
+  font-size: 2.6rem;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+#contribution-label {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 8px;
+  font-style: italic;
+  text-align: center;
+}
+#contribution-since {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.72rem;
+  color: var(--subtle);
+  letter-spacing: 0.06em;
+  margin-top: 10px;
+  text-transform: lowercase;
 }
 
 .research-toggle {
@@ -1796,10 +1836,63 @@ body.focus-mode #text-container {
   margin-bottom: 20px; letter-spacing: 0.01em;
 }
 
-#hs-modal-body {
+#hs-modal-body,
+.hs-modal-body {
   font-family: "Cormorant Garamond", serif;
   font-size: 0.97rem; color: #666;
   line-height: 1.7; margin: 0;
+}
+
+/* ─── Research participation indicator ───────────────────────────────────── */
+#research-strip {
+  position: fixed;
+  bottom: calc(var(--bottom-nav) + 12px);
+  right: 18px;
+  z-index: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: 1px solid transparent;
+  padding: 5px 10px 5px 8px;
+  border-radius: 99px;
+  cursor: pointer;
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: #9c8a72;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+#research-strip:hover {
+  color: var(--text);
+  border-color: var(--border);
+  background: rgba(0,0,0,0.02);
+}
+.research-strip-text { white-space: nowrap; }
+
+.research-pulse {
+  position: relative;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #a86a4a;
+  flex-shrink: 0;
+}
+.research-pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #a86a4a;
+  opacity: 0.55;
+  animation: research-pulse 2.6s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes research-pulse {
+  0%   { transform: scale(1);   opacity: 0.55; }
+  100% { transform: scale(3.2); opacity: 0;    }
+}
+@media (max-width: 480px) {
+  #research-strip { font-size: 0.66rem; right: 10px; padding: 4px 8px 4px 7px; }
 }
 
 /* ─── Toasts ──────────────────────────────────────────────────────────────── */

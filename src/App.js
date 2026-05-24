@@ -74,6 +74,55 @@ function initState() {
   return { docs, activeId: validId };
 }
 
+// In-place smart typography on the contenteditable. Looks at the text around
+// the caret and rewrites common ASCII sequences into proper book glyphs.
+// Invisible to the user — no toolbar, no shortcuts.
+function applySmartTypography() {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  if (!range.collapsed) return;
+  const node = range.startContainer;
+  if (!node || node.nodeType !== Node.TEXT_NODE) return;
+  const offset = range.startOffset;
+  const text = node.nodeValue;
+  if (!text) return;
+  const before = text.slice(0, offset);
+  const after  = text.slice(offset);
+  const setCaret = (n, off) => { try { sel.collapse(n, off); } catch {} };
+
+  // Em-dash: -- → —
+  if (before.endsWith("--")) {
+    node.nodeValue = before.slice(0, -2) + "—" + after;
+    setCaret(node, offset - 1);
+    return;
+  }
+  // Ellipsis: ... → …
+  if (before.endsWith("...")) {
+    node.nodeValue = before.slice(0, -3) + "…" + after;
+    setCaret(node, offset - 2);
+    return;
+  }
+  // Curly double quote.
+  if (before.endsWith('"')) {
+    const prev = before.length >= 2 ? before[before.length - 2] : "";
+    const opening = !prev || /[\s([{—–]/.test(prev);
+    const glyph = opening ? "“" : "”";
+    node.nodeValue = before.slice(0, -1) + glyph + after;
+    setCaret(node, offset);
+    return;
+  }
+  // Curly single quote / apostrophe.
+  if (before.endsWith("'")) {
+    const prev = before.length >= 2 ? before[before.length - 2] : "";
+    const opening = !prev || /[\s([{—–]/.test(prev);
+    const glyph = opening ? "‘" : "’";
+    node.nodeValue = before.slice(0, -1) + glyph + after;
+    setCaret(node, offset);
+    return;
+  }
+}
+
 function stripHtml(html) {
   if (!html) return "";
   return html
@@ -344,6 +393,17 @@ async function addComment(pubId, userId, body) {
   if (trimmed.length > 2000) return "Comment is too long (max 2000 chars).";
   const { error } = await supabase.from("comments").insert({ user_id: userId, publication_id: pubId, body: trimmed });
   return error?.message || null;
+}
+
+// ─── Research contribution stats ───────────────────────────────────────────
+async function fetchMyContribution(userId) {
+  if (!supabase || !userId) return null;
+  const { data, error } = await supabase
+    .from("my_writing_event_counts")
+    .select("event_count, first_t, last_t")
+    .maybeSingle();
+  if (error) return null;
+  return data || null;
 }
 
 async function deleteCommentRow(commentId) {
@@ -620,12 +680,12 @@ function HumanSignalModal({ onClose }) {
     <div id="auth-overlay" onClick={onClose}>
       <div id="auth-modal" onClick={e => e.stopPropagation()}>
         <button id="auth-close" onClick={onClose}>×</button>
-        <div id="hs-modal-title">Human Signal</div>
+        <div id="hs-modal-title">A small study of writing.</div>
         <p id="hs-modal-body">
-          Inkk does not claim to perfectly detect AI. Instead it shows the process behind a piece of writing: time spent drafting, number of revisions, and word count.
+          When you write in Inkk, the rhythm of your typing — pauses, revisions, bursts — is recorded as anonymous, character-free metadata. We use it to study what human writing process looks like in latent space, so we can one day separate it from machine-written text on its own terms.
         </p>
-        <p id="hs-modal-body" style={{ marginTop: "12px" }}>
-          This is Human Signal — a quiet record of thought in progress.
+        <p className="hs-modal-body" style={{ marginTop: "12px" }}>
+          You can opt out, download, or delete your contribution at any time from your Profile.
         </p>
       </div>
     </div>
@@ -950,7 +1010,13 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
   const [showTerms,   setShowTerms]   = useState(false);
   const [confirmDeleteId, setConfirmDeleteId]     = useState(null);
   const [confirmUnpublishId, setConfirmUnpublishId] = useState(null);
+  const [contribution, setContribution] = useState(null);
   const fileInputRef              = useRef(null);
+
+  useEffect(() => {
+    if (!user || !researchOptIn) { setContribution(null); return; }
+    fetchMyContribution(user.id).then(setContribution);
+  }, [user, researchOptIn]);
 
   useEffect(() => {
     if (!user) { setPubs([]); setLoading(false); return; }
@@ -1152,11 +1218,19 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
       </div>
 
       <div id="research-section">
+        {researchOptIn && contribution && contribution.event_count > 0 && (
+          <div id="contribution-card">
+            <div id="contribution-num">{Number(contribution.event_count).toLocaleString()}</div>
+            <div id="contribution-label">events contributed to the inkk writing study</div>
+            {contribution.first_t && (
+              <div id="contribution-since">since {formatDate(new Date(Number(contribution.first_t)).toISOString())}</div>
+            )}
+          </div>
+        )}
         <div id="research-head">
-          <div id="research-title">Privacy</div>
+          <div id="research-title">Research participation</div>
           <p id="research-blurb">
-            Inkk shares your anonymised writing-process data — the timing, pauses, and revisions behind a piece — with our research dataset.
-            We never store the letters or digits you type, only how you type them. You can turn this off at any time, and even after that you can keep using Inkk normally.
+            When you write in Inkk, the rhythm of your typing — pauses, revisions, bursts — is recorded as anonymous, character-free metadata. We use it to study what human writing looks like in latent space. You can turn this off at any time, and the editor keeps working exactly as before.
           </p>
           <label className="research-toggle">
             <input
@@ -1545,6 +1619,7 @@ export default function App() {
   });
   const [hsPanelOpen, setHsPanelOpen] = useState(false);
   const [researchOptIn, setResearchOptIn] = useState(false);
+  const [liveStats, setLiveStats] = useState({ events: 0, sessionStartedAt: null });
   const [panelConfirmDeleteId, setPanelConfirmDeleteId] = useState(null);
   const [confirmUnpublishOpen, setConfirmUnpublishOpen] = useState(false);
 
@@ -1615,7 +1690,15 @@ export default function App() {
     if (!docId) return;
     const rec = recorderRef.current;
     if (!rec) return;
-    const { events } = rec.snapshot(docId);
+    const { events, startedAt } = rec.snapshot(docId);
+    // Always update the visible live counter — even on tiny sample sizes,
+    // so the research indicator ticks up in real time.
+    const lastT = events.length ? events[events.length - 1].t : null;
+    setLiveStats({
+      events: events.length,
+      sessionStartedAt: startedAt || null,
+      lastEventAt: lastT,
+    });
     if (events.length < 8) return;        // very early — don't touch existing score
     const words = wordCount(contentRef.current || "");
     const features = extractFeatures(events, { words });
@@ -2053,6 +2136,7 @@ export default function App() {
     }
     const el = editorRef.current;
     if (!el) return;
+    applySmartTypography();
     const fullContent = el.innerHTML;
     contentRef.current = fullContent;
     setWords(wordCount(fullContent));
@@ -2457,6 +2541,23 @@ export default function App() {
         </div>
       )}
       {hsPanelOpen && <HumanSignalPanel score={liveScore} onClose={() => setHsPanelOpen(false)} />}
+
+      {/* ── Research participation indicator (only when opted in) ── */}
+      {isEditor && user && researchOptIn && (
+        <button
+          id="research-strip"
+          className={menuClass}
+          onClick={() => setHsModalOpen(true)}
+          aria-label="About inkk research"
+          title="Click for info — your typing patterns contribute to a research study (no characters stored)"
+        >
+          <span className="research-pulse" aria-hidden="true" />
+          <span className="research-strip-text">
+            recording · {liveStats.events.toLocaleString()} {liveStats.events === 1 ? "event" : "events"}
+            {liveStats.sessionStartedAt && ` · ${Math.max(1, Math.round((Date.now() - liveStats.sessionStartedAt) / 60000))}m`}
+          </span>
+        </button>
+      )}
 
       {/* ── editor (always mounted) ── */}
       <div

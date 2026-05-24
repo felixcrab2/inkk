@@ -28,8 +28,8 @@ function saveStatusText({ saving, online, signedIn }) {
   return "saved";
 }
 
-// Tiny live indicator below the editor. Shows Human Signal tier (if scored),
-// word count, save status, and published status.
+// Tiny live indicator below the editor. Shows the writer's Process tier
+// (private), word count, save status, and published status.
 export function HumanSignalLine({ score, words, saving, online, signedIn, published, hasContent, onClick }) {
   const status = saveStatusText({ saving, online, signedIn });
   const hasScore = !!score?.tier && (score.confidence ?? 0) > 0.05;
@@ -37,10 +37,9 @@ export function HumanSignalLine({ score, words, saving, online, signedIn, publis
     <button id="hs-line" className="hs-line" onClick={hasScore ? onClick : undefined} type="button" disabled={!hasScore}>
       {hasScore && (
         <span className="hs-line-row">
-          <span className="hs-line-label">Human Signal —</span>
+          <span className="hs-line-label">Process —</span>
           {dotsRow(score.tier)}
           <span className="hs-line-tier">{score.tier}</span>
-          {Number.isFinite(score.score) && <span className="hs-line-score">· {score.score}</span>}
         </span>
       )}
       <span className="hs-line-sub">
@@ -53,18 +52,20 @@ export function HumanSignalLine({ score, words, saving, online, signedIn, publis
   );
 }
 
-// Tiny badge used in feed / profile / reading meta lines.
+// Public-facing badge — kept intentionally quiet. No tier dots, no number,
+// just a small "process recorded" mark so readers know inkk captured the
+// writing. The full process view lives behind a dedicated reader-side toggle.
 export function HumanSignalBadge({ score }) {
-  if (!score || !score.tier) return null;
+  if (!score) return null;
   return (
-    <span className="hs-badge" title={`Process score ${score.score}/100 — ${score.tier}`}>
-      {dotsRow(score.tier)}
-      <span className="hs-badge-text">Human Signal · {score.tier}</span>
+    <span className="hs-badge" title="Written with inkk — process metadata recorded">
+      <span className="hs-badge-mark" aria-hidden="true">◇</span>
+      <span className="hs-badge-text">process recorded</span>
     </span>
   );
 }
 
-// Slide-up panel showing the breakdown of contributors.
+// Slide-up panel showing the breakdown of contributors (writer's own view).
 export function HumanSignalPanel({ score, onClose }) {
   if (!score) return null;
   const contributors = score.contributors || [];
@@ -81,7 +82,7 @@ export function HumanSignalPanel({ score, onClose }) {
           <div className="hs-panel-score">{score.score} / 100</div>
         </div>
         <p className="hs-panel-blurb">
-          A measurement of the writing process — not the words themselves. Built from how the text was typed: rhythm, pauses, corrections, revisions.
+          A reading of how this piece was made — rhythm, pauses, corrections, revisions. Built from process metadata only; the words themselves are never analysed.
         </p>
 
         <div className="hs-panel-list">
