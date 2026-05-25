@@ -53,6 +53,39 @@ function logNormalShape(pauses) {
   return Math.max(0, 1 - Math.min(1, Math.abs(skew)));
 }
 
+const VELOCITY_WINDOW_MS = 30_000;
+
+function buildVelocitySeries(inputEvents, statsFunc) {
+  if (!inputEvents.length) return { series: [], avg_wpm: 0, peak_wpm: 0, velocity_cv: 0 };
+  const firstT = inputEvents[0].t;
+  const lastT = inputEvents[inputEvents.length - 1].t;
+  const span = lastT - firstT;
+  if (span < 10_000) {
+    const chars = inputEvents.reduce((s, e) => s + Math.max(0, e.len_delta || 0), 0);
+    const wpm = span > 0 ? Math.round((chars / 5) / (span / 60000)) : 0;
+    return { series: [{ tMs: 0, pct: 0.5, wpm }], avg_wpm: wpm, peak_wpm: wpm, velocity_cv: 0 };
+  }
+  const windowMs = Math.max(VELOCITY_WINDOW_MS, Math.ceil(span / 24));
+  const numWindows = Math.ceil(span / windowMs);
+  const wpmArr = [];
+  const series = [];
+  for (let i = 0; i < numWindows; i++) {
+    const wStart = firstT + i * windowMs;
+    const wEnd = wStart + windowMs;
+    const chars = inputEvents
+      .filter(e => e.t >= wStart && e.t < wEnd)
+      .reduce((s, e) => s + Math.max(0, e.len_delta || 0), 0);
+    const wpm = Math.round((chars / 5) / (windowMs / 60000));
+    wpmArr.push(wpm);
+    series.push({ tMs: i * windowMs, pct: numWindows > 1 ? i / (numWindows - 1) : 0, wpm });
+  }
+  const nonZero = wpmArr.filter(v => v > 0);
+  const avg_wpm = nonZero.length ? Math.round(nonZero.reduce((s, v) => s + v, 0) / nonZero.length) : 0;
+  const peak_wpm = wpmArr.length ? Math.max(...wpmArr) : 0;
+  const st = statsFunc(wpmArr);
+  return { series, avg_wpm, peak_wpm, velocity_cv: st.cv };
+}
+
 export function extractFeatures(events, { words = 0 } = {}) {
   const out = {
     event_count: events.length,
@@ -82,6 +115,14 @@ export function extractFeatures(events, { words = 0 } = {}) {
 
     paste_ratio: 0,
     deletion_ratio: 0,
+
+    velocity_series: [],
+    avg_wpm: 0,
+    peak_wpm: 0,
+    velocity_cv: 0,
+    thinking_pauses: 0,
+    nav_events: 0,
+    active_ratio: 0,
   };
 
   if (!events?.length) return out;
@@ -109,6 +150,7 @@ export function extractFeatures(events, { words = 0 } = {}) {
     if (gap >= 500)    out.pause_count_500++;
     if (gap >= 2000)   out.pause_count_2000++;
     if (gap >= 10_000) out.pause_count_10000++;
+    if (gap >= 2000 && gap < 10000) out.thinking_pauses++;
     if (gap >= 500)    pauses.push(gap);
     if (gap < ACTIVE_GAP_MS) out.active_time_ms += gap;
   }
@@ -204,10 +246,24 @@ export function extractFeatures(events, { words = 0 } = {}) {
     }
   }
 
+  // ── Nav events ────────────────────────────────────────────────────────────
+  out.nav_events = sorted.filter(e => e.kind === "keydown" && e.key_class === "nav").length;
+
+  // ── Active ratio ──────────────────────────────────────────────────────────
+  out.active_ratio = out.total_time_ms > 0 ? out.active_time_ms / out.total_time_ms : 0;
+
   // ── Ratios ────────────────────────────────────────────────────────────────
   const grossIn = out.typed_chars + out.pasted_chars;
   out.paste_ratio    = grossIn > 0 ? out.pasted_chars / grossIn : 0;
   out.deletion_ratio = out.typed_chars > 0 ? out.deleted_chars / out.typed_chars : 0;
+
+  // ── Velocity series ───────────────────────────────────────────────────────
+  const inputEvs = sorted.filter(e => e.kind === "input");
+  const vel = buildVelocitySeries(inputEvs, stats);
+  out.velocity_series = vel.series;
+  out.avg_wpm = vel.avg_wpm;
+  out.peak_wpm = vel.peak_wpm;
+  out.velocity_cv = vel.velocity_cv;
 
   return out;
 }

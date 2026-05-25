@@ -23,7 +23,7 @@ import {
   flushNow as syncFlushNow,
 } from "./telemetry/sync";
 import { claimAnonymous as claimAnonymousEvents, clearForUser as clearLocalForUser } from "./telemetry/store";
-import { HumanSignalBadge } from "./components/HumanSignal";
+import { HumanSignalBadge, HumanSignalPanel } from "./components/HumanSignal";
 import { PrivacyModal, TermsModal, TOS_VERSION } from "./components/Legal";
 
 // ─── local storage ────────────────────────────────────────────────────────────
@@ -1689,6 +1689,7 @@ export default function App() {
   const [font, setFont]               = useState(() => localStorage.getItem("inkk_font") || "garamond");
   const [showLanding, setShowLanding] = useState(() => !localStorage.getItem("inkk_visited"));
   const [hsModalOpen, setHsModalOpen] = useState(false);
+  const [hsScoreOpen, setHsScoreOpen]   = useState(false);
   const [streak, setStreak]           = useState(() => loadStreak().count);
   const [toasts, setToasts]           = useState([]);
   const [focusMode, setFocusMode]     = useState(false);
@@ -1815,6 +1816,17 @@ export default function App() {
           mid_revisions: features.mid_revisions,
           typo_corrections: features.typo_corrections,
           pause_count_500: features.pause_count_500,
+          velocity_series:   score.velocity_series  || [],
+          avg_wpm:           score.avg_wpm          || 0,
+          peak_wpm:          score.peak_wpm         || 0,
+          active_time_ms:    score.active_time_ms   || 0,
+          thinking_pauses:   score.thinking_pauses  || 0,
+          active_ratio:      score.active_ratio     || 0,
+          typed_chars:       features.typed_chars   || 0,
+          words:             features.words         || 0,
+          typo_corrections:  features.typo_corrections || 0,
+          mid_revisions:     features.mid_revisions || 0,
+          burst_count:       features.burst_count   || 0,
         },
       }));
       nextDoc = next.find(d => d.id === docId);
@@ -2339,7 +2351,7 @@ export default function App() {
         if (publishMenuOpen) { setPublishMenuOpen(false); setConfirmUnpublishOpen(false); return; }
         if (publishModalDoc) { setPublishModalDoc(null); return; }
         if (usernameModalOpen) return;
-        setPanelOpen(false); setAuthOpen(false); setHsModalOpen(false);
+        setPanelOpen(false); setAuthOpen(false); setHsModalOpen(false); setHsScoreOpen(false);
         if (view !== "editor") { window.history.back(); return; }
       }
     };
@@ -2610,6 +2622,22 @@ export default function App() {
                   <span className="ws-sep">·</span>
                   <span className="ws-stat ws-published">published</span>
                 </>)}
+                {(() => {
+                  const sf = doc?.scoreFeatures;
+                  const hasScore = doc?.humanScore != null && doc?.scoreTier && (sf?.confidence || 0) > 0.08;
+                  if (!hasScore) return null;
+                  const tierList = ["Faint","Developing","Strong","Distinct"];
+                  const filled = tierList.indexOf(doc.scoreTier) + 1;
+                  return (<>
+                    <span className="ws-sep">·</span>
+                    <button className="ws-stat ws-process-btn" onClick={() => setHsScoreOpen(true)} title="View writing process signal">
+                      {tierList.map((_, i) => (
+                        <span key={i} className={`hs-dot-xs ${i < filled ? "on" : "off"}`} />
+                      ))}
+                      <span style={{ marginLeft: 5 }}>{doc.scoreTier}</span>
+                    </button>
+                  </>);
+                })()}
                 <span className="ws-sep">·</span>
                 <span className={`ws-status ${saving ? "saving" : (online ? "ok" : "off")}`}>
                   <span className="hs-status-dot" aria-hidden="true" />
@@ -2775,6 +2803,12 @@ export default function App() {
       )}
       {authOpen && supabase && <AuthModal onClose={() => setAuthOpen(false)} />}
       {hsModalOpen && <HumanSignalModal onClose={() => setHsModalOpen(false)} />}
+      {hsScoreOpen && (() => {
+        const doc = docs.find(d => d.id === activeId);
+        if (!doc?.scoreFeatures) return null;
+        const scoreObj = { score: doc.humanScore, tier: doc.scoreTier, ...doc.scoreFeatures };
+        return <HumanSignalPanel score={scoreObj} onClose={() => setHsScoreOpen(false)} />;
+      })()}
       {usernameModalOpen && user && (
         <UsernameModal user={user} onDone={prof => {
           setProfile(prof);

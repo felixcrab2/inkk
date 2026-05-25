@@ -9,13 +9,15 @@
 //    feature vector. Short, normally-typed pieces score well.
 
 const WEIGHTS = {
-  variance:    0.28,
-  dwell:       0.16,
-  pauses:      0.10,
-  corrections: 0.20,
+  variance:    0.20,
+  dwell:       0.13,
+  pauses:      0.08,
+  corrections: 0.18,
   revisions:   0.10,
   bursts:      0.06,
-  rhythm:      0.10,   // dwell + IKI interaction
+  rhythm:      0.09,
+  velocity:    0.10,
+  engagement:  0.06,
 };
 
 const sigmoid = (x, k = 1) => 1 / (1 + Math.exp(-k * x));
@@ -81,6 +83,24 @@ function subRhythm(f) {
   return { value: both, conf, raw: { cv, dw } };
 }
 
+function subVelocity(f) {
+  const cv = f.velocity_cv || 0;
+  const n = (f.velocity_series || []).length;
+  const value = sigmoid(cv - 0.28, 6);
+  const conf = clamp01(n / 4);
+  return { value, conf, raw: cv };
+}
+
+function subEngagement(f) {
+  const words = Math.max(f.words || 0, 1);
+  const tpRate = (f.thinking_pauses || 0) / Math.max(words / 25, 1);
+  const tp = clamp01(tpRate);
+  const ar = clamp01((f.active_ratio || 0) * 2.5);
+  const value = clamp01(tp * 0.55 + ar * 0.45);
+  const conf = clamp01(words / 40);
+  return { value, conf, raw: { tpRate, active_ratio: f.active_ratio } };
+}
+
 function pastePenalty(f) {
   // Paste up to 20% of content is normal (quotes, links). Beyond that, scale.
   const p = f.paste_ratio || 0;
@@ -91,13 +111,27 @@ function pastePenalty(f) {
 }
 
 const CONTRIBUTOR_LABELS = {
-  variance:    "Typing rhythm varies",
-  dwell:       "Keypress timing varies",
-  pauses:      "Natural pause distribution",
-  corrections: "Real edits and corrections",
-  revisions:   "Going back to rework lines",
-  bursts:      "Bursts of sustained writing",
+  variance:    "Keystroke variance",
+  dwell:       "Key contact time",
+  pauses:      "Pause distribution",
+  corrections: "In-line corrections",
+  revisions:   "Mid-stream revisions",
+  bursts:      "Sustained writing bursts",
   rhythm:      "Combined rhythm signature",
+  velocity:    "Writing speed naturalness",
+  engagement:  "Cognitive engagement",
+};
+
+export const CONTRIBUTOR_DESC = {
+  variance:    "Natural irregularity in inter-keystroke timing",
+  dwell:       "Physical variation in how long keys are held",
+  pauses:      "Pauses distribute as a human thinking pattern",
+  corrections: "Genuine edits — deletions and immediate fixes",
+  revisions:   "Jumping back to rework earlier passages",
+  bursts:      "Periods of sustained, uninterrupted output",
+  rhythm:      "IKI and dwell variance confirm each other",
+  velocity:    "Writing speed varies naturally as ideas flow",
+  engagement:  "Thinking pauses signal real deliberation",
 };
 
 export function computeScore(features) {
@@ -109,6 +143,8 @@ export function computeScore(features) {
     revisions:   subRevisions(features),
     bursts:      subBursts(features),
     rhythm:      subRhythm(features),
+    velocity:    subVelocity(features),
+    engagement:  subEngagement(features),
   };
 
   // weighted mean of confident sub-scores
@@ -151,8 +187,19 @@ export function computeScore(features) {
     penalty, base,
     subs,
     contributors,
-    paste_ratio: features.paste_ratio || 0,
+    paste_ratio:       features.paste_ratio || 0,
+    velocity_series:   features.velocity_series || [],
+    avg_wpm:           features.avg_wpm || 0,
+    peak_wpm:          features.peak_wpm || 0,
+    active_time_ms:    features.active_time_ms || 0,
+    thinking_pauses:   features.thinking_pauses || 0,
+    active_ratio:      features.active_ratio || 0,
+    typed_chars:       features.typed_chars || 0,
+    words:             features.words || 0,
+    typo_corrections:  features.typo_corrections || 0,
+    mid_revisions:     features.mid_revisions || 0,
+    burst_count:       features.burst_count || 0,
   };
 }
 
-export const __test__ = { subs: { subVariance, subDwell, subPauses, subCorrections, subRevisions, subBursts, subRhythm }, pastePenalty, WEIGHTS };
+export const __test__ = { subs: { subVariance, subDwell, subPauses, subCorrections, subRevisions, subBursts, subRhythm, subVelocity, subEngagement }, pastePenalty, WEIGHTS };
