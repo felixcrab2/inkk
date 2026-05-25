@@ -2032,7 +2032,7 @@ export default function App() {
       const cloudDocs = await fetchCloudDocs();
       const saved = loadState();
       const localDocs = saved?.docs || [];
-      const hasLocalContent = localDocs.some(d => stripHtml(d.content).trim());
+      const hasLocalContent = localDocs.some(d => stripHtml(d.content).trim()) || !!titleRef.current.trim();
       let merged = (hasLocalContent || !cloudDocs.length)
         ? mergeDocs(localDocs, cloudDocs) : cloudDocs;
       if (!merged.length) merged = [createDoc()];
@@ -2126,7 +2126,11 @@ export default function App() {
   useEffect(() => {
     if (!mountedRef.current) return;
     const doc = docs.find(d => d.id === activeId);
-    if (doc) { loadDocIntoEditor(doc); setShowTitleInput(!!doc.title); }
+    if (doc) {
+      loadDocIntoEditor(doc);
+      // Preserve locally-typed title when switching to a cloud doc that has no title
+      if (!!doc.title || !titleRef.current) setShowTitleInput(!!doc.title);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
 
