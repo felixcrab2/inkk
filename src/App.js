@@ -1766,7 +1766,6 @@ export default function App() {
   const [toasts, setToasts]           = useState([]);
   const [focusMode, setFocusMode]     = useState(false);
   const [publishMenuOpen, setPublishMenuOpen] = useState(false);
-  const [showTitleInput, setShowTitleInput] = useState(() => !!initDocs.find(d => d.id === initActiveId)?.title);
   const [profile, setProfile]         = useState(null);
   const [dropCapImages, setDropCapImages] = useState({});
   const [usernameModalOpen, setUsernameModalOpen] = useState(false);
@@ -2126,7 +2125,7 @@ export default function App() {
   useEffect(() => {
     if (!mountedRef.current) return;
     const doc = docs.find(d => d.id === activeId);
-    if (doc) { loadDocIntoEditor(doc); setShowTitleInput(!!doc.title); }
+    if (doc) loadDocIntoEditor(doc);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
 
@@ -2454,7 +2453,6 @@ export default function App() {
       contentRef.current = doc.content;
       writingBaseRef.current = doc.writingTimeSecs || 0;
       if (titleEditorRef.current) { titleEditorRef.current.value = doc.title || ""; titleEditorRef.current.style.height = "auto"; titleEditorRef.current.style.height = titleEditorRef.current.scrollHeight + "px"; }
-      setShowTitleInput(!!doc.title);
       const el = editorRef.current;
       if (el) {
         setEditorHtml(el, doc.content);
@@ -2758,26 +2756,16 @@ export default function App() {
         ref={containerRef}
         style={{ display: isEditor ? "" : "none" }}
       >
-        {showTitleInput ? (
-          <textarea
-            id="title-input"
-            ref={titleEditorRef}
-            rows={1}
-            placeholder="Title"
-            className={font === "arial" ? "font-arial" : ""}
-            onInput={onTitleInput}
-            onBlur={() => { const v = titleEditorRef.current?.value ?? ""; titleRef.current = v; }}
-            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); if (titleEditorRef.current) titleRef.current = titleEditorRef.current.value; editorRef.current?.focus(); } }}
-          />
-        ) : (
-          <button
-            id="add-title-btn"
-            className={menuClass}
-            onClick={() => { setShowTitleInput(true); setTimeout(() => titleEditorRef.current?.focus(), 20); }}
-          >
-            add title
-          </button>
-        )}
+        <textarea
+          id="title-input"
+          ref={titleEditorRef}
+          rows={1}
+          placeholder="Title"
+          className={font === "arial" ? "font-arial" : ""}
+          onInput={onTitleInput}
+          onBlur={() => { const v = titleEditorRef.current?.value ?? ""; titleRef.current = v; }}
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); if (titleEditorRef.current) titleRef.current = titleEditorRef.current.value; editorRef.current?.focus(); } }}
+        />
         <div id="writing-area">
           <div
             id="text"
