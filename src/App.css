@@ -517,8 +517,6 @@ body.focus-mode #text-container {
   background: none;
   border: none;
   outline: none;
-  resize: none;
-  overflow: hidden;
   font-family: "Cormorant Garamond", serif;
   font-weight: 600;
   font-style: italic;
@@ -531,9 +529,54 @@ body.focus-mode #text-container {
   text-align: center;
   display: block;
   flex-shrink: 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  cursor: text;
+  caret-color: #999;
+  min-height: 1.35em;
 }
-#title-input::placeholder { color: #d8d5d0; font-weight: 400; }
+#title-input:focus { caret-color: #777; }
+#title-input:empty::before {
+  content: attr(data-placeholder);
+  color: #d8d5d0;
+  font-weight: 400;
+  font-style: italic;
+  pointer-events: none;
+}
 #title-input.font-arial { font-family: Arial, sans-serif; letter-spacing: -0.01em; }
+
+#format-toolbar {
+  position: fixed;
+  z-index: 900;
+  background: #fff;
+  border: 1px solid #e8e6e2;
+  border-radius: 999px;
+  padding: 4px 6px;
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  transition: opacity 0.12s ease;
+}
+.format-bar-hidden  { opacity: 0; pointer-events: none; }
+.format-bar-visible { opacity: 1; pointer-events: auto; }
+.format-btn {
+  background: none;
+  border: none;
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.95rem;
+  color: var(--subtle);
+  cursor: pointer;
+  padding: 3px 9px;
+  border-radius: 999px;
+  min-width: 22px;
+  text-align: center;
+  transition: color 0.15s, background 0.15s;
+}
+.format-btn b { font-weight: 600; font-style: normal; }
+.format-btn i { font-weight: 400; font-style: italic; }
+.format-btn:hover  { color: var(--text); }
+.format-btn.active { color: var(--text); background: rgba(0, 0, 0, 0.05); }
 
 #add-title-btn {
   background: none;
@@ -777,14 +820,12 @@ body.focus-mode #text-container {
 
 .pub-card-title {
   font-family: "Cormorant Garamond", serif;
-  font-size: 1.25rem;
-  font-weight: 600;
-  font-style: italic;
+  font-size: 1.4rem;
+  font-weight: 500;
   color: var(--text);
   margin: 0 0 8px;
-  line-height: 1.35;
-  letter-spacing: 0.01em;
-  text-align: center;
+  line-height: 1.2;
+  letter-spacing: -0.005em;
   transition: color 0.2s;
 }
 
@@ -2355,7 +2396,7 @@ body.focus-mode #text-container {
   #feed-list, #feed-header { max-width: 100%; }
   #feed-header { padding-left: 20px; padding-right: 20px; }
   #feed-list { padding-left: 20px; padding-right: 20px; }
-  .pub-card-title { font-size: 1.15rem; }
+  .pub-card-title { font-size: 1.2rem; }
 
   /* ── Profile ── */
   #profile-container { padding: 28px 20px 24px; }

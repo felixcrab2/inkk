@@ -191,6 +191,12 @@ function setEditorHtml(el, content) {
   else { el.innerText = content; }
 }
 
+function setTitleHtml(el, content) {
+  if (!content) { el.innerHTML = ""; return; }
+  if (/<\w+/.test(content) || /&\w+;/.test(content)) { el.innerHTML = content; }
+  else { el.innerText = content; }
+}
+
 function caretRangeAt(x, y) {
   if (document.caretRangeFromPoint) return document.caretRangeFromPoint(x, y);
   const pos = document.caretPositionFromPoint?.(x, y);
@@ -955,7 +961,7 @@ function UsernameModal({ user, onDone }) {
 
 function PublishModal({ doc, user, profile, onConfirm, onClose }) {
   const author = profile?.username || user.user_metadata?.full_name || user.email.split("@")[0];
-  const [title, setTitle]     = useState(doc.title || "");
+  const [title, setTitle]     = useState(stripHtml(doc.title || ""));
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
 
@@ -1269,7 +1275,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
                 <p className="feed-empty">No drafts yet. <button className="feed-empty-link" onClick={onNewDoc}>Start writing →</button></p>
               )}
               {drafts.map(d => {
-                const title = d.title || docTitle(d.content);
+                const title = stripHtml(d.title || "") || docTitle(d.content);
                 const preview = pubPreview(d.content);
                 const wc = wordCount(d.content);
                 const sc = d.humanScore != null && d.scoreTier ? { score: d.humanScore, tier: d.scoreTier, confidence: d.scoreFeatures?.confidence ?? 0.5, paste_ratio: d.scoreFeatures?.paste_ratio || 0, contributors: [] } : null;
@@ -1772,10 +1778,12 @@ export default function App() {
   const [liveStats, setLiveStats] = useState({ events: 0, sessionStartedAt: null });
   const [panelConfirmDeleteId, setPanelConfirmDeleteId] = useState(null);
   const [confirmUnpublishOpen, setConfirmUnpublishOpen] = useState(false);
+  const [formatActive, setFormatActive] = useState({ bold: false, italic: false });
 
   const editorRef      = useRef(null);
   const titleEditorRef = useRef(null);
   const containerRef   = useRef(null);
+  const formatBarRef   = useRef(null);
   const contentRef     = useRef("");
   const titleRef       = useRef("");
   const isMobileRef  = useRef(false);
@@ -1996,11 +2004,7 @@ export default function App() {
     const finalTitle = (preserveLocalTitle && !incomingTitle && titleRef.current)
       ? titleRef.current : incomingTitle;
     titleRef.current = finalTitle;
-    if (titleEditorRef.current) {
-      titleEditorRef.current.value = finalTitle;
-      titleEditorRef.current.style.height = "auto";
-      titleEditorRef.current.style.height = titleEditorRef.current.scrollHeight + "px";
-    }
+    if (titleEditorRef.current) setTitleHtml(titleEditorRef.current, finalTitle);
     contentRef.current = doc.content;
     setEditorHtml(el, doc.content);
     setWords(wordCount(doc.content));
@@ -2028,7 +2032,7 @@ export default function App() {
       // Use live in-memory docs/activeId — localStorage may be stale or empty for
       // a brand-new session where initState created a doc but saveState hasn't fired yet.
       const localDocs = docsRef.current.map(normaliseDoc);
-      const hasLocalContent = localDocs.some(d => stripHtml(d.content).trim()) || !!titleRef.current.trim();
+      const hasLocalContent = localDocs.some(d => stripHtml(d.content).trim()) || !!stripHtml(titleRef.current).trim();
       let merged = (hasLocalContent || !cloudDocs.length)
         ? mergeDocs(localDocs, cloudDocs) : cloudDocs;
       if (!merged.length) merged = [createDoc()];
@@ -2327,13 +2331,11 @@ export default function App() {
   const onTitleInput = useCallback(() => {
     const el = titleEditorRef.current;
     if (!el) return;
-    el.style.height = "auto";
-    el.style.height = el.scrollHeight + "px";
-    titleRef.current = el.value;
+    titleRef.current = el.innerHTML;
     setSaveStatus("saving");
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     const capturedId = activeId;
-    const capturedTitle = el.value;
+    const capturedTitle = el.innerHTML;
     saveTimerRef.current = setTimeout(() => {
       const capturedUpdatedAt = Date.now();
       setDocs(prev => {
@@ -2401,7 +2403,7 @@ export default function App() {
     const text = contentRef.current || "";
     if (!stripHtml(text).trim()) return;
     try {
-      const titleStr  = titleRef.current.trim();
+      const titleStr  = stripHtml(titleRef.current).trim();
       const pdf = new jsPDF({ unit: "pt", format: [PAGE_W_PT, PAGE_H_PT], compress: true });
 
       await renderBookPdfPages({
@@ -2449,7 +2451,7 @@ export default function App() {
       titleRef.current = doc.title || "";
       contentRef.current = doc.content;
       writingBaseRef.current = doc.writingTimeSecs || 0;
-      if (titleEditorRef.current) { titleEditorRef.current.value = doc.title || ""; titleEditorRef.current.style.height = "auto"; titleEditorRef.current.style.height = titleEditorRef.current.scrollHeight + "px"; }
+      if (titleEditorRef.current) setTitleHtml(titleEditorRef.current, doc.title || "");
       const el = editorRef.current;
       if (el) {
         setEditorHtml(el, doc.content);
@@ -2483,6 +2485,60 @@ export default function App() {
   useEffect(() => {
     if (view === "editor" && !isMobileRef.current) editorRef.current?.focus();
   }, [view]);
+
+  // ─ format toolbar ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    const handler = () => {
+      const sel = window.getSelection();
+      const bar = formatBarRef.current;
+      if (!bar) return;
+      const ed = editorRef.current;
+      const ti = titleEditorRef.current;
+      if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+        bar.classList.remove("format-bar-visible");
+        bar.classList.add("format-bar-hidden");
+        return;
+      }
+      const range = sel.getRangeAt(0);
+      const anchor = range.commonAncestorContainer;
+      const inEditor = ed && ed.contains(anchor);
+      const inTitle  = ti && ti.contains(anchor);
+      if (!inEditor && !inTitle) {
+        bar.classList.remove("format-bar-visible");
+        bar.classList.add("format-bar-hidden");
+        return;
+      }
+      const rect = range.getBoundingClientRect();
+      bar.classList.remove("format-bar-hidden");
+      bar.classList.add("format-bar-visible");
+      const w = bar.offsetWidth || 60;
+      const cx = rect.left + rect.width / 2;
+      bar.style.left = `${Math.max(8, Math.min(window.innerWidth - w - 8, cx - w / 2))}px`;
+      bar.style.top  = `${Math.max(8, rect.top - bar.offsetHeight - 8)}px`;
+      try {
+        setFormatActive({
+          bold:   document.queryCommandState("bold"),
+          italic: document.queryCommandState("italic"),
+        });
+      } catch {}
+    };
+    document.addEventListener("selectionchange", handler);
+    return () => document.removeEventListener("selectionchange", handler);
+  }, []);
+
+  const applyFormat = useCallback((cmd) => {
+    document.execCommand(cmd);
+    // Trigger save by re-firing input on whichever editor has focus
+    const active = document.activeElement;
+    if (active === titleEditorRef.current) onTitleInput();
+    else if (active === editorRef.current) onInput();
+    try {
+      setFormatActive({
+        bold:   document.queryCommandState("bold"),
+        italic: document.queryCommandState("italic"),
+      });
+    } catch {}
+  }, [onTitleInput, onInput]);
 
   // ─ render ───────────────────────────────────────────────────────────────────
 
@@ -2620,7 +2676,7 @@ export default function App() {
             {sortedDocs.map(d => (
               <div key={d.id} className={`doc-item${d.id === activeId ? " active" : ""}`} onClick={() => switchDoc(d.id)}>
                 <div className="doc-item-body">
-                  <span className="doc-item-title">{d.title || docTitle(d.content)}</span>
+                  <span className="doc-item-title">{stripHtml(d.title || "") || docTitle(d.content)}</span>
                   <span className="doc-item-meta">
                     {wordCount(d.content)}w
                     {d.writingTimeSecs > 60 && ` · ${formatWritingTime(d.writingTimeSecs)}`}
@@ -2753,15 +2809,22 @@ export default function App() {
         ref={containerRef}
         style={{ display: isEditor ? "" : "none" }}
       >
-        <textarea
+        <div
           id="title-input"
           ref={titleEditorRef}
-          rows={1}
-          placeholder="Title"
+          contentEditable
+          suppressContentEditableWarning
+          spellCheck={false}
+          data-placeholder="Title"
           className={font === "arial" ? "font-arial" : ""}
           onInput={onTitleInput}
-          onBlur={() => { const v = titleEditorRef.current?.value ?? ""; titleRef.current = v; }}
-          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); if (titleEditorRef.current) titleRef.current = titleEditorRef.current.value; editorRef.current?.focus(); } }}
+          onBlur={() => { titleRef.current = titleEditorRef.current?.innerHTML ?? ""; }}
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); titleRef.current = titleEditorRef.current?.innerHTML ?? ""; editorRef.current?.focus(); } }}
+          onPaste={e => {
+            e.preventDefault();
+            const text = (e.clipboardData?.getData("text/plain") || "").replace(/\s*\n\s*/g, " ");
+            document.execCommand("insertText", false, text);
+          }}
         />
         <div id="writing-area">
           <div
@@ -2779,6 +2842,22 @@ export default function App() {
             onPaste={handleEditorPaste}
           />
         </div>
+      </div>
+
+      {/* ── floating format toolbar (appears on selection in title/body) ── */}
+      <div id="format-toolbar" ref={formatBarRef} className="format-bar-hidden">
+        <button
+          type="button"
+          className={`format-btn${formatActive.bold ? " active" : ""}`}
+          onMouseDown={e => { e.preventDefault(); applyFormat("bold"); }}
+          title="Bold  ⌘B"
+        ><b>B</b></button>
+        <button
+          type="button"
+          className={`format-btn${formatActive.italic ? " active" : ""}`}
+          onMouseDown={e => { e.preventDefault(); applyFormat("italic"); }}
+          title="Italic  ⌘I"
+        ><i>I</i></button>
       </div>
 
       {/* ── views ── */}
