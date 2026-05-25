@@ -1986,12 +1986,15 @@ export default function App() {
       }
     });
 
-    // If the user landed here via the reset link, the Supabase JS SDK reads
-    // the recovery token from the URL hash and fires PASSWORD_RECOVERY above.
-    // We also strip the ?recovery=1 marker so the URL is clean.
+    // In Supabase v2 PKCE flow the PASSWORD_RECOVERY event fires during client
+    // initialisation (module level), before React registers the listener above,
+    // so we detect the recovery landing via the ?recovery=1 param we set in
+    // redirectTo and open the modal directly.
     try {
       const params = new URLSearchParams(window.location.search);
       if (params.get("recovery") === "1") {
+        setUpdatePasswordOpen(true);
+        setAuthOpen(false);
         params.delete("recovery");
         const qs = params.toString();
         window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash);
