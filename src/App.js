@@ -2029,8 +2029,9 @@ export default function App() {
       syncedUserRef.current = signedInUser.id;
       setUser(signedInUser); userRef.current = signedInUser; setAuthOpen(false);
       const cloudDocs = await fetchCloudDocs();
-      const saved = loadState();
-      const localDocs = saved?.docs || [];
+      // Use live in-memory docs/activeId — localStorage may be stale or empty for
+      // a brand-new session where initState created a doc but saveState hasn't fired yet.
+      const localDocs = docsRef.current.map(normaliseDoc);
       const hasLocalContent = localDocs.some(d => stripHtml(d.content).trim()) || !!titleRef.current.trim();
       let merged = (hasLocalContent || !cloudDocs.length)
         ? mergeDocs(localDocs, cloudDocs) : cloudDocs;
@@ -2040,8 +2041,8 @@ export default function App() {
       for (const doc of merged)
         if (!cloudIds.has(doc.id) && stripHtml(doc.content).trim())
           await pushDocToCloud(doc, signedInUser.id);
-      const savedActiveId = saved?.activeId;
-      const newActiveId = merged.find(d => d.id === savedActiveId) ? savedActiveId : merged[0].id;
+      const currentActiveId = activeIdRef.current;
+      const newActiveId = merged.find(d => d.id === currentActiveId) ? currentActiveId : merged[0].id;
       setDocs(merged); saveState(merged, newActiveId); setActiveId(newActiveId);
       const docToLoad = merged.find(d => d.id === newActiveId);
       if (docToLoad) loadDocIntoEditor(docToLoad, { preserveLocalTitle: true });
