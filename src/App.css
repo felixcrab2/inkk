@@ -1210,6 +1210,32 @@ body.focus-mode #text-container {
 }
 #signout-btn:hover { color: var(--text); }
 
+/* ─── Account footer (Change password · Contact · Sign out) ───────────── */
+#account-footer {
+  width: 100%;
+  max-width: 520px;
+  display: flex; align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 22px 0 6px;
+  margin-top: 18px;
+  border-top: 1px solid var(--border);
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.86rem;
+  letter-spacing: 0.02em;
+}
+.account-link {
+  background: none; border: none; padding: 0;
+  font: inherit;
+  color: var(--subtle);
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.account-link:hover { color: var(--text); }
+.account-signout { margin-left: auto; }
+.account-dot     { color: var(--subtle); }
+
 /* ─── Research section (Profile) ─────────────────────────────────────────── */
 #research-section {
   width: 100%; max-width: 520px;
@@ -1880,6 +1906,38 @@ body.focus-mode #text-container {
 #auth-message {
   font-family: "Cormorant Garamond", serif; font-size: 1rem;
   color: #666; text-align: center; padding: 24px 0; line-height: 1.6;
+}
+
+.auth-forgot {
+  display: block;
+  background: none; border: none; padding: 0;
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.85rem; font-style: italic;
+  color: var(--muted);
+  cursor: pointer;
+  margin: 14px auto 0;
+  text-align: center;
+  transition: color 0.15s;
+}
+.auth-forgot:hover { color: var(--text); }
+
+.auth-back {
+  display: block;
+  background: none; border: none; padding: 0;
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.85rem; color: var(--muted);
+  cursor: pointer; margin: 16px auto 0;
+  letter-spacing: 0.02em;
+  transition: color 0.15s;
+}
+.auth-back:hover { color: var(--text); }
+
+.auth-blurb {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.9rem; color: var(--muted);
+  line-height: 1.55;
+  margin: 0 0 18px;
+  text-align: center;
 }
 
 /* ─── Human Signal modal ──────────────────────────────────────────────────── */

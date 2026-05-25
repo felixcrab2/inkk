@@ -720,7 +720,7 @@ function scoreFromRecord(rec) {
 // ─── AuthModal ────────────────────────────────────────────────────────────────
 
 function AuthModal({ onClose }) {
-  const [mode, setMode]         = useState("signin");
+  const [mode, setMode]         = useState("signin"); // signin | signup | reset
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [error, setError]       = useState("");
@@ -732,10 +732,16 @@ function AuthModal({ onClose }) {
     if (mode === "signin") {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) setError(error.message);
-    } else {
+    } else if (mode === "signup") {
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) setError(error.message);
       else if (!data.session) setMessage("Check your email to confirm your account.");
+    } else if (mode === "reset") {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + "/?recovery=1",
+      });
+      if (error) setError(error.message);
+      else setMessage("Check your email for a link to reset your password.");
     }
     setLoading(false);
   };
@@ -750,6 +756,21 @@ function AuthModal({ onClose }) {
         <button id="auth-close" onClick={onClose}>×</button>
         {message ? (
           <p id="auth-message">{message}</p>
+        ) : mode === "reset" ? (
+          <>
+            <div id="auth-tabs">
+              <button className="active" style={{ cursor: "default" }}>reset password</button>
+            </div>
+            <p className="auth-blurb">Enter the email you signed up with — we'll send you a link to set a new password.</p>
+            <form onSubmit={submit}>
+              <input type="email" placeholder="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus />
+              {error && <p className="auth-error">{error}</p>}
+              <button id="auth-submit" type="submit" disabled={loading}>
+                {loading ? "…" : "Send reset link"}
+              </button>
+            </form>
+            <button className="auth-back" onClick={() => { setMode("signin"); setError(""); }}>← back to sign in</button>
+          </>
         ) : (
           <>
             <div id="auth-tabs">
@@ -764,10 +785,57 @@ function AuthModal({ onClose }) {
                 {loading ? "…" : mode === "signin" ? "sign in" : "create account"}
               </button>
             </form>
+            {mode === "signin" && (
+              <button className="auth-forgot" onClick={() => { setMode("reset"); setError(""); setPassword(""); }}>
+                Forgot password?
+              </button>
+            )}
             <div id="auth-divider"><span>or</span></div>
             <button id="google-btn" onClick={googleSignIn}>continue with Google</button>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ─── UpdatePasswordModal ──────────────────────────────────────────────────────
+// Shown after the user clicks a password-recovery link in their email, or
+// from the Profile "Change password" entry. Calls supabase.auth.updateUser.
+
+function UpdatePasswordModal({ onClose, onDone }) {
+  const [password, setPassword]   = useState("");
+  const [confirm, setConfirm]     = useState("");
+  const [error, setError]         = useState("");
+  const [loading, setLoading]     = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (password.length < 8)        { setError("At least 8 characters."); return; }
+    if (password !== confirm)        { setError("Passwords don't match.");  return; }
+    setLoading(true);
+    const { error } = await supabase.auth.updateUser({ password });
+    setLoading(false);
+    if (error) setError(error.message);
+    else { onDone?.(); onClose?.(); }
+  };
+
+  return (
+    <div id="auth-overlay">
+      <div id="auth-modal" onClick={e => e.stopPropagation()}>
+        {onClose && <button id="auth-close" onClick={onClose}>×</button>}
+        <div id="auth-tabs">
+          <button className="active" style={{ cursor: "default" }}>set new password</button>
+        </div>
+        <form onSubmit={submit}>
+          <input type="password" placeholder="new password (min 8)" value={password} onChange={e => setPassword(e.target.value)} required autoFocus />
+          <input type="password" placeholder="confirm new password" value={confirm} onChange={e => setConfirm(e.target.value)} required />
+          {error && <p className="auth-error">{error}</p>}
+          <button id="auth-submit" type="submit" disabled={loading || !password || !confirm}>
+            {loading ? "saving…" : "Set new password"}
+          </button>
+        </form>
       </div>
     </div>
   );
@@ -999,7 +1067,7 @@ function Feed({ user, onRead, onHsModal, onAuthorClick, dropCapImages, onRequest
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
-function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapImages, onRead, onUnpublish, onSignIn, onSignOut, onAvatarChange, onEditDoc, onNewDoc, onDeleteDoc, onPublishDoc, researchOptIn, onToggleOptIn, onDownloadData, onDeleteData }) {
+function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapImages, onRead, onUnpublish, onSignIn, onSignOut, onAvatarChange, onEditDoc, onNewDoc, onDeleteDoc, onPublishDoc, researchOptIn, onToggleOptIn, onDownloadData, onDeleteData, onChangePassword }) {
   const [pubs, setPubs]           = useState([]);
   const [loading, setLoading]     = useState(!!user);
   const [uploading, setUploading] = useState(false);
@@ -1288,7 +1356,13 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
         )}
       </div>
 
-      <button id="signout-btn" onClick={onSignOut}>Sign out</button>
+      <div id="account-footer">
+        <button className="account-link" onClick={onChangePassword}>Change password</button>
+        <span className="account-dot">·</span>
+        <a className="account-link" href="mailto:hello@inkk.example?subject=Hello%20Inkk">Contact</a>
+        <span className="account-dot">·</span>
+        <button className="account-link account-signout" onClick={onSignOut}>Sign out</button>
+      </div>
 
       {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
       {showTerms   && <TermsModal   onClose={() => setShowTerms(false)} />}
@@ -1622,6 +1696,7 @@ export default function App() {
   const [profile, setProfile]         = useState(null);
   const [dropCapImages, setDropCapImages] = useState({});
   const [usernameModalOpen, setUsernameModalOpen] = useState(false);
+  const [updatePasswordOpen, setUpdatePasswordOpen] = useState(false);
   const [viewingUser, setViewingUser] = useState(null);
   const [researchOptIn, setResearchOptIn] = useState(false);
   const [liveStats, setLiveStats] = useState({ events: 0, sessionStartedAt: null });
@@ -1899,6 +1974,10 @@ export default function App() {
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" && session?.user) syncOnLogin(session.user);
+      if (event === "PASSWORD_RECOVERY") {
+        setUpdatePasswordOpen(true);
+        setAuthOpen(false);
+      }
       if (event === "SIGNED_OUT") {
         syncedUserRef.current = null;
         setUser(null); setPublishedDocIds(new Set()); setProfile(null); setUsernameModalOpen(false);
@@ -1906,6 +1985,18 @@ export default function App() {
         recorderRef.current?.recordUserChange(null);
       }
     });
+
+    // If the user landed here via the reset link, the Supabase JS SDK reads
+    // the recovery token from the URL hash and fires PASSWORD_RECOVERY above.
+    // We also strip the ?recovery=1 marker so the URL is clean.
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("recovery") === "1") {
+        params.delete("recovery");
+        const qs = params.toString();
+        window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash);
+      }
+    } catch {}
     return () => subscription.unsubscribe();
   }, [loadDocIntoEditor]);
 
@@ -2619,6 +2710,7 @@ export default function App() {
           onToggleOptIn={toggleResearchOptIn}
           onDownloadData={downloadResearchData}
           onDeleteData={deleteResearchData}
+          onChangePassword={() => setUpdatePasswordOpen(true)}
         />
       )}
       {view === "search" && (
@@ -2689,6 +2781,12 @@ export default function App() {
             syncFlushNow();
           }
         }} />
+      )}
+      {updatePasswordOpen && (
+        <UpdatePasswordModal
+          onClose={() => setUpdatePasswordOpen(false)}
+          onDone={() => addToast("Password updated.")}
+        />
       )}
 
       {/* ── focus mode exit ── */}
