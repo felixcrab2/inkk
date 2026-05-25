@@ -954,19 +954,17 @@ function UsernameModal({ user, onDone }) {
 // ─── PublishModal ─────────────────────────────────────────────────────────────
 
 function PublishModal({ doc, user, profile, onConfirm, onClose }) {
-  const rawTitle  = doc.title || docTitle(doc.content);
-  const rawAuthor = profile?.username || user.user_metadata?.full_name || user.email.split("@")[0];
-  const [title, setTitle]     = useState(rawTitle === "Untitled" ? "" : rawTitle);
-  const [author, setAuthor]   = useState(rawAuthor);
+  const author = profile?.username || user.user_metadata?.full_name || user.email.split("@")[0];
+  const [title, setTitle]     = useState(doc.title || "");
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
 
   const submit = async (e) => {
     e.preventDefault();
-    const t = title.trim(); const a = author.trim() || rawAuthor;
+    const t = title.trim();
     if (!t) return;
     setLoading(true); setError("");
-    const errMsg = await onConfirm(t, a);
+    const errMsg = await onConfirm(t, author);
     if (errMsg) setError(errMsg);
     setLoading(false);
   };
@@ -980,7 +978,6 @@ function PublishModal({ doc, user, profile, onConfirm, onClose }) {
         </div>
         <form onSubmit={submit}>
           <input type="text" placeholder="article title" value={title} onChange={e => setTitle(e.target.value)} required autoFocus />
-          <input type="text" placeholder="author name" value={author} onChange={e => setAuthor(e.target.value)} />
           {error && <p className="auth-error">{error}</p>}
           <button id="auth-submit" type="submit" disabled={loading || !title.trim()}>
             {loading ? "publishing…" : "publish"}
