@@ -338,7 +338,7 @@ body.focus-mode #text-container {
   left: 0;
   top: 0;
   bottom: 0;
-  width: 260px;
+  width: 320px;
   background: var(--surface);
   border-right: 1px solid var(--border);
   transform: translateX(-100%);
@@ -573,6 +573,12 @@ body.focus-mode #text-container {
 }
 
 #text.font-arial { font-family: Arial, sans-serif; }
+
+/* List items: hanging indent so bullet/number sits in the gutter */
+#text > div[data-list], #text > p[data-list] {
+  padding-left: 1.6em;
+  text-indent: -1.6em;
+}
 
 #text img {
   max-width: 100%;
@@ -2352,7 +2358,7 @@ body.focus-mode #text-container {
   /* ── Nav / top bar ── */
   .btn-label { display: none; }
   #publish-btn { padding: 6px 9px; }
-  #doc-panel { width: 240px; }
+  #doc-panel { width: 290px; }
 
   /* ── Landing ── */
   #landing-headline { font-size: 1.75rem; }

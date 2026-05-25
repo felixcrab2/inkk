@@ -91,15 +91,22 @@ function applySmartTypography() {
   const after  = text.slice(offset);
   const setCaret = (n, off) => { try { sel.collapse(n, off); } catch {} };
 
-  // Auto-bullet: "- " typed at the very start of a fresh paragraph → bullet character
-  if (before === "- ") {
+  // Auto-list: "- " or "N. " at the very start of a fresh paragraph
+  if (before === "- " || /^\d+\. $/.test(before)) {
     const parent = node.parentElement;
     const atParaStart = !node.previousSibling &&
       parent && ["DIV","P"].includes(parent.tagName) &&
       parent.parentElement?.id === "text";
     if (atParaStart) {
-      node.nodeValue = "• " + after;
-      setCaret(node, 2);
+      if (before === "- ") {
+        node.nodeValue = "• " + after;
+        parent.setAttribute("data-list", "bullet");
+      } else {
+        const num = before.match(/^(\d+)\. $/)[1];
+        node.nodeValue = num + ". " + after;
+        parent.setAttribute("data-list", "ordered");
+      }
+      setCaret(node, before.length);
       return;
     }
   }
@@ -2735,7 +2742,7 @@ export default function App() {
             placeholder="Title"
             className={font === "arial" ? "font-arial" : ""}
             onInput={onTitleInput}
-            onBlur={() => { const v = titleEditorRef.current?.value ?? ""; titleRef.current = v; if (!v.trim()) { titleRef.current = ""; setShowTitleInput(false); } }}
+            onBlur={() => { const v = titleEditorRef.current?.value ?? ""; titleRef.current = v; }}
             onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); if (titleEditorRef.current) titleRef.current = titleEditorRef.current.value; editorRef.current?.focus(); } }}
           />
         ) : (
