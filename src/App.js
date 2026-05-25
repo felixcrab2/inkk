@@ -1824,9 +1824,6 @@ export default function App() {
           active_ratio:      score.active_ratio     || 0,
           typed_chars:       features.typed_chars   || 0,
           words:             features.words         || 0,
-          typo_corrections:  features.typo_corrections || 0,
-          mid_revisions:     features.mid_revisions || 0,
-          burst_count:       features.burst_count   || 0,
         },
       }));
       nextDoc = next.find(d => d.id === docId);
