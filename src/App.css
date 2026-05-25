@@ -506,8 +506,8 @@ body.focus-mode #text-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0px, transparent 50px, black 90px, black calc(100% - 36px), transparent 100%);
-  mask-image: linear-gradient(to bottom, transparent 0px, transparent 50px, black 90px, black calc(100% - 36px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 0px, black calc(100% - 36px), transparent 100%);
+  mask-image: linear-gradient(to bottom, black 0px, black calc(100% - 36px), transparent 100%);
 }
 
 #title-input {
@@ -530,6 +530,7 @@ body.focus-mode #text-container {
   letter-spacing: 0.01em;
   text-align: center;
   display: block;
+  flex-shrink: 0;
 }
 #title-input::placeholder { color: #d8d5d0; font-weight: 400; }
 #title-input.font-arial { font-family: Arial, sans-serif; letter-spacing: -0.01em; }
@@ -552,6 +553,7 @@ body.focus-mode #text-container {
   width: 44vw;
   max-width: 560px;
   min-width: 200px;
+  flex-shrink: 0;
 }
 
 #text {
