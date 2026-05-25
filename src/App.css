@@ -777,12 +777,14 @@ body.focus-mode #text-container {
 
 .pub-card-title {
   font-family: "Cormorant Garamond", serif;
-  font-size: 1.6rem;
-  font-weight: 400;
+  font-size: 1.25rem;
+  font-weight: 600;
+  font-style: italic;
   color: var(--text);
   margin: 0 0 8px;
-  line-height: 1.2;
-  letter-spacing: 0.005em;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  text-align: center;
   transition: color 0.2s;
 }
 
@@ -1885,12 +1887,14 @@ body.focus-mode #text-container {
 
 #reading-headline {
   font-family: "Cormorant Garamond", serif;
-  font-size: 1.9rem;
-  font-weight: 400;
+  font-size: 1.7rem;
+  font-weight: 600;
+  font-style: italic;
   color: var(--text);
-  line-height: 1.25;
+  line-height: 1.35;
   margin: 0 0 20px;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.01em;
+  text-align: center;
 }
 
 .hs-badge + #reading-text { margin-top: 28px; }
@@ -2344,14 +2348,14 @@ body.focus-mode #text-container {
 
   /* ── Reading ── */
   #reading-inner { padding: 32px 28px 20vh; }
-  #reading-headline { font-size: 1.5rem; }
+  #reading-headline { font-size: 1.4rem; }
   #reading-text { font-size: 1.08rem; }
 
   /* ── Feed ── */
   #feed-list, #feed-header { max-width: 100%; }
   #feed-header { padding-left: 20px; padding-right: 20px; }
   #feed-list { padding-left: 20px; padding-right: 20px; }
-  .pub-card-title { font-size: 1.35rem; }
+  .pub-card-title { font-size: 1.15rem; }
 
   /* ── Profile ── */
   #profile-container { padding: 28px 20px 24px; }
