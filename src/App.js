@@ -735,6 +735,7 @@ function AuthModal({ onClose }) {
     } else if (mode === "signup") {
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) setError(error.message);
+      else if (data.user?.identities?.length === 0) setError("An account with this email already exists — try signing in.");
       else if (!data.session) setMessage("Check your email to confirm your account.");
     } else if (mode === "reset") {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
