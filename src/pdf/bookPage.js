@@ -266,29 +266,6 @@ function wrapSegment(ctx, text, fullWidth, opts = {}) {
   return out;
 }
 
-function drawLine(ctx, line, x, y) {
-  const text = line.text;
-  if (!text) return;
-  const words = text.split(" ").filter(Boolean);
-  if (words.length <= 1 || line.endOfSegment) {
-    ctx.fillText(text, x, y);
-    return;
-  }
-  const wordsW = words.reduce((s, w) => s + ctx.measureText(w).width, 0);
-  const totalGapsW = line.width - wordsW;
-  const gapW = totalGapsW / (words.length - 1);
-  const naturalGap = ctx.measureText(" ").width;
-  if (gapW > naturalGap * MAX_GAP_RATIO || gapW < 0) {
-    ctx.fillText(text, x, y);
-    return;
-  }
-  let cx = x;
-  for (let i = 0; i < words.length; i++) {
-    ctx.fillText(words[i], cx, y);
-    cx += ctx.measureText(words[i]).width + gapW;
-  }
-}
-
 // Wrap a styled segment (array of runs) into lines, supporting narrow first
 // lines (drop cap / paragraph indent). Each line is { tokens, width,
 // endOfSegment } where tokens preserve per-character style.
