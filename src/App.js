@@ -91,23 +91,32 @@ function applySmartTypography() {
   const after  = text.slice(offset);
   const setCaret = (n, off) => { try { sel.collapse(n, off); } catch {} };
 
-  // Auto-list: "- " or "N. " at the very start of a fresh paragraph
+  // Auto-list: "- " or "N. " at the very start of a paragraph
   if (before === "- " || /^\d+\. $/.test(before)) {
     const parent = node.parentElement;
-    const atParaStart = !node.previousSibling &&
-      parent && ["DIV","P"].includes(parent.tagName) &&
-      parent.parentElement?.id === "text";
-    if (atParaStart) {
-      if (before === "- ") {
-        node.nodeValue = "• " + after;
-        parent.setAttribute("data-list", "bullet");
-      } else {
-        const num = before.match(/^(\d+)\. $/)[1];
-        node.nodeValue = num + ". " + after;
-        parent.setAttribute("data-list", "ordered");
+    if (!node.previousSibling && parent) {
+      let listDiv = null;
+      if (parent.id === "text") {
+        // Bare text node directly in #text — wrap it in a div first
+        const wrapper = document.createElement("div");
+        parent.insertBefore(wrapper, node);
+        wrapper.appendChild(node);
+        listDiv = wrapper;
+      } else if (["DIV","P"].includes(parent.tagName) && parent.parentElement?.id === "text") {
+        listDiv = parent;
       }
-      setCaret(node, before.length);
-      return;
+      if (listDiv) {
+        if (before === "- ") {
+          node.nodeValue = "\u2022 " + after;
+          listDiv.setAttribute("data-list", "bullet");
+        } else {
+          const num = before.match(/^(\d+)\. $/)[1];
+          node.nodeValue = num + ". " + after;
+          listDiv.setAttribute("data-list", "ordered");
+        }
+        setCaret(node, before.length);
+        return;
+      }
     }
   }
 
