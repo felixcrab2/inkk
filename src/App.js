@@ -91,10 +91,15 @@ function applySmartTypography() {
   const after  = text.slice(offset);
   const setCaret = (n, off) => { try { sel.collapse(n, off); } catch {} };
 
-  // Auto-list: "- " or "N. " at the very start of a paragraph
+  // Auto-list: "- " or "N. " at the very start of a paragraph.
+  // Chrome sometimes places a <br> placeholder before the text node in a new
+  // div, so we allow that as "first in paragraph" too.
   if (before === "- " || /^\d+\. $/.test(before)) {
     const parent = node.parentElement;
-    if (!node.previousSibling && parent) {
+    const prevSib = node.previousSibling;
+    const isFirstInPara = !prevSib ||
+      (prevSib.nodeType === Node.ELEMENT_NODE && prevSib.tagName === "BR" && !prevSib.previousSibling);
+    if (isFirstInPara && parent) {
       let listDiv = null;
       if (parent.id === "text") {
         // Bare text node directly in #text — wrap it in a div first
@@ -106,6 +111,8 @@ function applySmartTypography() {
         listDiv = parent;
       }
       if (listDiv) {
+        // Remove any <br> placeholder that was inside the div
+        listDiv.querySelectorAll("br").forEach(br => br.remove());
         if (before === "- ") {
           node.nodeValue = "\u2022 " + after;
           listDiv.setAttribute("data-list", "bullet");
@@ -1989,8 +1996,16 @@ export default function App() {
   const loadDocIntoEditor = useCallback((doc) => {
     const el = editorRef.current;
     if (!el) return;
-    titleRef.current = doc.title || "";
-    if (titleEditorRef.current) { titleEditorRef.current.value = doc.title || ""; titleEditorRef.current.style.height = "auto"; titleEditorRef.current.style.height = titleEditorRef.current.scrollHeight + "px"; }
+    const incomingTitle = doc.title || "";
+    const keepLocalTitle = !!titleRef.current && !incomingTitle;
+    if (!keepLocalTitle) {
+      titleRef.current = incomingTitle;
+      if (titleEditorRef.current) {
+        titleEditorRef.current.value = incomingTitle;
+        titleEditorRef.current.style.height = "auto";
+        titleEditorRef.current.style.height = titleEditorRef.current.scrollHeight + "px";
+      }
+    }
     contentRef.current = doc.content;
     setEditorHtml(el, doc.content);
     setWords(wordCount(doc.content));
