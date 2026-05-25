@@ -1993,18 +1993,17 @@ export default function App() {
 
   // ─ load doc into DOM ────────────────────────────────────────────────────────
 
-  const loadDocIntoEditor = useCallback((doc) => {
+  const loadDocIntoEditor = useCallback((doc, { preserveLocalTitle = false } = {}) => {
     const el = editorRef.current;
     if (!el) return;
     const incomingTitle = doc.title || "";
-    const keepLocalTitle = !!titleRef.current && !incomingTitle;
-    if (!keepLocalTitle) {
-      titleRef.current = incomingTitle;
-      if (titleEditorRef.current) {
-        titleEditorRef.current.value = incomingTitle;
-        titleEditorRef.current.style.height = "auto";
-        titleEditorRef.current.style.height = titleEditorRef.current.scrollHeight + "px";
-      }
+    const finalTitle = (preserveLocalTitle && !incomingTitle && titleRef.current)
+      ? titleRef.current : incomingTitle;
+    titleRef.current = finalTitle;
+    if (titleEditorRef.current) {
+      titleEditorRef.current.value = finalTitle;
+      titleEditorRef.current.style.height = "auto";
+      titleEditorRef.current.style.height = titleEditorRef.current.scrollHeight + "px";
     }
     contentRef.current = doc.content;
     setEditorHtml(el, doc.content);
@@ -2045,7 +2044,7 @@ export default function App() {
       const newActiveId = merged.find(d => d.id === savedActiveId) ? savedActiveId : merged[0].id;
       setDocs(merged); saveState(merged, newActiveId); setActiveId(newActiveId);
       const docToLoad = merged.find(d => d.id === newActiveId);
-      if (docToLoad) loadDocIntoEditor(docToLoad);
+      if (docToLoad) loadDocIntoEditor(docToLoad, { preserveLocalTitle: true });
       const myPubs = await fetchMyPublications(signedInUser.id);
       setPublishedDocIds(new Set(myPubs.map(p => p.doc_id).filter(Boolean)));
       const prof = await fetchProfile(signedInUser.id);
@@ -2126,11 +2125,7 @@ export default function App() {
   useEffect(() => {
     if (!mountedRef.current) return;
     const doc = docs.find(d => d.id === activeId);
-    if (doc) {
-      loadDocIntoEditor(doc);
-      // Preserve locally-typed title when switching to a cloud doc that has no title
-      if (!!doc.title || !titleRef.current) setShowTitleInput(!!doc.title);
-    }
+    if (doc) { loadDocIntoEditor(doc); setShowTitleInput(!!doc.title); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
 
