@@ -631,6 +631,74 @@ body.focus-mode #text-container {
   line-height: 1.2;
 }
 
+#feed-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.feed-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: 6px 0;
+  margin-right: 24px;
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+  color: var(--subtle);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.feed-tab:hover { color: var(--text); }
+.feed-tab.active { color: var(--text); border-bottom-color: var(--text); }
+.feed-tab-count {
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 1px 6px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.writer-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  animation: cardIn 0.4s ease both;
+  animation-delay: calc(var(--card-index, 0) * 0.04s);
+  transition: opacity 0.15s;
+}
+.writer-card:hover { opacity: 0.7; }
+.writer-card:first-of-type { border-top: 1px solid var(--border); }
+.writer-card-info { flex: 1; min-width: 0; }
+.writer-card-name {
+  display: block;
+  font-family: "Cormorant Garamond", serif;
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: var(--text);
+}
+.writer-card-meta {
+  display: block;
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.78rem;
+  color: var(--subtle);
+  margin-top: 2px;
+}
+.writer-card-arrow {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 1rem;
+  color: var(--subtle);
+}
+
 #hs-link {
   background: none;
   border: none;
@@ -1024,12 +1092,16 @@ body.focus-mode #text-container {
 }
 
 .ws-process-btn {
-  background: none; border: none; padding: 0;
+  background: none; border: none; padding: 2px 5px;
   font: inherit; color: var(--muted); cursor: pointer;
   display: inline-flex; align-items: center; gap: 2px;
   font-size: 0.78rem;
+  border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
 }
-.ws-process-btn:hover { color: var(--text); }
+.ws-process-btn:hover { color: var(--text); background: rgba(0,0,0,0.05); }
+.ws-process-expand { font-size: 0.7rem; opacity: 0.45; margin-left: 2px; }
+.ws-process-btn:hover .ws-process-expand { opacity: 1; }
 .hs-dot-xs { width: 4px; height: 4px; border-radius: 50%; background: #e0ddd7; display: inline-block; }
 .hs-dot-xs.on { background: #2a2a2a; }
 

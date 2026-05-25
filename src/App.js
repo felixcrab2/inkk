@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import "@fontsource/eb-garamond/400.css";
 import "@fontsource/cormorant-garamond/400.css";
@@ -90,6 +90,19 @@ function applySmartTypography() {
   const before = text.slice(0, offset);
   const after  = text.slice(offset);
   const setCaret = (n, off) => { try { sel.collapse(n, off); } catch {} };
+
+  // Auto-bullet: "- " typed at the very start of a fresh paragraph → bullet character
+  if (before === "- ") {
+    const parent = node.parentElement;
+    const atParaStart = !node.previousSibling &&
+      parent && ["DIV","P"].includes(parent.tagName) &&
+      parent.parentElement?.id === "text";
+    if (atParaStart) {
+      node.nodeValue = "• " + after;
+      setCaret(node, 2);
+      return;
+    }
+  }
 
   // Em-dash: -- → —
   if (before.endsWith("--")) {
@@ -961,6 +974,7 @@ function Feed({ user, onRead, onHsModal, onAuthorClick, dropCapImages, onRequest
   const [pubs, setPubs]       = useState([]);
   const [loading, setLoading] = useState(true);
   const [likedSet, setLikedSet] = useState(new Set());
+  const [feedTab, setFeedTab] = useState("stories");
   const inflightLikes = useRef(new Set());
 
   useEffect(() => {
@@ -971,6 +985,16 @@ function Feed({ user, onRead, onHsModal, onAuthorClick, dropCapImages, onRequest
     if (user) fetchLikesForUser(user.id).then(setLikedSet);
     else      setLikedSet(new Set());
   }, [user]);
+
+  // Derive unique writers from feed publications
+  const writers = useMemo(() => {
+    const seen = new Set();
+    return pubs.filter(p => {
+      if (!p.user_id || seen.has(p.user_id)) return false;
+      seen.add(p.user_id);
+      return true;
+    });
+  }, [pubs]);
 
   const handleLike = useCallback(async (pub) => {
     if (!user) { onRequestAuth?.(); return; }
@@ -1007,9 +1031,34 @@ function Feed({ user, onRead, onHsModal, onAuthorClick, dropCapImages, onRequest
     <div id="feed-container">
       <div id="feed-header">
         <h1 id="feed-title">Explore human writing.</h1>
+        <div id="feed-tabs">
+          <button className={`feed-tab${feedTab === "stories" ? " active" : ""}`} onClick={() => setFeedTab("stories")}>Stories</button>
+          <button className={`feed-tab${feedTab === "writers" ? " active" : ""}`} onClick={() => setFeedTab("writers")}>Writers{writers.length > 0 && <span className="feed-tab-count">{writers.length}</span>}</button>
+        </div>
         <button id="hs-link" onClick={onHsModal}>What is Human Signal?</button>
       </div>
-      <div id="feed-list">
+
+      {feedTab === "writers" && (
+        <div id="feed-list">
+          {loading && <p className="feed-empty">loading…</p>}
+          {!loading && writers.length === 0 && <p className="feed-empty">no writers yet.</p>}
+          {writers.map((w, i) => {
+            const pieceCount = pubs.filter(p => p.user_id === w.user_id).length;
+            return (
+              <div key={w.user_id} className="writer-card" style={{ "--card-index": i }} onClick={() => w.user_id && onAuthorClick(w.user_id)}>
+                <DropCapAvatar letter={w.author_name?.[0] || "?"} avatarData={w.avatar_data} dropCapImages={dropCapImages} size={36} />
+                <div className="writer-card-info">
+                  <span className="writer-card-name">{w.author_name}</span>
+                  <span className="writer-card-meta">{pieceCount} {pieceCount === 1 ? "piece" : "pieces"} · {formatDate(w.published_at)}</span>
+                </div>
+                <span className="writer-card-arrow">→</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {feedTab === "stories" && <div id="feed-list">
         {loading && <p className="feed-empty">loading…</p>}
         {!loading && pubs.length === 0 && (
           <p className="feed-empty">nothing published yet — be the first.</p>
@@ -1061,7 +1110,7 @@ function Feed({ user, onRead, onHsModal, onAuthorClick, dropCapImages, onRequest
             </article>
           );
         })}
-      </div>
+      </div>}
     </div>
   );
 }
@@ -2378,7 +2427,7 @@ export default function App() {
       const el = editorRef.current;
       if (el) {
         setEditorHtml(el, doc.content);
-        if (!isMobileRef.current && localStorage.getItem("inkk_visited")) el.focus();
+        if (!isMobileRef.current) el.focus();
       }
     }
     // Establish initial history state so popstate can always restore view
@@ -2444,7 +2493,7 @@ export default function App() {
         <div id="top-bar-left">
           {isEditor && (
             <button
-              className={`icon-btn icon-btn-labelled ${menuClass}`}
+              className="icon-btn icon-btn-labelled"
               onClick={() => setPanelOpen(v => !v)}
               title="Open documents"
               aria-label="Open documents"
@@ -2640,6 +2689,7 @@ export default function App() {
                         <span key={i} className={`hs-dot-xs ${i < filled ? "on" : "off"}`} />
                       ))}
                       <span style={{ marginLeft: 5 }}>{doc.scoreTier}</span>
+                      <span className="ws-process-expand">↗</span>
                     </button>
                   </>);
                 })()}
@@ -2685,8 +2735,8 @@ export default function App() {
             placeholder="Title"
             className={font === "arial" ? "font-arial" : ""}
             onInput={onTitleInput}
-            onBlur={() => { if (!titleRef.current.trim()) { titleRef.current = ""; setShowTitleInput(false); } }}
-            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); editorRef.current?.focus(); } }}
+            onBlur={() => { const v = titleEditorRef.current?.value ?? ""; titleRef.current = v; if (!v.trim()) { titleRef.current = ""; setShowTitleInput(false); } }}
+            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); if (titleEditorRef.current) titleRef.current = titleEditorRef.current.value; editorRef.current?.focus(); } }}
           />
         ) : (
           <button
