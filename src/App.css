@@ -984,6 +984,41 @@ body.focus-mode #text-container {
   font-style: italic;
 }
 
+/* ─── Method tab ─────────────────────────────────────────────────────────── */
+.hs-method-lead {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 1rem; color: var(--text);
+  line-height: 1.6; margin: 0 0 18px;
+  font-style: italic;
+}
+.hs-method-list {
+  display: flex; flex-direction: column; gap: 14px;
+  margin-bottom: 20px;
+}
+.hs-method-item {
+  display: flex; flex-direction: column; gap: 2px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.hs-method-item:last-child { border-bottom: none; padding-bottom: 0; }
+.hs-method-name {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.88rem; color: var(--text);
+  letter-spacing: 0.01em;
+}
+.hs-method-body {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.83rem; color: var(--muted);
+  line-height: 1.6;
+}
+.hs-method-footer {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.8rem; color: var(--subtle);
+  font-style: italic; line-height: 1.55;
+  border-top: 1px solid var(--border);
+  padding-top: 14px; margin: 0;
+}
+
 .ws-process-btn {
   background: none; border: none; padding: 0;
   font: inherit; color: var(--muted); cursor: pointer;

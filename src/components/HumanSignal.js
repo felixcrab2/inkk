@@ -107,7 +107,7 @@ function StatChip({ label, value, sub }) {
   );
 }
 
-const TABS = ["Signal", "Velocity", "Patterns"];
+const TABS = ["Signal", "Velocity", "Patterns", "Method"];
 
 export function HumanSignalPanel({ score, onClose }) {
   const [tab, setTab] = useState("Signal");
@@ -197,6 +197,54 @@ export function HumanSignalPanel({ score, onClose }) {
                 <StatChip label="bursts" value={score.burst_count ?? "—"} sub="writing bursts" />
                 <StatChip label="typed" value={score.typed_chars || 0} sub="characters" />
               </div>
+            </div>
+          )}
+          {tab === "Method" && (
+            <div className="hs-tab-method">
+              <p className="hs-method-lead">
+                inkk measures nine dimensions of your writing process. None of them involve reading your words.
+              </p>
+              <div className="hs-method-list">
+                <div className="hs-method-item">
+                  <span className="hs-method-name">Keystroke timing variance</span>
+                  <span className="hs-method-body">The gaps between keystrokes are measured in milliseconds. Human writers have a naturally uneven rhythm that changes with the difficulty of what they are composing.</span>
+                </div>
+                <div className="hs-method-item">
+                  <span className="hs-method-name">Key contact duration</span>
+                  <span className="hs-method-body">How long each key is physically held down. People vary this unconsciously depending on the character and the moment; the distribution is a stable biometric signature.</span>
+                </div>
+                <div className="hs-method-item">
+                  <span className="hs-method-name">Pause distribution</span>
+                  <span className="hs-method-body">Pauses in human writing follow a log-normal distribution — mostly short hesitations, with occasional long stops for thought. Flat or absent pause distributions are a known marker of generated text.</span>
+                </div>
+                <div className="hs-method-item">
+                  <span className="hs-method-name">In-line corrections</span>
+                  <span className="hs-method-body">The rate of deletions and immediate self-corrections. Real writers fix things as they go; the absence of any corrections, or an unusually high rate, both carry information.</span>
+                </div>
+                <div className="hs-method-item">
+                  <span className="hs-method-name">Mid-stream revisions</span>
+                  <span className="hs-method-body">Moving the cursor backward to rework an earlier sentence, then continuing forward. This non-linear movement is a strong indicator of engaged authorship.</span>
+                </div>
+                <div className="hs-method-item">
+                  <span className="hs-method-name">Writing burst patterns</span>
+                  <span className="hs-method-body">Sustained episodes of uninterrupted typing — flow states — followed by pauses. The shape and frequency of these bursts reflects the cognitive structure of composition.</span>
+                </div>
+                <div className="hs-method-item">
+                  <span className="hs-method-name">Combined rhythm signature</span>
+                  <span className="hs-method-body">An interaction term: when keystroke variance and key-contact variance appear together, they reinforce each other. Neither alone is sufficient; both together are hard to fake simultaneously.</span>
+                </div>
+                <div className="hs-method-item">
+                  <span className="hs-method-name">Writing speed naturalness</span>
+                  <span className="hs-method-body">Words per minute measured in rolling windows across the session. Human writing accelerates and decelerates as ideas come and go; a constant typing speed is uncharacteristic of human composition.</span>
+                </div>
+                <div className="hs-method-item">
+                  <span className="hs-method-name">Cognitive engagement</span>
+                  <span className="hs-method-body">Pauses of two to ten seconds — long enough to suggest genuine thought, short enough to remain part of active composition. Their presence, frequency, and distribution tell us something about the effort behind the text.</span>
+                </div>
+              </div>
+              <p className="hs-method-footer">
+                The exact weighting of these signals is not published. This is intentional: the score is only meaningful if it cannot be trivially gamed.
+              </p>
             </div>
           )}
         </div>
