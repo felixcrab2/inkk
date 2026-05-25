@@ -1903,14 +1903,27 @@ body.focus-mode #text-container {
 #reading-meta {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   font-family: "Cormorant Garamond", serif;
   font-size: 0.82rem;
   color: #aaa;
   letter-spacing: 0.02em;
-  margin-bottom: 16px;
+  padding: 18px 24px 0;
   flex-wrap: wrap;
 }
+.reading-author-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.reading-author-btn:hover:not(:disabled) { color: var(--text); }
+.reading-author-btn:disabled { cursor: default; }
 
 .reading-dot { color: #d0ceca; }
 

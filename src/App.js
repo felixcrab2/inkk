@@ -1544,7 +1544,7 @@ function UserProfileView({ profile, onRead, dropCapImages }) {
 
 // ─── ReadingView ──────────────────────────────────────────────────────────────
 
-function ReadingView({ pub, font, user, dropCapImages, focus, onRequestAuth }) {
+function ReadingView({ pub, font, user, dropCapImages, focus, onRequestAuth, onAuthorClick }) {
   const containerRef = useRef(null);
   const commentsRef  = useRef(null);
   const [progress, setProgress] = useState(0);
@@ -1640,17 +1640,23 @@ function ReadingView({ pub, font, user, dropCapImages, focus, onRequestAuth }) {
     <>
       <div id="reading-progress" style={{ width: `${progress * 100}%` }} />
       <div id="reading-container" ref={containerRef} onScroll={handleScroll}>
+        <div id="reading-meta">
+          <button
+            className="reading-author-btn"
+            onClick={() => pub.user_id && onAuthorClick?.(pub.user_id)}
+            disabled={!pub.user_id}
+          >
+            {pub.author_name}
+          </button>
+          <span className="reading-dot">·</span>
+          <span>{formatDate(pub.published_at)}</span>
+          <span className="reading-dot">·</span>
+          <span>{readingTime(pub.content)}</span>
+          <button id="reading-copy" onClick={copyText} title="Copy text">
+            {copied ? <CheckCheck size={14} /> : <Copy size={14} />}
+          </button>
+        </div>
         <div id="reading-inner">
-          <div id="reading-meta">
-            <span>{pub.author_name}</span>
-            <span className="reading-dot">·</span>
-            <span>{formatDate(pub.published_at)}</span>
-            <span className="reading-dot">·</span>
-            <span>{readingTime(pub.content)}</span>
-            <button id="reading-copy" onClick={copyText} title="Copy text">
-              {copied ? <CheckCheck size={14} /> : <Copy size={14} />}
-            </button>
-          </div>
           <h1 id="reading-headline">{pub.title}</h1>
           <div id="reading-text" className={font === "arial" ? "font-arial" : ""} dangerouslySetInnerHTML={{ __html: renderHtml(pub.content) }} />
 
@@ -2908,6 +2914,7 @@ export default function App() {
           dropCapImages={dropCapImages}
           focus={readingFocus}
           onRequestAuth={() => setAuthOpen(true)}
+          onAuthorClick={openUserProfile}
         />
       )}
 
