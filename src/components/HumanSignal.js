@@ -196,6 +196,7 @@ export function HumanSignalPanel({ score, onClose }) {
                 <StatChip label="engagement" value={score.active_ratio > 0 ? `${Math.round(score.active_ratio * 100)}%` : "—"} sub="of session active" />
                 <StatChip label="bursts" value={score.burst_count ?? "—"} sub="writing bursts" />
                 <StatChip label="typed" value={score.typed_chars || 0} sub="characters" />
+                <StatChip label="sessions" value={score.session_count || 1} sub="visits to this doc" />
               </div>
             </div>
           )}

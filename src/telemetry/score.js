@@ -42,9 +42,26 @@ function subDwell(f) {
 }
 
 function subPauses(f) {
-  const value = clamp01(f.pause_lognormal || 0);
-  const conf  = clamp01((f.pause_count_500 || 0) / 4);
-  return { value, conf, raw: value };
+  // Human writing has pauses at multiple timescales: micro-hesitations (500ms–2s),
+  // thinking pauses (2s–10s), and longer breaks (10s+). The co-presence of
+  // pauses at different scales is a reliable human signal.
+  // The previous log-normal shape test was too strict — human pause distributions
+  // are right-skewed by nature and always failed the skewness check.
+  const p500 = f.pause_count_500  || 0;
+  const p2k  = f.pause_count_2000 || 0;
+  const p10k = f.pause_count_10000 || 0;
+  if (p500 === 0) return { value: 0, conf: 0, raw: 0 };
+  const short  = p500 - p2k;   // 500ms–2s
+  const medium = p2k  - p10k;  // 2s–10s
+  const long_  = p10k;         // 10s+
+  let diversity = 0;
+  if (short  > 0) diversity += 0.45;
+  if (medium > 0) diversity += 0.40;
+  if (long_  > 0) diversity += 0.15;
+  const scale = clamp01(p500 / 8);
+  const value = clamp01(diversity * (0.45 + 0.55 * scale));
+  const conf  = clamp01(p500 / 4);
+  return { value, conf, raw: { p500, p2k, p10k } };
 }
 
 function subCorrections(f) {
@@ -199,6 +216,7 @@ export function computeScore(features) {
     typo_corrections:  features.typo_corrections || 0,
     mid_revisions:     features.mid_revisions || 0,
     burst_count:       features.burst_count || 0,
+    session_count:     features.session_count || 0,
   };
 }
 

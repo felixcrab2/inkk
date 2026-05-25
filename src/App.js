@@ -1824,6 +1824,12 @@ export default function App() {
           active_ratio:      score.active_ratio     || 0,
           typed_chars:       features.typed_chars   || 0,
           words:             features.words         || 0,
+          // Take the max so a page reload (which resets in-memory events) never
+          // erases a previously observed higher session count.
+          session_count: Math.max(
+            prevDoc?.scoreFeatures?.session_count || 0,
+            score.session_count || 0,
+          ),
         },
       }));
       nextDoc = next.find(d => d.id === docId);

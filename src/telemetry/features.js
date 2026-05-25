@@ -116,6 +116,8 @@ export function extractFeatures(events, { words = 0 } = {}) {
     paste_ratio: 0,
     deletion_ratio: 0,
 
+    session_count: 0,
+
     velocity_series: [],
     avg_wpm: 0,
     peak_wpm: 0,
@@ -256,6 +258,15 @@ export function extractFeatures(events, { words = 0 } = {}) {
   const grossIn = out.typed_chars + out.pasted_chars;
   out.paste_ratio    = grossIn > 0 ? out.pasted_chars / grossIn : 0;
   out.deletion_ratio = out.typed_chars > 0 ? out.deleted_chars / out.typed_chars : 0;
+
+  // ── Session count: activity clusters separated by > 10 min ──────────────
+  const SESSION_BOUNDARY_MS = 10 * 60_000;
+  if (editEvents.length > 0) {
+    out.session_count = 1;
+    for (let i = 1; i < editEvents.length; i++) {
+      if (editEvents[i].t - editEvents[i - 1].t > SESSION_BOUNDARY_MS) out.session_count++;
+    }
+  }
 
   // ── Velocity series ───────────────────────────────────────────────────────
   const inputEvs = sorted.filter(e => e.kind === "input");
