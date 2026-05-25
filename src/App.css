@@ -574,10 +574,9 @@ body.focus-mode #text-container {
 
 #text.font-arial { font-family: Arial, sans-serif; }
 
-/* List items: hanging indent so bullet/number sits in the gutter */
+/* List items: indent the whole line including bullet/number */
 #text > div[data-list], #text > p[data-list] {
-  padding-left: 1.6em;
-  text-indent: -1.6em;
+  padding-left: 1.8em;
 }
 
 #text img {
