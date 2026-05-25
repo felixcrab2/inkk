@@ -1925,7 +1925,7 @@ export default function App() {
     const el = editorRef.current;
     if (!el) return;
     titleRef.current = doc.title || "";
-    if (titleEditorRef.current) titleEditorRef.current.value = doc.title || "";
+    if (titleEditorRef.current) { titleEditorRef.current.value = doc.title || ""; titleEditorRef.current.style.height = "auto"; titleEditorRef.current.style.height = titleEditorRef.current.scrollHeight + "px"; }
     contentRef.current = doc.content;
     setEditorHtml(el, doc.content);
     setWords(wordCount(doc.content));
@@ -2251,6 +2251,8 @@ export default function App() {
   const onTitleInput = useCallback(() => {
     const el = titleEditorRef.current;
     if (!el) return;
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
     titleRef.current = el.value;
     setSaveStatus("saving");
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -2323,7 +2325,7 @@ export default function App() {
     const text = contentRef.current || "";
     if (!stripHtml(text).trim()) return;
     try {
-      const titleStr  = titleRef.current.trim() || docTitle(text);
+      const titleStr  = titleRef.current.trim();
       const pdf = new jsPDF({ unit: "pt", format: [PAGE_W_PT, PAGE_H_PT], compress: true });
 
       await renderBookPdfPages({
@@ -2371,7 +2373,7 @@ export default function App() {
       titleRef.current = doc.title || "";
       contentRef.current = doc.content;
       writingBaseRef.current = doc.writingTimeSecs || 0;
-      if (titleEditorRef.current) titleEditorRef.current.value = doc.title || "";
+      if (titleEditorRef.current) { titleEditorRef.current.value = doc.title || ""; titleEditorRef.current.style.height = "auto"; titleEditorRef.current.style.height = titleEditorRef.current.scrollHeight + "px"; }
       setShowTitleInput(!!doc.title);
       const el = editorRef.current;
       if (el) {
@@ -2676,10 +2678,10 @@ export default function App() {
         style={{ display: isEditor ? "" : "none" }}
       >
         {showTitleInput ? (
-          <input
+          <textarea
             id="title-input"
             ref={titleEditorRef}
-            type="text"
+            rows={1}
             placeholder="Title"
             className={font === "arial" ? "font-arial" : ""}
             onInput={onTitleInput}

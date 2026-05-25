@@ -517,17 +517,21 @@ body.focus-mode #text-container {
   background: none;
   border: none;
   outline: none;
+  resize: none;
+  overflow: hidden;
   font-family: "Cormorant Garamond", serif;
-  font-weight: 500;
-  font-size: 1.65rem;
+  font-weight: 600;
+  font-style: italic;
+  font-size: 1.35rem;
   color: var(--text);
   padding: 0 8px;
   margin-bottom: 28px;
-  line-height: 1.25;
+  line-height: 1.35;
   letter-spacing: 0.01em;
   text-align: center;
+  display: block;
 }
-#title-input::placeholder { color: #d8d5d0; }
+#title-input::placeholder { color: #d8d5d0; font-weight: 400; }
 #title-input.font-arial { font-family: Arial, sans-serif; letter-spacing: -0.01em; }
 
 #add-title-btn {
@@ -2249,7 +2253,7 @@ body.focus-mode #text-container {
   #title-input {
     width: 100%;
     max-width: none;
-    font-size: 1.5rem;
+    font-size: 1.25rem;
   }
   #text {
     width: 100%;
