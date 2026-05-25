@@ -90,23 +90,24 @@ function loadImg(src) {
   });
 }
 
-function font(sizePt, italic = false) {
-  return `${italic ? "italic " : ""}${sizePt * PX}px "Cormorant Garamond", "EB Garamond", Georgia, serif`;
+function font(sizePt, italic = false, bold = false) {
+  return `${italic ? "italic " : ""}${bold ? "600 " : ""}${sizePt * PX}px "Cormorant Garamond", "EB Garamond", Georgia, serif`;
 }
 
 // Parse the editor HTML into an ordered list of blocks:
-//   { type: "text",  segments: ["seg-1 text", "seg-2 text", ...] }
+//   { type: "text",  segments: [ [run, run, ...], [run, ...] ] }   // styled runs
 //   { type: "image", src }
-// Segments inside a text block are joined by hard line-breaks; blocks are
-// joined by paragraph breaks.
+// A run is { text, b, i }. Segments inside a text block are joined by hard
+// line-breaks; blocks are joined by paragraph breaks.
 function parseHtmlToBlocks(html) {
   const container = document.createElement("div");
   container.innerHTML = html || "";
 
+  // tokens: { type: "text", text, b, i } | { type: "image", src } | { type: "break" }
   const tokens = [];
-  function walk(node) {
+  function walk(node, ctx) {
     if (node.nodeType === 3) {
-      if (node.nodeValue) tokens.push({ type: "text", text: node.nodeValue });
+      if (node.nodeValue) tokens.push({ type: "text", text: node.nodeValue, b: ctx.b, i: ctx.i });
       return;
     }
     if (node.nodeType !== 1) return;
@@ -118,22 +119,26 @@ function parseHtmlToBlocks(html) {
     }
     if (tag === "br") { tokens.push({ type: "break" }); return; }
     const block = tag === "div" || tag === "p" || tag === "h1" || tag === "h2" || tag === "h3" || tag === "li" || tag === "blockquote";
-    for (const child of node.childNodes) walk(child);
+    const next = {
+      b: ctx.b || tag === "b" || tag === "strong",
+      i: ctx.i || tag === "i" || tag === "em",
+    };
+    for (const child of node.childNodes) walk(child, next);
     if (block) tokens.push({ type: "break" });
   }
-  for (const child of container.childNodes) walk(child);
+  for (const child of container.childNodes) walk(child, { b: false, i: false });
 
   // Collapse into blocks.
   const blocks = [];
-  let curText = [];
-  let curSegments = [];
+  let curRuns = [];     // current segment's runs
+  let curSegments = []; // current paragraph's segments
   let breaks = 0;
 
   const flushSeg = () => {
-    if (curText.length) {
-      const merged = curText.join("").replace(/\s+/g, " ").trim();
-      if (merged) curSegments.push(merged);
-      curText = [];
+    if (curRuns.length) {
+      const trimmed = trimRuns(mergeAdjacentRuns(curRuns));
+      if (trimmed.length) curSegments.push(trimmed);
+      curRuns = [];
     }
   };
   const flushPara = () => {
@@ -149,7 +154,7 @@ function parseHtmlToBlocks(html) {
       breaks = 0;
       const parts = tok.text.split("\n");
       for (let i = 0; i < parts.length; i++) {
-        if (parts[i]) curText.push(parts[i]);
+        if (parts[i]) curRuns.push({ text: parts[i], b: tok.b, i: tok.i });
         if (i < parts.length - 1) flushSeg();
       }
     } else if (tok.type === "break") {
@@ -164,6 +169,64 @@ function parseHtmlToBlocks(html) {
   }
   flushPara();
   return blocks;
+}
+
+function mergeAdjacentRuns(runs) {
+  const out = [];
+  for (const r of runs) {
+    const last = out[out.length - 1];
+    if (last && last.b === r.b && last.i === r.i) last.text += r.text;
+    else out.push({ text: r.text, b: r.b, i: r.i });
+  }
+  return out;
+}
+
+function trimRuns(runs) {
+  for (const r of runs) r.text = r.text.replace(/\s+/g, " ");
+  while (runs.length) {
+    const t = runs[0].text.replace(/^\s+/, "");
+    if (t === "") runs.shift();
+    else { runs[0].text = t; break; }
+  }
+  while (runs.length) {
+    const t = runs[runs.length - 1].text.replace(/\s+$/, "");
+    if (t === "") runs.pop();
+    else { runs[runs.length - 1].text = t; break; }
+  }
+  return runs;
+}
+
+// Tokenize a list of runs into word/space units. Words straddling style
+// boundaries are kept as single tokens with multiple "sub" segments so
+// wrapping never splits an italicized fragment from the rest of its word.
+function tokenizeRuns(runs) {
+  const out = [];
+  for (const r of runs) {
+    const re = /\s+|\S+/g;
+    let m;
+    while ((m = re.exec(r.text)) !== null) {
+      const text = m[0];
+      const isSpace = /\s/.test(text[0]);
+      const last = out[out.length - 1];
+      if (last && !last.isSpace && !isSpace) {
+        last.subs.push({ text, b: r.b, i: r.i });
+      } else {
+        out.push({ isSpace, subs: [{ text, b: r.b, i: r.i }] });
+      }
+    }
+  }
+  return out;
+}
+
+function measureToken(ctx, tok) {
+  let w = 0;
+  let curFont = null;
+  for (const s of tok.subs) {
+    const f = font(T_BODY, s.i, s.b);
+    if (f !== curFont) { ctx.font = f; curFont = f; }
+    w += ctx.measureText(s.text).width;
+  }
+  return w;
 }
 
 // Wrap a single text segment into lines, supporting a narrower width for the
@@ -223,6 +286,86 @@ function drawLine(ctx, line, x, y) {
   for (let i = 0; i < words.length; i++) {
     ctx.fillText(words[i], cx, y);
     cx += ctx.measureText(words[i]).width + gapW;
+  }
+}
+
+// Wrap a styled segment (array of runs) into lines, supporting narrow first
+// lines (drop cap / paragraph indent). Each line is { tokens, width,
+// endOfSegment } where tokens preserve per-character style.
+function wrapRuns(ctx, runs, fullWidth, opts = {}) {
+  const { narrowCount = 0, narrowWidth = fullWidth } = opts;
+  const widthFor = (i) => i < narrowCount ? narrowWidth : fullWidth;
+  const tokens = tokenizeRuns(runs);
+  if (!tokens.length) return [];
+
+  const lines = [];
+  let cur = [];
+  let curW = 0;
+  let idx = 0;
+
+  const pushLine = (markEnd = false) => {
+    const trimmed = dropTrailingSpaces(cur);
+    if (trimmed.length || markEnd) {
+      lines.push({ tokens: trimmed, width: widthFor(idx), endOfSegment: markEnd });
+    }
+    cur = []; curW = 0; idx++;
+  };
+
+  for (const t of tokens) {
+    if (cur.length === 0 && t.isSpace) continue; // skip leading space on a line
+    const w = measureToken(ctx, t);
+    const lineMax = widthFor(idx);
+    if (curW + w > lineMax && cur.length) {
+      if (t.isSpace) { pushLine(); continue; }
+      pushLine();
+      cur.push({ ...t, _w: w });
+      curW = w;
+      continue;
+    }
+    cur.push({ ...t, _w: w });
+    curW += w;
+  }
+  if (cur.length) {
+    lines.push({ tokens: dropTrailingSpaces(cur), width: widthFor(idx), endOfSegment: true });
+  } else if (lines.length) {
+    lines[lines.length - 1].endOfSegment = true;
+  }
+  return lines;
+}
+
+function dropTrailingSpaces(toks) {
+  let i = toks.length - 1;
+  while (i >= 0 && toks[i].isSpace) i--;
+  return toks.slice(0, i + 1);
+}
+
+function drawTokenLine(ctx, tokens, lineWidth, x, y, endOfSegment) {
+  if (!tokens.length) return;
+  let natural = 0;
+  for (const t of tokens) natural += t._w;
+
+  // Justify only when not last line of segment and there's something to stretch.
+  const spaceCount = tokens.filter(t => t.isSpace).length;
+  let extra = 0;
+  if (!endOfSegment && spaceCount > 0) {
+    // Use a roman-weight space width as the reference so style-mix doesn't trip
+    // the MAX_GAP_RATIO sanity check.
+    ctx.font = font(T_BODY);
+    const naturalSpaceW = ctx.measureText(" ").width;
+    extra = (lineWidth - natural) / spaceCount;
+    if (extra < 0 || (naturalSpaceW + extra) > naturalSpaceW * MAX_GAP_RATIO) extra = 0;
+  }
+
+  let cx = x;
+  let curFont = null;
+  for (const t of tokens) {
+    for (const s of t.subs) {
+      const f = font(T_BODY, s.i, s.b);
+      if (f !== curFont) { ctx.font = f; curFont = f; }
+      ctx.fillText(s.text, cx, y);
+      cx += ctx.measureText(s.text).width;
+    }
+    if (t.isSpace && extra) cx += extra;
   }
 }
 
@@ -369,19 +512,14 @@ export async function renderBookPdfPages({ title, html, onPage }) {
   let firstChar = "";
   let useDropCap = false;
   if (blocks.length && blocks[0].type === "text" && blocks[0].segments.length) {
-    const first = blocks[0].segments[0];
-    const c = (first.match(/^\s*([A-Za-z])/) || [])[1];
+    const seg = blocks[0].segments[0];
+    const firstRun = seg[0];
+    const c = firstRun ? (firstRun.text.match(/^\s*([A-Za-z])/) || [])[1] : null;
     if (c) {
       firstChar = c.toUpperCase();
       useDropCap = true;
-      // Remove the first letter from the first segment.
-      blocks[0] = {
-        type: "text",
-        segments: [
-          first.replace(/^\s*[A-Za-z]/, ""),
-          ...blocks[0].segments.slice(1),
-        ].map(s => s ?? ""),
-      };
+      firstRun.text = firstRun.text.replace(/^\s*[A-Za-z]/, "");
+      if (!firstRun.text) seg.shift();
     }
   }
 
@@ -415,12 +553,11 @@ export async function renderBookPdfPages({ title, html, onPage }) {
         wrapOpts.narrowCount = 1;
         wrapOpts.narrowWidth = fullWidth - PARA_INDENT;
       }
-      mctx.font = font(T_BODY);
-      const lines = wrapSegment(mctx, seg || "", fullWidth, wrapOpts);
+      const lines = wrapRuns(mctx, seg || [], fullWidth, wrapOpts);
       lines.forEach((ln, li) => {
         const item = {
           type: "line",
-          text: ln.text,
+          tokens: ln.tokens,
           width: ln.width,
           endOfSegment: !!ln.endOfSegment,
         };
@@ -490,17 +627,10 @@ export async function renderBookPdfPages({ title, html, onPage }) {
           ctx.font = font(T_DROPCAP);
           ctx.fillStyle = INK_TITLE;
           ctx.textAlign = "left";
-          // Align the cap's visible TOP with the visible top of line 1 of
-          // body text. Body usually starts with lowercase (the cap took the
-          // first letter), so "top of line 1" = the x-height of line 1.
-          //   bodyAscent  ≈ T_BODY · 0.82  (canvas baseline of line 1)
-          //   bodyXHeight ≈ T_BODY · 0.48  (Cormorant has a modest x-height)
-          //   capAscent   ≈ T_DROPCAP · 0.72 (cap-height proportion)
-          const bodyAscent  = T_BODY * PX * 0.82;
-          const bodyXHeight = T_BODY * PX * 0.48;
-          const line1XHeightTop = y + bodyAscent - bodyXHeight;
+          // Align the cap's visible top with body line 1's top — y is the
+          // line-box top, capAscent is the cap-height proportion of the cap.
           const capAscent   = T_DROPCAP * PX * 0.72;
-          const capBaseline = line1XHeightTop + capAscent;
+          const capBaseline = y + capAscent;
           ctx.fillText(firstChar, M_X * PX, capBaseline);
         }
 
@@ -530,7 +660,7 @@ export async function renderBookPdfPages({ title, html, onPage }) {
           }
           // line
           const x = leftX + (it.indent || 0);
-          drawLine(ctx, { text: it.text, width: it.width, endOfSegment: it.endOfSegment }, x, y + baselineOffset);
+          drawTokenLine(ctx, it.tokens, it.width, x, y + baselineOffset, it.endOfSegment);
           y += LINE_H;
         }
 

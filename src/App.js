@@ -4,6 +4,7 @@ import "@fontsource/eb-garamond/400.css";
 import "@fontsource/cormorant-garamond/400.css";
 import "@fontsource/cormorant-garamond/600.css";
 import "@fontsource/cormorant-garamond/400-italic.css";
+import "@fontsource/cormorant-garamond/600-italic.css";
 import { jsPDF } from "jspdf";
 import { supabase } from "./supabase";
 import { renderBookPdfPages, PAGE_W_PT, PAGE_H_PT } from "./pdf/bookPage";
@@ -1556,7 +1557,6 @@ function ReadingView({ pub, font, user, dropCapImages, focus, onRequestAuth }) {
   const [body, setBody]                 = useState("");
   const [posting, setPosting]           = useState(false);
   const [confirmDelId, setConfirmDelId] = useState(null);
-  const pubScore = scoreFromRecord(pub);
 
   useEffect(() => {
     setLikeCount(getRelCount(pub.like_count));
@@ -1652,7 +1652,6 @@ function ReadingView({ pub, font, user, dropCapImages, focus, onRequestAuth }) {
             </button>
           </div>
           <h1 id="reading-headline">{pub.title}</h1>
-          {pubScore && <HumanSignalBadge score={pubScore} />}
           <div id="reading-text" className={font === "arial" ? "font-arial" : ""} dangerouslySetInnerHTML={{ __html: renderHtml(pub.content) }} />
 
           {/* ── Like + Comments ──────────────────────────────────────────── */}
