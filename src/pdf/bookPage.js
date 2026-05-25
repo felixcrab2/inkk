@@ -155,7 +155,7 @@ function parseHtmlToBlocks(html) {
     } else if (tok.type === "break") {
       flushSeg();
       breaks++;
-      if (breaks >= 2) { flushPara(); breaks = 0; }
+      if (breaks >= 1) { flushPara(); breaks = 0; }
     } else if (tok.type === "image") {
       breaks = 0;
       flushPara();
