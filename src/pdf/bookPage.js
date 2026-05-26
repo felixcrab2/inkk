@@ -125,9 +125,11 @@ function parseHtmlToBlocks(html) {
     }
     if (tag === "br") { tokens.push({ type: "break" }); return; }
     const block = tag === "div" || tag === "p" || tag === "h1" || tag === "h2" || tag === "h3" || tag === "li" || tag === "blockquote";
+    const fw = node.style?.fontWeight;
+    const fs = node.style?.fontStyle;
     const next = {
-      b: ctx.b || tag === "b" || tag === "strong",
-      i: ctx.i || tag === "i" || tag === "em",
+      b: ctx.b || tag === "b" || tag === "strong" || fw === "bold" || +fw >= 600,
+      i: ctx.i || tag === "i" || tag === "em" || fs === "italic" || fs === "oblique",
     };
     for (const child of node.childNodes) walk(child, next);
     if (block) tokens.push({ type: "break" });
