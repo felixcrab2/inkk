@@ -1948,7 +1948,7 @@ body.focus-mode #text-container {
   font-style: italic;
   color: var(--text);
   line-height: 1.35;
-  margin: 0 0 28px;
+  margin: 0 0 64px;
   letter-spacing: 0.01em;
   text-align: center;
 }
@@ -1960,8 +1960,34 @@ body.focus-mode #text-container {
   line-height: 1.55;
   color: var(--text);
   margin-top: 0;
+  text-align: justify;
+  hyphens: auto;
+  -webkit-hyphens: auto;
 }
 #reading-text.font-arial { font-family: Arial, sans-serif; }
+
+/* Drop cap on the first paragraph's first letter. */
+#reading-text > div:first-child::first-letter,
+#reading-text > p:first-child::first-letter {
+  font-family: "Cormorant Garamond", serif;
+  font-weight: 600;
+  font-size: 4.6em;
+  line-height: 0.85;
+  float: left;
+  padding: 0.04em 0.12em 0 0;
+  color: var(--text);
+}
+
+/* Indent every paragraph after the first (book-style). */
+#reading-text > div + div,
+#reading-text > p + p {
+  text-indent: 1.4em;
+}
+
+/* But don't indent lists / blockquotes. */
+#reading-text > div[data-list],
+#reading-text > p[data-list],
+#reading-text > blockquote { text-indent: 0; }
 
 /* ─── Feed card engagement row ──────────────────────────────────────────── */
 .pub-card-engagement {
@@ -2178,6 +2204,43 @@ body.focus-mode #text-container {
 }
 #auth-submit:hover { opacity: 0.75; }
 #auth-submit:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ─── Download modal controls ─────────────────────────────────────────── */
+.dl-section-label {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 14px 0 8px;
+}
+.dl-radio-row {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-bottom: 4px;
+}
+.dl-radio {
+  display: inline-flex; align-items: center;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.9rem;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.dl-radio:hover { color: var(--text); border-color: #b8b6b2; }
+.dl-radio.active { color: var(--text); border-color: var(--text); background: rgba(0,0,0,0.03); }
+.dl-radio input { position: absolute; opacity: 0; pointer-events: none; }
+.dl-check {
+  display: flex; align-items: center; gap: 8px;
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.95rem;
+  color: var(--text);
+  cursor: pointer;
+  padding: 4px 0;
+}
+.dl-check input { accent-color: var(--text); }
 
 #auth-divider {
   text-align: center; margin: 18px 0; position: relative;

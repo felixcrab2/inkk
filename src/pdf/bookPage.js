@@ -19,8 +19,14 @@ export const PAGE_H_PT = Math.round(PAGE_W_PT * (TEX_H / TEX_W));  // ~639
 
 // Canvas scale. 4× ≈ 288 dpi — crisp at Instagram sizes.
 const PX = 4;
-const CW = PAGE_W_PT * PX;
-const CH = PAGE_H_PT * PX;
+
+// Preset page dimensions (pt) for Instagram-style PNG exports.
+export const PAGE_PRESETS = {
+  book:         { w: PAGE_W_PT, h: PAGE_H_PT },              // 480 × 639
+  square:       { w: 480, h: 480 },                          // 1:1 (Instagram post)
+  portrait:     { w: 480, h: 600 },                          // 4:5 (Instagram portrait)
+  story:        { w: 480, h: 853 },                          // 9:16 (Instagram story)
+};
 
 // Warm ink, slightly transparent under multiply for "absorbed letterpress".
 const INK_BODY    = "#241a12";
@@ -32,10 +38,9 @@ const INK_ALPHA   = 0.93;
 // Paper tone: slight desaturation pulls the yellow back without losing warmth.
 const PAPER_FILTER = "saturate(0.65) brightness(1.02)";
 
-// Margins (pt). Generous, book-like.
-const M_X       = 72;
-const M_TOP     = 96;
-const M_BOT     = 80;
+// Header / footer offsets (pt). Margins are now computed proportionally
+// per page size inside renderBookPdfPages so non-default aspects still
+// look book-like.
 const HEADER_Y  = 40;   // running header baseline (pt from top)
 const FOOTER_FROM_BOTTOM = 34;
 
@@ -316,15 +321,15 @@ function dropTrailingSpaces(toks) {
   return toks.slice(0, i + 1);
 }
 
-function drawTokenLine(ctx, tokens, lineWidth, x, y, endOfSegment) {
+function drawTokenLine(ctx, tokens, lineWidth, x, y, endOfSegment, justify = true) {
   if (!tokens.length) return;
   let natural = 0;
   for (const t of tokens) natural += t._w;
 
-  // Justify only when not last line of segment and there's something to stretch.
+  // Justify only when enabled, not last line of segment, and there's something to stretch.
   const spaceCount = tokens.filter(t => t.isSpace).length;
   let extra = 0;
-  if (!endOfSegment && spaceCount > 0) {
+  if (justify && !endOfSegment && spaceCount > 0) {
     // Use a roman-weight space width as the reference so style-mix doesn't trip
     // the MAX_GAP_RATIO sanity check.
     ctx.font = font(T_BODY);
@@ -399,17 +404,22 @@ function paginate(items, firstPageHeight, otherPageHeight, fullWidth) {
 
 // ── page rendering ────────────────────────────────────────────────────────
 
-async function renderOnePage({ texture, drawInk }) {
+async function renderOnePage({ texture, drawInk, cw, ch, paperTexture }) {
   const canvas = document.createElement("canvas");
-  canvas.width  = CW;
-  canvas.height = CH;
+  canvas.width  = cw;
+  canvas.height = ch;
   const ctx = canvas.getContext("2d");
 
-  // 1. Paper full-bleed — desaturated slightly to take the yellow back.
-  ctx.save();
-  ctx.filter = PAPER_FILTER;
-  ctx.drawImage(texture, 0, 0, CW, CH);
-  ctx.restore();
+  // 1. Background — paper texture or flat inkk background.
+  if (paperTexture && texture) {
+    ctx.save();
+    ctx.filter = PAPER_FILTER;
+    ctx.drawImage(texture, 0, 0, cw, ch);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = "#faf9f7";
+    ctx.fillRect(0, 0, cw, ch);
+  }
 
   // 2. All ink (text + images) drawn under multiply blend, slightly
   //    transparent.
@@ -419,26 +429,28 @@ async function renderOnePage({ texture, drawInk }) {
   drawInk(ctx);
   ctx.restore();
 
-  // 3. Sparse grain for cohesion.
-  ctx.save();
-  ctx.globalAlpha = 0.025;
-  ctx.fillStyle = "#1a1410";
-  const STEP = 3;
-  for (let y = 0; y < CH; y += STEP) {
-    for (let x = 0; x < CW; x += STEP) {
-      if (Math.random() < 0.008) ctx.fillRect(x, y, 1, 1);
+  if (paperTexture && texture) {
+    // 3. Sparse grain for cohesion (only when paper is on).
+    ctx.save();
+    ctx.globalAlpha = 0.025;
+    ctx.fillStyle = "#1a1410";
+    const STEP = 3;
+    for (let y = 0; y < ch; y += STEP) {
+      for (let x = 0; x < cw; x += STEP) {
+        if (Math.random() < 0.008) ctx.fillRect(x, y, 1, 1);
+      }
     }
-  }
-  ctx.restore();
+    ctx.restore();
 
-  // 4. Paper-on-paper soft-light pass — bakes fibres into both letters and
-  //    photographs. Same desaturated paper tone for consistency.
-  ctx.save();
-  ctx.globalCompositeOperation = "soft-light";
-  ctx.globalAlpha = 0.45;
-  ctx.filter = PAPER_FILTER;
-  ctx.drawImage(texture, 0, 0, CW, CH);
-  ctx.restore();
+    // 4. Paper-on-paper soft-light pass — bakes fibres into both letters and
+    //    photographs.
+    ctx.save();
+    ctx.globalCompositeOperation = "soft-light";
+    ctx.globalAlpha = 0.45;
+    ctx.filter = PAPER_FILTER;
+    ctx.drawImage(texture, 0, 0, cw, ch);
+    ctx.restore();
+  }
 
   return canvas;
 }
@@ -454,18 +466,42 @@ async function renderOnePage({ texture, drawInk }) {
  *                                       images preserved).
  * @param {function} opts.onPage       — async fn(canvas, pageIndex, totalPages)
  */
-export async function renderBookPdfPages({ title, html, onPage }) {
+export async function renderBookPdfPages({ title, html, onPage, options = {} }) {
   await document.fonts.ready;
-  const texture = await loadTexture();
+
+  const {
+    pageW            = PAGE_W_PT,
+    pageH            = PAGE_H_PT,
+    dropCap: dropCapOpt   = true,
+    justify          = true,
+    titleGap         = "normal",   // 'tight' | 'normal' | 'loose'
+    paragraphIndent  = true,
+    paperTexture     = true,
+  } = options;
+
+  const texture = paperTexture ? await loadTexture() : null;
+  const cw = pageW * PX;
+  const ch = pageH * PX;
+  // Proportional margins so non-default aspects still look book-like.
+  const mX   = Math.round(pageW * 0.15);
+  const mTop = Math.round(pageH * 0.15);
+  const mBot = Math.round(pageH * 0.125);
+  const titleGapMult =
+    titleGap === "tight" ? 0.6 :
+    titleGap === "loose" ? 1.7 :
+    1.0;
+  // User asked for default = 1 line more than before. Original was 18pt; bump
+  // to 30pt at default (≈ 1.5× a body line).
+  const TITLE_BODY_GAP = 30 * PX * titleGapMult;
 
   // Measurement canvas (for wrap and layout calculations).
   const measure = document.createElement("canvas");
-  measure.width = CW; measure.height = CH;
+  measure.width = cw; measure.height = ch;
   const mctx = measure.getContext("2d");
 
-  const fullWidth  = (PAGE_W_PT - M_X * 2) * PX;
-  const bodyTop    = M_TOP * PX;
-  const bodyBottom = (PAGE_H_PT - M_BOT) * PX;
+  const fullWidth  = (pageW - mX * 2) * PX;
+  const bodyTop    = mTop * PX;
+  const bodyBottom = (pageH - mBot) * PX;
   const otherPageHeight = bodyBottom - bodyTop;
 
   // ── Title (wrapped) ──────────────────────────────────────────────────────
@@ -476,7 +512,7 @@ export async function renderBookPdfPages({ title, html, onPage }) {
     mctx.font = font(T_TITLE, true);
     titleLines = wrapSegment(mctx, titleStr, fullWidth).map(l => l.text);
     if (!titleLines.length) titleLines = [titleStr];
-    titleBlockH = titleLines.length * T_TITLE * PX * TITLE_LINE_MULT + 26 * PX;
+    titleBlockH = titleLines.length * T_TITLE * PX * TITLE_LINE_MULT + TITLE_BODY_GAP;
   }
   const firstPageHeight = otherPageHeight - titleBlockH;
 
@@ -488,7 +524,7 @@ export async function renderBookPdfPages({ title, html, onPage }) {
   // Drop cap based on the first character of the first text block.
   let firstChar = "";
   let useDropCap = false;
-  if (blocks.length && blocks[0].type === "text" && blocks[0].segments.length) {
+  if (dropCapOpt && blocks.length && blocks[0].type === "text" && blocks[0].segments.length) {
     const seg = blocks[0].segments[0];
     const firstRun = seg[0];
     const c = firstRun ? (firstRun.text.match(/^\s*([A-Za-z])/) || [])[1] : null;
@@ -521,7 +557,7 @@ export async function renderBookPdfPages({ title, html, onPage }) {
     const isFirstParaForIndent = bi > 0;
     block.segments.forEach((seg, si) => {
       // For segment 0 of a paragraph (not first paragraph) → first-line indent.
-      const wantsParaIndent = si === 0 && isFirstParaForIndent;
+      const wantsParaIndent = paragraphIndent && si === 0 && isFirstParaForIndent;
       const wrapOpts = {};
       if (dropCapLinesLeft > 0) {
         wrapOpts.narrowCount = dropCapLinesLeft;
@@ -568,6 +604,7 @@ export async function renderBookPdfPages({ title, html, onPage }) {
 
     const canvas = await renderOnePage({
       texture,
+      cw, ch, paperTexture,
       drawInk(ctx) {
         ctx.textBaseline = "alphabetic";
         let y = bodyTop;
@@ -578,10 +615,10 @@ export async function renderBookPdfPages({ title, html, onPage }) {
           ctx.fillStyle = INK_TITLE;
           ctx.textAlign = "center";
           for (const ln of titleLines) {
-            ctx.fillText(ln, CW / 2, y + T_TITLE * PX);
+            ctx.fillText(ln, cw / 2, y + T_TITLE * PX);
             y += T_TITLE * PX * TITLE_LINE_MULT;
           }
-          y += 18 * PX;       // space after title block
+          y += TITLE_BODY_GAP - 8 * PX;   // space after title block (already partly used by titleBlockH calc)
         }
 
         // ── Page 2+: tiny italic running header ─────────────────────────
@@ -596,7 +633,7 @@ export async function renderBookPdfPages({ title, html, onPage }) {
             while (hdr.length > 6 && mctx.measureText(hdr + "…").width > fullWidth) hdr = hdr.slice(0, -1);
             hdr += "…";
           }
-          ctx.fillText(hdr, CW / 2, HEADER_Y * PX);
+          ctx.fillText(hdr, cw / 2, HEADER_Y * PX);
         }
 
         // ── Drop cap (page 1 only) ──────────────────────────────────────
@@ -604,25 +641,23 @@ export async function renderBookPdfPages({ title, html, onPage }) {
           ctx.font = font(T_DROPCAP);
           ctx.fillStyle = INK_TITLE;
           ctx.textAlign = "left";
-          // Align the cap's visible top with body line 1's top — y is the
-          // line-box top, capAscent is the cap-height proportion of the cap.
           const capAscent   = T_DROPCAP * PX * 0.72;
           const capBaseline = y + capAscent;
-          ctx.fillText(firstChar, M_X * PX, capBaseline);
+          ctx.fillText(firstChar, mX * PX, capBaseline);
         }
 
         // ── Body ────────────────────────────────────────────────────────
         ctx.font = font(T_BODY);
         ctx.fillStyle = INK_BODY;
         ctx.textAlign = "left";
-        const leftX = M_X * PX;
+        const leftX = mX * PX;
         const baselineOffset = T_BODY * PX * 0.82;
 
         for (const it of pageItems) {
           if (it.type === "gap")   { y += PARA_GAP; continue; }
           if (it.type === "image") {
             const w = it._w, h = it._h;
-            const x = (CW - w) / 2;
+            const x = (cw - w) / 2;
             // Slight desaturation/contrast as a film/print look; multiply
             // blend (active on the surrounding save) bakes it into paper.
             ctx.save();
@@ -637,17 +672,17 @@ export async function renderBookPdfPages({ title, html, onPage }) {
           }
           // line
           const x = leftX + (it.indent || 0);
-          drawTokenLine(ctx, it.tokens, it.width, x, y + baselineOffset, it.endOfSegment);
+          drawTokenLine(ctx, it.tokens, it.width, x, y + baselineOffset, it.endOfSegment, justify);
           y += LINE_H;
         }
 
         // ── Footer: pretty page number ──────────────────────────────────
-        const footerBaseline = (PAGE_H_PT - FOOTER_FROM_BOTTOM) * PX;
+        const footerBaseline = (pageH - FOOTER_FROM_BOTTOM) * PX;
         ctx.font = font(T_FOOTER, true);
         ctx.fillStyle = INK_FOOTER;
         ctx.textAlign = "center";
         // En-spaces around dots for elegance.
-        ctx.fillText(`· ${pageNum} ·`, CW / 2, footerBaseline);
+        ctx.fillText(`· ${pageNum} ·`, cw / 2, footerBaseline);
       },
     });
 

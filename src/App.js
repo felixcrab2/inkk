@@ -7,7 +7,7 @@ import "@fontsource/cormorant-garamond/400-italic.css";
 import "@fontsource/cormorant-garamond/600-italic.css";
 import { jsPDF } from "jspdf";
 import { supabase } from "./supabase";
-import { renderBookPdfPages, PAGE_W_PT, PAGE_H_PT } from "./pdf/bookPage";
+import { renderBookPdfPages, PAGE_PRESETS } from "./pdf/bookPage";
 import {
   Menu, ArrowLeft, PenLine, Globe, User,
   Share2, Check, Download, Maximize2, Minimize2,
@@ -995,6 +995,78 @@ function PublishModal({ doc, user, profile, onConfirm, onClose }) {
   );
 }
 
+// ─── DownloadModal ────────────────────────────────────────────────────────────
+
+function DownloadModal({ onConfirm, onClose }) {
+  const [format,          setFormat]          = useState("pdf");
+  const [dropCap,         setDropCap]         = useState(true);
+  const [justify,         setJustify]         = useState(true);
+  const [paragraphIndent, setParagraphIndent] = useState(true);
+  const [titleGap,        setTitleGap]        = useState("normal");
+  const [paperTexture,    setPaperTexture]    = useState(true);
+  const [busy,            setBusy]            = useState(false);
+
+  const isPng = format !== "pdf";
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    await onConfirm({
+      format,
+      style: { dropCap, justify, paragraphIndent, titleGap, paperTexture: isPng ? paperTexture : true },
+    });
+    setBusy(false);
+    onClose();
+  };
+
+  return (
+    <div id="auth-overlay">
+      <div id="auth-modal">
+        <button id="auth-close" onClick={onClose}>×</button>
+        <div id="auth-tabs"><button className="active" style={{ cursor: "default" }}>download</button></div>
+        <form onSubmit={submit}>
+          <div className="dl-section-label">Format</div>
+          <div className="dl-radio-row">
+            {[
+              { v: "pdf",          l: "PDF" },
+              { v: "png-square",   l: "PNG · square" },
+              { v: "png-portrait", l: "PNG · portrait" },
+              { v: "png-story",    l: "PNG · story" },
+            ].map(o => (
+              <label key={o.v} className={`dl-radio${format === o.v ? " active" : ""}`}>
+                <input type="radio" name="format" value={o.v} checked={format === o.v} onChange={() => setFormat(o.v)} />
+                <span>{o.l}</span>
+              </label>
+            ))}
+          </div>
+
+          <div className="dl-section-label">Style</div>
+          <label className="dl-check"><input type="checkbox" checked={dropCap}         onChange={e => setDropCap(e.target.checked)} /><span>Drop cap</span></label>
+          <label className="dl-check"><input type="checkbox" checked={justify}         onChange={e => setJustify(e.target.checked)} /><span>Justify text</span></label>
+          <label className="dl-check"><input type="checkbox" checked={paragraphIndent} onChange={e => setParagraphIndent(e.target.checked)} /><span>Paragraph indent</span></label>
+          {isPng && (
+            <label className="dl-check"><input type="checkbox" checked={paperTexture} onChange={e => setPaperTexture(e.target.checked)} /><span>Paper texture</span></label>
+          )}
+
+          <div className="dl-section-label">Title spacing</div>
+          <div className="dl-radio-row">
+            {[{ v: "tight", l: "Tight" }, { v: "normal", l: "Normal" }, { v: "loose", l: "Loose" }].map(o => (
+              <label key={o.v} className={`dl-radio${titleGap === o.v ? " active" : ""}`}>
+                <input type="radio" name="titleGap" value={o.v} checked={titleGap === o.v} onChange={() => setTitleGap(o.v)} />
+                <span>{o.l}</span>
+              </label>
+            ))}
+          </div>
+
+          <button id="auth-submit" type="submit" disabled={busy}>
+            {busy ? "preparing…" : `Download ${format === "pdf" ? "PDF" : "PNG"}`}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Feed ─────────────────────────────────────────────────────────────────────
 
 function Feed({ user, onRead, onHsModal, onAuthorClick, dropCapImages, onRequestAuth }) {
@@ -1784,6 +1856,7 @@ export default function App() {
   const [panelConfirmDeleteId, setPanelConfirmDeleteId] = useState(null);
   const [confirmUnpublishOpen, setConfirmUnpublishOpen] = useState(false);
   const [formatActive, setFormatActive] = useState({ bold: false, italic: false });
+  const [downloadModalOpen, setDownloadModalOpen] = useState(false);
 
   const editorRef      = useRef(null);
   const titleEditorRef = useRef(null);
@@ -2404,40 +2477,87 @@ export default function App() {
   // multiply blend mode) and embeds each as a JPEG image in a custom-sized
   // PDF, so the result is visually indistinguishable from a scanned book.
 
-  const exportToPdf = useCallback(async () => {
+  const downloadDoc = useCallback(async ({ format, style }) => {
     const text = contentRef.current || "";
     if (!stripHtml(text).trim()) return;
+    const titleStr = stripHtml(titleRef.current).trim();
+    const safeName = titleStr.replace(/[^a-zA-Z0-9\s\-_]/g, "").trim() || "inkk";
+    const preset = PAGE_PRESETS[
+      format === "png-square"   ? "square"   :
+      format === "png-portrait" ? "portrait" :
+      format === "png-story"    ? "story"    :
+      "book"
+    ];
+    // PNG outputs default to inkk background; user can override.
+    const paperTexture = style.paperTexture ?? (format === "pdf");
+    const renderOptions = {
+      pageW: preset.w,
+      pageH: preset.h,
+      dropCap:         style.dropCap         ?? true,
+      justify:         style.justify         ?? true,
+      titleGap:        style.titleGap        ?? "normal",
+      paragraphIndent: style.paragraphIndent ?? true,
+      paperTexture,
+    };
+
     try {
-      const titleStr  = stripHtml(titleRef.current).trim();
-      const pdf = new jsPDF({ unit: "pt", format: [PAGE_W_PT, PAGE_H_PT], compress: true });
-
-      await renderBookPdfPages({
-        title: titleStr,
-        html: text,
-        async onPage(canvas, pageIndex /*, totalPages */) {
-          if (pageIndex > 0) pdf.addPage([PAGE_W_PT, PAGE_H_PT]);
-          const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
-          pdf.addImage(dataUrl, "JPEG", 0, 0, PAGE_W_PT, PAGE_H_PT, undefined, "MEDIUM");
-        },
-      });
-
-      pdf.save(`${titleStr.replace(/[^a-zA-Z0-9\s\-_]/g, "").trim() || "inkk"}.pdf`);
+      if (format === "pdf") {
+        const pdf = new jsPDF({ unit: "pt", format: [preset.w, preset.h], compress: true });
+        await renderBookPdfPages({
+          title: titleStr,
+          html: text,
+          options: renderOptions,
+          async onPage(canvas, pageIndex) {
+            if (pageIndex > 0) pdf.addPage([preset.w, preset.h]);
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+            pdf.addImage(dataUrl, "JPEG", 0, 0, preset.w, preset.h, undefined, "MEDIUM");
+          },
+        });
+        pdf.save(`${safeName}.pdf`);
+      } else {
+        // PNG — only the first page becomes the image.
+        let pngBlob = null;
+        await renderBookPdfPages({
+          title: titleStr,
+          html: text,
+          options: renderOptions,
+          async onPage(canvas, pageIndex) {
+            if (pageIndex > 0 || pngBlob) return;
+            pngBlob = await new Promise(res => canvas.toBlob(res, "image/png"));
+          },
+        });
+        if (!pngBlob) { addToast("Nothing to export."); return; }
+        const url = URL.createObjectURL(pngBlob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${safeName}.png`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
     } catch (err) {
-      console.error("PDF export failed:", err);
-      addToast("PDF export failed.");
+      console.error("Download failed:", err);
+      addToast("Download failed.");
     }
   }, [addToast]);
+
+  const openDownloadModal = useCallback(() => {
+    if (!stripHtml(contentRef.current || "").trim()) return;
+    setDownloadModalOpen(true);
+  }, []);
 
   // ─ keyboard shortcuts ───────────────────────────────────────────────────────
 
   useEffect(() => {
     const handler = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); if (view === "editor") exportToPdf(); }
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); if (view === "editor") openDownloadModal(); }
       if ((e.metaKey || e.ctrlKey) && e.key === ".") { e.preventDefault(); if (view === "editor") setFocusMode(v => !v); }
       if (e.key === "Escape") {
         if (focusMode) { setFocusMode(false); return; }
         if (publishMenuOpen) { setPublishMenuOpen(false); setConfirmUnpublishOpen(false); return; }
         if (publishModalDoc) { setPublishModalDoc(null); return; }
+        if (downloadModalOpen) { setDownloadModalOpen(false); return; }
         if (usernameModalOpen) return;
         setPanelOpen(false); setAuthOpen(false); setHsModalOpen(false); setHsScoreOpen(false);
         if (view !== "editor") { window.history.back(); return; }
@@ -2445,7 +2565,7 @@ export default function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [exportToPdf, view, focusMode, publishMenuOpen, publishModalDoc, usernameModalOpen]);
+  }, [openDownloadModal, view, focusMode, publishMenuOpen, publishModalDoc, downloadModalOpen, usernameModalOpen]);
 
   // ─ mount ────────────────────────────────────────────────────────────────────
 
@@ -2653,9 +2773,9 @@ export default function App() {
             </div>
           )}
           {isEditor && hasContent && (
-            <button id="pdf-btn" className={menuClass} onClick={exportToPdf} title="Export PDF  ⌘S">
+            <button id="pdf-btn" className={menuClass} onClick={openDownloadModal} title="Download  ⌘S">
               <Download size={13} />
-              <span className="btn-label">PDF</span>
+              <span className="btn-label">Download</span>
             </button>
           )}
           {isEditor && (
@@ -2697,7 +2817,7 @@ export default function App() {
                       {publishedDocIds.has(d.id) ? <Check size={11} /> : <Share2 size={11} />}
                     </button>
                   )}
-                  <button className="doc-pdf" onClick={exportToPdf} title="Export PDF  ⌘S">
+                  <button className="doc-pdf" onClick={openDownloadModal} title="Download  ⌘S">
                     <Download size={11} />
                   </button>
                   {docs.length > 1 && (
@@ -2956,6 +3076,9 @@ export default function App() {
       {/* ── modals ── */}
       {publishModalDoc && user && (
         <PublishModal doc={publishModalDoc} user={user} profile={profile} onConfirm={confirmPublish} onClose={() => setPublishModalDoc(null)} />
+      )}
+      {downloadModalOpen && (
+        <DownloadModal onConfirm={downloadDoc} onClose={() => setDownloadModalOpen(false)} />
       )}
       {authOpen && supabase && <AuthModal onClose={() => setAuthOpen(false)} />}
       {hsModalOpen && <HumanSignalModal onClose={() => setHsModalOpen(false)} />}
