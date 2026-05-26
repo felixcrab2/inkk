@@ -25,7 +25,6 @@ export const PAGE_PRESETS = {
   book:         { w: PAGE_W_PT, h: PAGE_H_PT },              // 480 × 639
   square:       { w: 480, h: 480 },                          // 1:1 (Instagram post)
   portrait:     { w: 480, h: 600 },                          // 4:5 (Instagram portrait)
-  story:        { w: 480, h: 853 },                          // 9:16 (Instagram story)
 };
 
 // Warm ink, slightly transparent under multiply for "absorbed letterpress".
@@ -48,11 +47,13 @@ const FOOTER_FROM_BOTTOM = 34;
 const T_TITLE   = 13.5;
 const T_HEADER  = 8.5;
 const T_BODY    = 11.25;
-const T_DROPCAP = 56;
+const T_DROPCAP = 42;
 const T_FOOTER  = 10.5;
 
 // Drop cap spans this many body lines.
-const DROPCAP_LINES = 3;
+// At T_DROPCAP=42pt, cap-height ≈ 0.72 × 42 = 30.2pt = 1.73 body lines,
+// so 2 reserved lines clears the cap without an empty third line.
+const DROPCAP_LINES = 2;
 
 const LINE_H_PT      = T_BODY * 1.55;
 const LINE_H         = LINE_H_PT * PX;

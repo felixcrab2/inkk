@@ -1966,15 +1966,20 @@ body.focus-mode #text-container {
 }
 #reading-text.font-arial { font-family: Arial, sans-serif; }
 
-/* Drop cap on the first paragraph's first letter. */
+/* Drop cap on the first paragraph's first letter — a clean 2-line cap.
+   font-size 3em × line-height 0.9 = 2.7em float box ≈ 2.05 body lines,
+   so the cap-height (≈0.72 × 3em = 2.16em) sits cleanly inside the float
+   without bleeding into line 3. The small margin-top nudges the cap-line
+   to align with body line 1's ascender top. */
 #reading-text > div:first-child::first-letter,
 #reading-text > p:first-child::first-letter {
   font-family: "Cormorant Garamond", serif;
   font-weight: 600;
-  font-size: 4.6em;
-  line-height: 0.85;
+  font-size: 3em;
+  line-height: 0.9;
   float: left;
-  padding: 0.04em 0.12em 0 0;
+  padding: 0 0.14em 0 0;
+  margin-top: 0.06em;
   color: var(--text);
 }
 

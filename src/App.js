@@ -1031,7 +1031,6 @@ function DownloadModal({ onConfirm, onClose }) {
               { v: "pdf",          l: "PDF" },
               { v: "png-square",   l: "PNG · square" },
               { v: "png-portrait", l: "PNG · portrait" },
-              { v: "png-story",    l: "PNG · story" },
             ].map(o => (
               <label key={o.v} className={`dl-radio${format === o.v ? " active" : ""}`}>
                 <input type="radio" name="format" value={o.v} checked={format === o.v} onChange={() => setFormat(o.v)} />
@@ -2485,7 +2484,6 @@ export default function App() {
     const preset = PAGE_PRESETS[
       format === "png-square"   ? "square"   :
       format === "png-portrait" ? "portrait" :
-      format === "png-story"    ? "story"    :
       "book"
     ];
     // PNG outputs default to inkk background; user can override.
