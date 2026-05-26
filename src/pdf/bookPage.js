@@ -97,7 +97,7 @@ function loadImg(src) {
 }
 
 function font(sizePt, italic = false, bold = false) {
-  return `${italic ? "italic " : ""}${bold ? "600 " : ""}${sizePt * PX}px "Cormorant Garamond", "EB Garamond", Georgia, serif`;
+  return `${italic ? "italic" : "normal"} ${bold ? "600" : "400"} ${sizePt * PX}px "Cormorant Garamond", "EB Garamond", Georgia, serif`;
 }
 
 // Parse the editor HTML into an ordered list of blocks:
