@@ -176,6 +176,7 @@ function parseHtmlToBlocks(html) {
     }
   }
   flushPara();
+  console.log("[inkk-debug] blocks:", JSON.stringify(blocks.slice(0, 3)));
   return blocks;
 }
 
