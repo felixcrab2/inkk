@@ -176,7 +176,6 @@ function parseHtmlToBlocks(html) {
     }
   }
   flushPara();
-  console.log("[inkk-debug] blocks:", JSON.stringify(blocks.slice(0, 3)));
   return blocks;
 }
 
@@ -513,7 +512,7 @@ export async function renderBookPdfPages({ title, html, onPage, options = {} }) 
   let titleLines = [];
   let titleBlockH = 0;
   if (titleStr) {
-    mctx.font = font(T_TITLE, true);
+    mctx.font = font(T_TITLE, true, true);
     titleLines = wrapSegment(mctx, titleStr, fullWidth).map(l => l.text);
     if (!titleLines.length) titleLines = [titleStr];
     titleBlockH = titleLines.length * T_TITLE * PX * TITLE_LINE_MULT + TITLE_BODY_GAP;
@@ -615,7 +614,7 @@ export async function renderBookPdfPages({ title, html, onPage, options = {} }) 
 
         // ── Page 1: small italic chapter title (wrapped) ────────────────
         if (isFirst && titleStr) {
-          ctx.font = font(T_TITLE, true);
+          ctx.font = font(T_TITLE, true, true);
           ctx.fillStyle = INK_TITLE;
           ctx.textAlign = "center";
           for (const ln of titleLines) {

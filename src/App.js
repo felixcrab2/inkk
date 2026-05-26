@@ -2478,7 +2478,6 @@ export default function App() {
 
   const downloadDoc = useCallback(async ({ format, style }) => {
     const text = contentRef.current || "";
-    console.log("[inkk-debug] raw html:", text.slice(0, 500));
     if (!stripHtml(text).trim()) return;
     const titleStr = stripHtml(titleRef.current).trim();
     const safeName = titleStr.replace(/[^a-zA-Z0-9\s\-_]/g, "").trim() || "inkk";
