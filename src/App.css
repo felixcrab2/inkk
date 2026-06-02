@@ -5,9 +5,9 @@
   --bg:          #faf9f7;
   --surface:     #f2f1ee;
   --text:        #1a1a1a;
-  --muted:       #888;
-  --subtle:      #c8c5c0;
-  --border:      rgba(0, 0, 0, 0.07);
+  --muted:       #575350;
+  --subtle:      #8a8580;
+  --border:      rgba(0, 0, 0, 0.13);
   --spine-a:     hsl(30, 28%, 64%);
   --spine-b:     hsl(148, 14%, 60%);
   --spine-c:     hsl(350, 18%, 66%);
@@ -70,7 +70,7 @@ body {
   display: inline-block;
   width: 0;
   height: 1.1em;
-  border-left: 1.5px solid #aaa;
+  border-left: 1.5px solid #666;
   vertical-align: -0.12em;
   margin-left: 2px;
   animation: blink 1s steps(2, start) infinite;
@@ -588,7 +588,7 @@ body.focus-mode #text-container {
   border: none;
   font-family: "Cormorant Garamond", serif;
   font-size: 0.78rem;
-  color: #d0ceca;
+  color: #9a9590;
   cursor: pointer;
   padding: 0 8px;
   margin-bottom: 20px;
@@ -642,15 +642,15 @@ body.focus-mode #text-container {
   content: "";
   display: inline-block;
   width: 0; height: 0.82em;
-  border-left: 1.5px solid #d0ceca;
+  border-left: 1.5px solid #9a9590;
   vertical-align: -0.08em;
   animation: blink 1s steps(2, start) infinite;
 }
-#text:focus { caret-color: #777; }
+#text:focus { caret-color: #555; }
 
 @keyframes blink {
   0%, 100% { border-color: transparent; }
-  50%       { border-color: #d0ceca; }
+  50%       { border-color: #9a9590; }
 }
 
 /* ─── Feed ────────────────────────────────────────────────────────────────── */
@@ -773,7 +773,7 @@ body.focus-mode #text-container {
   border: none;
   font-family: "Cormorant Garamond", serif;
   font-size: 0.82rem;
-  color: #bbbab6;
+  color: #7a7770;
   cursor: pointer;
   padding: 0;
   letter-spacing: 0.02em;
@@ -822,7 +822,7 @@ body.focus-mode #text-container {
   flex-direction: column;
   border: 1.5px solid #1c1a16;
   /* Flat offset shadow — drawn/stamped, not digital */
-  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.10);
+  box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.14);
   margin-bottom: 5px;
 }
 
@@ -838,10 +838,10 @@ body.focus-mode #text-container {
     to bottom,
     transparent 0px,
     transparent 6px,
-    rgba(28, 26, 22, 0.22) 6px,
-    rgba(28, 26, 22, 0.22) 7px
+    rgba(28, 26, 22, 0.30) 6px,
+    rgba(28, 26, 22, 0.30) 7px
   );
-  border-left: 1px solid rgba(28, 26, 22, 0.30);
+  border-left: 1px solid rgba(28, 26, 22, 0.40);
   pointer-events: none;
   z-index: 2;
 }
@@ -886,31 +886,34 @@ body.focus-mode #text-container {
 
 .book-spine-title {
   font-family: "Cormorant Garamond", serif;
-  font-size: 0.96rem;
+  font-size: 0.98rem;
   font-weight: 500;
+  font-style: italic;
   color: #1c1a16;
   flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.06em;
 }
 
 .book-spine-author {
   font-family: "Cormorant Garamond", serif;
-  font-size: 0.76rem;
-  font-style: italic;
-  color: #5a5650;
+  font-size: 0.72rem;
+  font-style: normal;
+  color: #3a3530;
   white-space: nowrap;
   flex-shrink: 0;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
 }
 
 .book-spine-badge {
   font-family: "Cormorant Garamond", serif;
-  font-size: 0.56rem;
-  letter-spacing: 0.14em;
+  font-size: 0.52rem;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #8a8680;
+  color: var(--muted);
   flex-shrink: 0;
 }
 
