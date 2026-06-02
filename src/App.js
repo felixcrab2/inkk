@@ -1156,59 +1156,61 @@ function Feed({ user, onRead, onHsModal, onAuthorClick, dropCapImages, onRequest
         </div>
       )}
 
-      {feedTab === "stories" && <div id="feed-list">
-        {loading && <p className="feed-empty">loading…</p>}
-        {!loading && pubs.length === 0 && (
-          <p className="feed-empty">nothing published yet — be the first.</p>
-        )}
-        {pubs.map((pub, i) => {
-          const hook = openingLine(pub.content);
-          const avatarLetter = pub.author_name?.[0] || "?";
-          const likeCount    = getRelCount(pub.like_count);
-          const commentCount = getRelCount(pub.comment_count);
-          const isLiked      = likedSet.has(pub.id);
-          return (
-            <article key={pub.id} className="pub-card" style={{ "--card-index": i }} onClick={() => onRead(pub)}>
-              <div className="pub-card-meta">
-                <DropCapAvatar letter={avatarLetter} avatarData={pub.avatar_data} dropCapImages={dropCapImages} size={22} />
-                <button className="pub-author-btn" onClick={e => { e.stopPropagation(); if (pub.user_id) onAuthorClick(pub.user_id); }}>
-                  {pub.author_name}
-                </button>
-                <span className="pub-dot">·</span>
-                <span className="pub-date">{formatDate(pub.published_at)}</span>
-                <span className="pub-dot">·</span>
-                <span className="pub-read-time">{readingTime(pub.content)}</span>
-              </div>
-              <h2 className="pub-card-title">{pub.title}</h2>
-              {hook && <p className="pub-card-opening">{hook}</p>}
-              {(() => {
-                const sc = scoreFromRecord(pub);
-                return sc
-                  ? <HumanSignalBadge score={sc} />
-                  : <span className="pub-card-words">{wordCount(pub.content)} words</span>;
-              })()}
-              <div className="pub-card-engagement">
-                <button
-                  className={`engage-btn engage-like${isLiked ? " liked" : ""}`}
-                  title={isLiked ? "Unlike" : "Like"}
-                  onClick={e => { e.stopPropagation(); handleLike(pub); }}
-                >
-                  <Heart size={14} strokeWidth={1.6} fill={isLiked ? "currentColor" : "none"} />
-                  <span>{likeCount}</span>
-                </button>
-                <button
-                  className="engage-btn engage-comment"
-                  title="Read & comment"
-                  onClick={e => { e.stopPropagation(); onRead(pub, { focus: "comments" }); }}
-                >
-                  <MessageCircle size={14} strokeWidth={1.6} />
-                  <span>{commentCount}</span>
-                </button>
-              </div>
-            </article>
-          );
-        })}
-      </div>}
+      {feedTab === "stories" && (
+        <div id="feed-list">
+          {loading && <p className="feed-empty">loading…</p>}
+          {!loading && pubs.length === 0 && (
+            <p className="feed-empty">nothing published yet — be the first.</p>
+          )}
+          {pubs.map((pub, i) => {
+            const hook         = openingLine(pub.content);
+            const likeCount    = getRelCount(pub.like_count);
+            const commentCount = getRelCount(pub.comment_count);
+            const isLiked      = likedSet.has(pub.id);
+            const sc           = scoreFromRecord(pub);
+            return (
+              <article key={pub.id} className="book-card" style={{ "--card-index": i }} onClick={() => onRead(pub)}>
+                <div className="book-spine-strip" />
+                <div className="book-card-body">
+                  <div className="book-card-top">
+                    <div className="book-card-main">
+                      <h2 className="book-title">{pub.title}</h2>
+                      <div className="book-author">
+                        <button
+                          className="pub-author-btn"
+                          style={{ fontStyle: "italic", fontSize: "0.84rem", color: "var(--muted)" }}
+                          onClick={e => { e.stopPropagation(); if (pub.user_id) onAuthorClick(pub.user_id); }}
+                        >{pub.author_name}</button>
+                      </div>
+                    </div>
+                  </div>
+                  {hook && <p className="book-excerpt">{hook}</p>}
+                  <div className="book-card-foot">
+                    <span className="book-meta">{formatDate(pub.published_at)} · {readingTime(pub.content)}</span>
+                    <div className="book-foot-actions">
+                      {sc && <HumanSignalBadge score={sc} />}
+                      <button
+                        className={`engage-btn engage-like${isLiked ? " liked" : ""}`}
+                        onClick={e => { e.stopPropagation(); handleLike(pub); }}
+                      >
+                        <Heart size={13} strokeWidth={1.6} fill={isLiked ? "currentColor" : "none"} />
+                        <span>{likeCount}</span>
+                      </button>
+                      <button
+                        className="engage-btn engage-comment"
+                        onClick={e => { e.stopPropagation(); onRead(pub, { focus: "comments" }); }}
+                      >
+                        <MessageCircle size={13} strokeWidth={1.6} />
+                        <span>{commentCount}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -1346,46 +1348,38 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
               {drafts.length === 0 && (
                 <p className="feed-empty">No drafts yet. <button className="feed-empty-link" onClick={onNewDoc}>Start writing →</button></p>
               )}
-              {drafts.map(d => {
+              {drafts.map((d, idx) => {
                 const title = stripHtml(d.title || "") || docTitle(d.content);
                 const preview = pubPreview(d.content);
                 const wc = wordCount(d.content);
                 const sc = d.humanScore != null && d.scoreTier ? { score: d.humanScore, tier: d.scoreTier, confidence: d.scoreFeatures?.confidence ?? 0.5, paste_ratio: d.scoreFeatures?.paste_ratio || 0, contributors: [] } : null;
                 const confirming = confirmDeleteId === d.id;
                 return (
-                  <article key={d.id} className="pub-card draft-card" onClick={() => !confirming && onEditDoc(d.id)}>
-                    <div className="pub-card-meta">
-                      <span className="draft-badge">Draft</span>
-                      <span className="pub-dot">·</span>
-                      <span className="pub-date">{formatDate(new Date(d.updatedAt).toISOString())}</span>
-                      <span className="pub-dot">·</span>
-                      <span className="pub-read-time">{wc} words</span>
-                      <div className="pub-card-actions">
-                        <button
-                          className="pub-mini-btn"
-                          title="Publish to feed"
-                          onClick={e => { e.stopPropagation(); onPublishDoc(d); }}
-                        >Publish</button>
+                  <article key={d.id} className="book-card book-card-draft" style={{ "--card-index": idx }} onClick={() => !confirming && onEditDoc(d.id)}>
+                    <div className="book-spine-strip" />
+                    <div className="book-card-body">
+                      <div className="book-card-top">
+                        <div className="book-card-main">
+                          <h2 className="book-title">{title}</h2>
+                          <div className="book-author">{formatDate(new Date(d.updatedAt).toISOString())} · {wc} words</div>
+                        </div>
+                        <span className="book-card-label">Draft</span>
+                      </div>
+                      {preview && <p className="book-excerpt">{preview}</p>}
+                      {sc && <HumanSignalBadge score={sc} />}
+                      <div className="book-card-actions-row" onClick={e => e.stopPropagation()}>
+                        <button className="pub-mini-btn" onClick={e => { e.stopPropagation(); onPublishDoc(d); }}>Publish</button>
                         {!confirming ? (
-                          <button
-                            className="pub-mini-btn pub-mini-danger"
-                            onClick={e => { e.stopPropagation(); setConfirmDeleteId(d.id); }}
-                          >Delete</button>
+                          <button className="pub-mini-btn pub-mini-danger" onClick={e => { e.stopPropagation(); setConfirmDeleteId(d.id); }}>Delete</button>
                         ) : (
                           <span className="pub-confirm" onClick={e => e.stopPropagation()}>
                             <span className="pub-confirm-text">Delete this draft?</span>
                             <button className="pub-mini-btn" onClick={() => setConfirmDeleteId(null)}>Cancel</button>
-                            <button
-                              className="pub-mini-btn pub-mini-danger"
-                              onClick={() => { onDeleteDoc(d.id); setConfirmDeleteId(null); }}
-                            >Yes, delete</button>
+                            <button className="pub-mini-btn pub-mini-danger" onClick={() => { onDeleteDoc(d.id); setConfirmDeleteId(null); }}>Yes, delete</button>
                           </span>
                         )}
                       </div>
                     </div>
-                    <h2 className="pub-card-title">{title}</h2>
-                    {preview && <p className="pub-card-preview">{preview}</p>}
-                    {sc && <HumanSignalBadge score={sc} />}
                   </article>
                 );
               })}
@@ -1405,45 +1399,36 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
         {!loading && pubs.length === 0 && (
           <p className="feed-empty">Nothing published yet.</p>
         )}
-        {pubs.map(pub => {
+        {pubs.map((pub, idx) => {
           const confirming = confirmUnpublishId === pub.id;
+          const sc = scoreFromRecord(pub);
+          const preview = pubPreview(pub.content);
           return (
-            <article key={pub.id} className="pub-card published-card" onClick={() => !confirming && onEditDoc(pub.doc_id)}>
-              <div className="pub-card-meta">
-                <span className="pub-badge-published">Published</span>
-                <span className="pub-dot">·</span>
-                <span className="pub-date">{formatDate(pub.published_at)}</span>
-                <span className="pub-dot">·</span>
-                <span className="pub-read-time">{readingTime(pub.content)}</span>
-                <div className="pub-card-actions">
+            <article key={pub.id} className="book-card book-card-published" style={{ "--card-index": idx }} onClick={() => !confirming && onEditDoc(pub.doc_id)}>
+              <div className="book-spine-strip" />
+              <div className="book-card-body">
+                <div className="book-card-top">
+                  <div className="book-card-main">
+                    <h2 className="book-title">{pub.title}</h2>
+                    <div className="book-author">{formatDate(pub.published_at)} · {readingTime(pub.content)}</div>
+                  </div>
+                  <span className="book-card-label">Published</span>
+                </div>
+                {preview && <p className="book-excerpt">{preview}</p>}
+                {sc && <HumanSignalBadge score={sc} />}
+                <div className="book-card-actions-row" onClick={e => e.stopPropagation()}>
                   <button className="pub-mini-btn" onClick={e => { e.stopPropagation(); onRead(pub); }}>Read</button>
                   {!confirming ? (
-                    <button
-                      className="pub-mini-btn pub-mini-danger"
-                      onClick={e => { e.stopPropagation(); setConfirmUnpublishId(pub.id); }}
-                    >Remove from feed</button>
+                    <button className="pub-mini-btn pub-mini-danger" onClick={e => { e.stopPropagation(); setConfirmUnpublishId(pub.id); }}>Remove from feed</button>
                   ) : (
                     <span className="pub-confirm" onClick={e => e.stopPropagation()}>
                       <span className="pub-confirm-text">Remove from public feed?</span>
                       <button className="pub-mini-btn" onClick={() => setConfirmUnpublishId(null)}>Cancel</button>
-                      <button
-                        className="pub-mini-btn pub-mini-danger"
-                        onClick={async (e) => { await handleUnpublish(pub, e); setConfirmUnpublishId(null); }}
-                      >Yes, remove</button>
+                      <button className="pub-mini-btn pub-mini-danger" onClick={async (e) => { await handleUnpublish(pub, e); setConfirmUnpublishId(null); }}>Yes, remove</button>
                     </span>
                   )}
                 </div>
               </div>
-              <h2 className="pub-card-title">{pub.title}</h2>
-              {pubPreview(pub.content) && (
-                <p className="pub-card-preview">{pubPreview(pub.content)}</p>
-              )}
-              {(() => {
-                const sc = scoreFromRecord(pub);
-                return sc
-                  ? <HumanSignalBadge score={sc} />
-                  : <span className="pub-card-words">{wordCount(pub.content)} words</span>;
-              })()}
             </article>
           );
         })}
