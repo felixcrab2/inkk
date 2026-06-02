@@ -797,68 +797,117 @@ body.focus-mode #text-container {
   margin: 0;
 }
 
-/* ─── Book spine cards ─────────────────────────────────────────────────────── */
+/* ─── Book shelf ─────────────────────────────────────────────────────────── */
 @keyframes cardIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-/* The spine: a thin horizontal bar, expands on hover to reveal preview */
+/*
+ * Each card is a book lying flat, face-up.
+ * Left edge = spine/binding (dark gradient strip).
+ * Right edge = fore-edge / page stack (::after repeating lines).
+ * Bottom shadow = physical weight/depth on the shelf.
+ */
 .book-spine {
+  position: relative;
   width: 100%;
   height: 52px;
   overflow: hidden;
-  background: #faf9f6;
-  border-top: 1px solid rgba(0, 0, 0, 0.09);
+  background: #f8f5f0;
   cursor: pointer;
   transition: height 0.26s cubic-bezier(0.4, 0, 0.2, 1), background 0.15s;
-  animation: cardIn 0.35s ease both;
+  animation: cardIn 0.32s ease both;
   animation-delay: calc(var(--card-index, 0) * 0.04s);
   display: flex;
   flex-direction: column;
+  /* Thin border on top/right/bottom — no left (binding handles it) */
+  border-top: 1px solid rgba(0, 0, 0, 0.10);
+  border-right: 1px solid rgba(0, 0, 0, 0.10);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.10);
+  /* Shadow: book sitting on surface — slight depth below */
+  box-shadow: 0 3px 7px rgba(0, 0, 0, 0.10), 0 1px 2px rgba(0, 0, 0, 0.06);
+  margin-bottom: 6px;
 }
-.book-spine:last-of-type { border-bottom: 1px solid rgba(0, 0, 0, 0.09); }
+
+/* Page fore-edge: repeating horizontal lines simulate stacked paper sheets */
+.book-spine::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 11px;
+  background: repeating-linear-gradient(
+    to bottom,
+    #ede8de 0px,
+    #ede8de 1px,
+    #c8c0af 1px,
+    #c8c0af 2px
+  );
+  pointer-events: none;
+  z-index: 2;
+}
+
+.book-spine:last-of-type { margin-bottom: 0; }
+
 .book-spine:hover {
-  height: 168px;
-  background: #f6f4ef;
+  height: 180px;
+  background: #f3ede4;
 }
 
-/* Draft variant — slightly looser, like an unbound manuscript */
+/* Draft: dashed border = unbound manuscript feel */
 .book-spine.spine-draft {
-  background: #faf8f2;
+  background: #faf7ed;
   border-top-style: dashed;
+  border-right-style: dashed;
+  border-bottom-style: dashed;
 }
-.book-spine.spine-draft:last-of-type { border-bottom-style: dashed; }
-.book-spine.spine-draft:hover { background: #f5f2e8; }
+.book-spine.spine-draft::after {
+  background: repeating-linear-gradient(
+    to bottom,
+    #f0ebe0 0px,
+    #f0ebe0 1px,
+    #cdc4ae 1px,
+    #cdc4ae 2px
+  );
+}
+.book-spine.spine-draft:hover { background: #f0e8d8; }
 
-/* The always-visible thin row: title left, author right */
+/* The always-visible row: binding | title ··· author */
 .book-spine-row {
   height: 52px;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 0 4px 0 0;
+  gap: 14px;
+  padding: 0 18px 0 0; /* right pad clears the page-edge strip */
   flex-shrink: 0;
 }
 
-/* Tiny left edge — the physical thickness of the book cover */
+/* Left binding strip — the spine of the book */
 .book-spine-edge {
-  width: 3px;
+  width: 8px;
   align-self: stretch;
-  background: rgba(0, 0, 0, 0.055);
+  background: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.20) 0%,
+    rgba(0, 0, 0, 0.08) 55%,
+    rgba(0, 0, 0, 0.01) 100%
+  );
   flex-shrink: 0;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .book-spine-title {
   font-family: "Cormorant Garamond", serif;
-  font-size: 1.06rem;
+  font-size: 1.05rem;
   font-weight: 500;
   color: var(--text);
   flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  letter-spacing: 0.005em;
+  letter-spacing: 0.01em;
   transition: color 0.15s;
 }
 .book-spine:hover .book-spine-title { color: #1a1a1a; }
@@ -874,21 +923,21 @@ body.focus-mode #text-container {
 
 .book-spine-badge {
   font-family: "Cormorant Garamond", serif;
-  font-size: 0.60rem;
-  letter-spacing: 0.12em;
+  font-size: 0.58rem;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--subtle);
   flex-shrink: 0;
 }
 
-/* The preview that slides into view on hover */
+/* Preview slides open on hover */
 .book-spine-preview {
-  padding: 8px 4px 14px;
+  padding: 9px 18px 14px 4px; /* right pad clears page-edge strip */
   display: flex;
   flex-direction: column;
   gap: 8px;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
-  margin: 0 0 0 3px;
+  border-top: 1px solid rgba(0, 0, 0, 0.07);
+  margin-left: 9px; /* align past the binding strip */
 }
 
 .book-spine-hook {
