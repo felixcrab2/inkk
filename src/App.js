@@ -1285,7 +1285,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
     <div id="profile-container">
       <div id="profile-header">
         <div id="profile-avatar-wrap">
-          <DropCapAvatar letter={avatarLetter} avatarData={profile?.avatar_data} dropCapImages={dropCapImages} size={44} />
+          <DropCapAvatar letter={avatarLetter} avatarData={profile?.avatar_data} dropCapImages={dropCapImages} size={60} />
           <button id="avatar-upload-btn" onClick={() => fileInputRef.current?.click()} title="Change photo">
             {uploading ? "…" : "✎"}
           </button>

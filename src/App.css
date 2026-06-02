@@ -8,6 +8,11 @@
   --muted:       #888;
   --subtle:      #c8c5c0;
   --border:      rgba(0, 0, 0, 0.07);
+  --spine-a:     hsl(30, 28%, 64%);
+  --spine-b:     hsl(148, 14%, 60%);
+  --spine-c:     hsl(350, 18%, 66%);
+  --spine-d:     hsl(218, 16%, 64%);
+  --spine-e:     hsl(55, 18%, 62%);
   --top-bar:     52px;
   --bottom-nav:  58px;
 }
@@ -719,15 +724,29 @@ body.focus-mode #text-container {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 16px 0;
-  border-bottom: 1px solid var(--border);
+  padding: 16px 0 16px 20px;
+  border-left: 3px solid var(--_spine, var(--subtle));
+  border-bottom: none;
+  position: relative;
   cursor: pointer;
   animation: cardIn 0.4s ease both;
   animation-delay: calc(var(--card-index, 0) * 0.04s);
-  transition: opacity 0.15s;
+  transition: transform 0.18s ease;
 }
-.writer-card:hover { opacity: 0.7; }
-.writer-card:first-of-type { border-top: 1px solid var(--border); }
+.writer-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 1px;
+  background: var(--border);
+}
+.writer-card:nth-child(5n+1) { --_spine: var(--spine-a); }
+.writer-card:nth-child(5n+2) { --_spine: var(--spine-b); }
+.writer-card:nth-child(5n+3) { --_spine: var(--spine-c); }
+.writer-card:nth-child(5n+4) { --_spine: var(--spine-d); }
+.writer-card:nth-child(5n+0) { --_spine: var(--spine-e); }
+.writer-card:hover { transform: translateX(6px); }
+.writer-card:first-of-type { border-top: none; }
 .writer-card-info { flex: 1; min-width: 0; }
 .writer-card-name {
   display: block;
@@ -766,6 +785,7 @@ body.focus-mode #text-container {
   width: 100%;
   max-width: 560px;
   padding: 0 24px;
+  overflow-x: hidden;
 }
 
 .feed-empty {
@@ -779,20 +799,36 @@ body.focus-mode #text-container {
 
 /* ─── Publication cards ───────────────────────────────────────────────────── */
 @keyframes cardIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 
 .pub-card {
-  padding: 28px 0;
-  border-bottom: 1px solid var(--border);
+  padding: 24px 0 24px 20px;
+  border-left: 3px solid var(--_spine, var(--subtle));
+  border-bottom: none;
+  position: relative;
   cursor: pointer;
   animation: cardIn 0.4s ease both;
   animation-delay: calc(var(--card-index, 0) * 0.05s);
+  transition: transform 0.18s ease;
 }
-.pub-card:first-of-type { border-top: 1px solid var(--border); }
-.pub-card:hover .pub-card-title { color: #666; }
-.pub-card:hover .pub-card-opening { color: #bbb; }
+.pub-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 1px;
+  background: var(--border);
+}
+.pub-card:nth-child(5n+1) { --_spine: var(--spine-a); }
+.pub-card:nth-child(5n+2) { --_spine: var(--spine-b); }
+.pub-card:nth-child(5n+3) { --_spine: var(--spine-c); }
+.pub-card:nth-child(5n+4) { --_spine: var(--spine-d); }
+.pub-card:nth-child(5n+0) { --_spine: var(--spine-e); }
+.pub-card:first-of-type { border-top: none; }
+.pub-card:hover { transform: translateX(6px); }
+.pub-card:hover .pub-card-title { color: #555; }
+.pub-card:hover .pub-card-opening { color: #c0bdb8; }
 
 .pub-card-meta {
   display: flex;
@@ -1233,11 +1269,16 @@ body.focus-mode #text-container {
 
 #profile-header {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 14px;
+  text-align: center;
+  gap: 10px;
   width: 100%;
   max-width: 520px;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
+  padding: 24px 0 20px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 #profile-avatar-wrap {
@@ -1362,6 +1403,8 @@ body.focus-mode #text-container {
   max-width: 520px;
   display: flex; align-items: baseline; justify-content: space-between;
   margin-bottom: 2px;
+  padding-left: 10px;
+  border-left: 3px solid var(--subtle);
 }
 .section-action {
   background: none; border: none; padding: 4px 8px;
@@ -1385,6 +1428,7 @@ body.focus-mode #text-container {
 #profile-list {
   width: 100%;
   max-width: 520px;
+  overflow-x: hidden;
 }
 
 /* ─── Card actions row (drafts + published) ───────────────────────────── */
@@ -1706,11 +1750,16 @@ body.focus-mode #text-container {
   margin: 0;
 }
 
+#profile-info {
+  text-align: center;
+}
 #profile-username {
   font-family: "Cormorant Garamond", serif;
-  font-size: 1.1rem;
+  font-size: 1.5rem;
+  font-weight: 500;
   color: var(--text);
-  letter-spacing: 0.01em;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
 }
 
 /* ─── Search view ─────────────────────────────────────────────────────────── */
