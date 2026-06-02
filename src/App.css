@@ -799,8 +799,8 @@ body.focus-mode #text-container {
 
 /* ─── Book shelf ─────────────────────────────────────────────────────────── */
 @keyframes cardIn {
-  from { transform: translateY(4px); }
-  to   { transform: translateY(0); }
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /*
@@ -816,7 +816,7 @@ body.focus-mode #text-container {
   background: #fffef9;
   cursor: pointer;
   transition: height 0.26s cubic-bezier(0.4, 0, 0.2, 1);
-  animation: cardIn 0.28s ease forwards;
+  animation: cardIn 0.30s ease both;
   animation-delay: calc(var(--card-index, 0) * 0.04s);
   display: flex;
   flex-direction: column;
@@ -1563,10 +1563,9 @@ body.focus-mode #text-container {
   font-style: italic;
 }
 
-#profile-list {
+.profile-list {
   width: 100%;
   max-width: 520px;
-  overflow-x: hidden;
 }
 
 /* ─── Card actions row (drafts + published) ───────────────────────────── */

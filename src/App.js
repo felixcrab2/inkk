@@ -1340,7 +1340,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
             </div>
             <p className="profile-section-sub">Saved on your device and synced to your account. Only you can see them.</p>
 
-            <div id="profile-list">
+            <div className="profile-list">
               {drafts.length === 0 && (
                 <p className="feed-empty">No drafts yet. <button className="feed-empty-link" onClick={onNewDoc}>Start writing →</button></p>
               )}
@@ -1391,7 +1391,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
       </div>
       <p className="profile-section-sub">Visible to anyone on the feed.</p>
 
-      <div id="profile-list">
+      <div className="profile-list">
         {loading && <p className="feed-empty">loading…</p>}
         {!loading && pubs.length === 0 && (
           <p className="feed-empty">Nothing published yet.</p>
