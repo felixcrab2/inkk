@@ -943,12 +943,11 @@ button.book-spine-author-btn {
 
 /* Preview slides open on hover */
 .book-spine-preview {
-  padding: 9px 18px 14px 4px; /* right pad clears page-edge strip */
+  padding: 14px 14px 12px 22px; /* left = binding(9px) + gap(13px); right clears page-edge */
   display: flex;
   flex-direction: column;
   gap: 8px;
-  border-top: 1px solid rgba(28, 26, 22, 0.14);
-  margin-left: 8px;
+  border-top: 1px solid rgba(28, 26, 22, 0.12);
 }
 
 .book-spine-hook {
@@ -985,7 +984,7 @@ button.book-spine-author-btn {
   flex-wrap: wrap;
 }
 
-/* ─── Legacy pub-card ─────────────────────────────────────────────────────── */
+/* pub-card kept for reading-view inline use only — not used in list views */
 .pub-card {
   padding: 24px 0;
   border-bottom: 1px solid var(--border);
@@ -2037,43 +2036,40 @@ button.book-spine-author-btn {
 .search-prompt { padding-top: 36px; }
 
 /* ─── User cards (search results) ────────────────────────────────────────── */
+/* user-card now uses writer-card styles — kept as alias for legacy refs */
 .user-card {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--border);
+  gap: 13px;
+  padding: 9px 14px;
+  border: 1.5px solid #1c1a16;
+  box-shadow: 2px 2px 0 #ddd6c8, 3px 3px 0 #1c1a16;
+  margin-bottom: 7px;
   cursor: pointer;
-  transition: opacity 0.15s;
+  background: #fffef9;
+  animation: cardIn 0.30s ease both;
+  animation-delay: calc(var(--card-index, 0) * 0.04s);
+  transition: background 0.15s;
 }
-.user-card:first-of-type { border-top: 1px solid var(--border); }
-.user-card:hover { opacity: 0.6; }
-
-.user-card-avatar {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background: var(--text);
-  color: var(--bg);
-  font-family: "Cormorant Garamond", serif;
-  font-size: 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
+.user-card:hover { background: #fdfcf4; }
+.user-card-info { flex: 1; min-width: 0; }
 .user-card-username {
+  display: block;
   font-family: "Cormorant Garamond", serif;
-  font-size: 0.97rem;
-  color: var(--text);
+  font-size: 0.98rem;
+  font-weight: 500;
+  font-style: italic;
+  color: #1c1a16;
+  letter-spacing: 0.04em;
 }
-
 .user-card-name {
+  display: block;
   font-family: "Cormorant Garamond", serif;
-  font-size: 0.82rem;
-  color: var(--muted);
-  margin-top: 1px;
+  font-size: 0.7rem;
+  color: #3a3530;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  margin-top: 2px;
 }
 
 /* ─── User profile view ───────────────────────────────────────────────────── */
@@ -2087,45 +2083,82 @@ button.book-spine-author-btn {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 32px 24px 48px;
+  padding: 28px 24px 48px;
   animation: viewIn 0.2s ease forwards;
 }
 
 #user-profile-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 14px;
   width: 100%;
   max-width: 520px;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(0,0,0,0.10);
 }
 
-.user-profile-avatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: var(--text);
-  color: var(--bg);
-  font-family: "Cormorant Garamond", serif;
-  font-size: 1.2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+#user-profile-info {
+  flex: 1;
+  min-width: 0;
 }
 
 #user-profile-username {
   font-family: "Cormorant Garamond", serif;
-  font-size: 1.1rem;
-  color: var(--text);
+  font-size: 1.3rem;
+  font-weight: 500;
+  color: #1c1a16;
+  letter-spacing: -0.01em;
 }
 
 #user-profile-name {
   font-family: "Cormorant Garamond", serif;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   color: var(--muted);
   margin-top: 2px;
 }
+
+#user-profile-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.user-profile-stat {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--muted);
+}
+.user-profile-stat-sep {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.85rem;
+  color: var(--subtle);
+  opacity: 0.4;
+}
+
+.follow-btn {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.75rem;
+  font-style: italic;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-bottom: 1px solid rgba(28, 26, 22, 0.3);
+  padding: 2px 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1.4;
+}
+.follow-btn:hover { color: #1c1a16; border-color: #1c1a16; }
+.follow-btn.following {
+  color: #1c1a16;
+  border-bottom-color: #1c1a16;
+}
+.follow-btn.following:hover { color: var(--muted); border-bottom-color: rgba(28, 26, 22, 0.3); }
+.follow-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 #user-profile-list {
   width: 100%;
@@ -2272,8 +2305,6 @@ button.book-spine-author-btn {
   transition: color 0.15s, background 0.15s;
 }
 .engage-btn:hover { color: var(--text); background: rgba(0,0,0,0.03); }
-.engage-like.liked { color: #a8424a; }
-.engage-like.liked:hover { color: #872f37; }
 
 /* ─── Reading footer (likes + comments) ─────────────────────────────────── */
 #reading-footer {
