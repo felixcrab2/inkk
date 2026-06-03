@@ -1490,7 +1490,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
                 const sc = d.humanScore != null && d.scoreTier ? { score: d.humanScore, tier: d.scoreTier, confidence: d.scoreFeatures?.confidence ?? 0.5, paste_ratio: d.scoreFeatures?.paste_ratio || 0, contributors: [] } : null;
                 const confirming = confirmDeleteId === d.id;
                 return (
-                  <article key={d.id} className="book-spine spine-draft profile-card" style={{ "--card-index": idx }} onClick={() => !confirming && onEditDoc(d.id)}>
+                  <article key={d.id} className="book-spine spine-draft" style={{ "--card-index": idx, height: confirming ? "auto" : undefined }} onClick={() => !confirming && onEditDoc(d.id)}>
                     <div className="book-spine-row">
                       <div className="book-spine-edge" />
                       <span className="book-spine-title">{title}</span>
@@ -1541,7 +1541,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
           const sc = scoreFromRecord(pub);
           const preview = pubPreview(pub.content);
           return (
-            <article key={pub.id} className="book-spine profile-card" style={{ "--card-index": idx }} onClick={() => !confirmingUnpublish && !confirmingDelete && onEditDoc(pub.doc_id)}>
+            <article key={pub.id} className="book-spine" style={{ "--card-index": idx, height: (confirmingUnpublish || confirmingDelete) ? "auto" : undefined }} onClick={() => !confirmingUnpublish && !confirmingDelete && onEditDoc(pub.doc_id)}>
               <div className="book-spine-row">
                 <div className="book-spine-edge" />
                 <span className="book-spine-title">{pub.title}</span>

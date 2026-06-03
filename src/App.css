@@ -857,14 +857,6 @@ body.focus-mode #text-container {
 
 .book-spine:hover { height: 162px; background: #fdfcf4; }
 
-/* Profile-owned cards: always show preview — no need to hover on your own work */
-.book-spine.profile-card {
-  height: auto;
-}
-.book-spine.profile-card:hover {
-  height: auto;
-  background: #fdfcf4;
-}
 
 /* Draft: dashed outline = rough/unbound manuscript */
 .book-spine.spine-draft {
@@ -2248,13 +2240,13 @@ button.book-spine-author-btn {
 
 #reading-headline {
   font-family: "Cormorant Garamond", serif;
-  font-size: 2.4rem;
+  font-size: 1.35rem;
   font-weight: 600;
   font-style: italic;
   color: var(--text);
-  line-height: 1.2;
-  margin: 0 0 52px;
-  letter-spacing: -0.01em;
+  line-height: 1.35;
+  margin: 0 0 64px;
+  letter-spacing: 0.01em;
   text-align: center;
 }
 
