@@ -811,11 +811,11 @@ body.focus-mode #text-container {
 .book-spine {
   position: relative;
   width: 100%;
-  height: 38px;
+  height: 44px;
   overflow: hidden;
   background: #fffef9;
   cursor: pointer;
-  transition: height 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: height 0.26s cubic-bezier(0.4, 0, 0.2, 1), background 0.15s;
   animation: cardIn 0.30s ease both;
   animation-delay: calc(var(--card-index, 0) * 0.04s);
   display: flex;
@@ -823,7 +823,7 @@ body.focus-mode #text-container {
   border: 1.5px solid #1c1a16;
   /* Flat offset shadow — drawn/stamped, not digital */
   box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.14);
-  margin-bottom: 5px;
+  margin-bottom: 6px;
 }
 
 /* Page fore-edge: sparse horizontal lines = pen-hatched page stack */
@@ -833,22 +833,22 @@ body.focus-mode #text-container {
   right: 0;
   top: 0;
   bottom: 0;
-  width: 9px;
+  width: 11px;
   background: repeating-linear-gradient(
     to bottom,
     transparent 0px,
-    transparent 6px,
-    rgba(28, 26, 22, 0.30) 6px,
-    rgba(28, 26, 22, 0.30) 7px
+    transparent 5px,
+    rgba(28, 26, 22, 0.28) 5px,
+    rgba(28, 26, 22, 0.28) 6px
   );
-  border-left: 1px solid rgba(28, 26, 22, 0.40);
+  border-left: 1.5px solid rgba(28, 26, 22, 0.45);
   pointer-events: none;
   z-index: 2;
 }
 
 .book-spine:last-of-type { margin-bottom: 0; }
 
-.book-spine:hover { height: 162px; }
+.book-spine:hover { height: 172px; background: #fdfcf4; }
 
 /* Draft: dashed outline = rough/unbound manuscript */
 .book-spine.spine-draft {
@@ -856,32 +856,33 @@ body.focus-mode #text-container {
   box-shadow: none;
 }
 .book-spine.spine-draft::after {
-  /* Slightly lighter hatching for drafts */
   background: repeating-linear-gradient(
     to bottom,
     transparent 0px,
-    transparent 6px,
-    rgba(28, 26, 22, 0.13) 6px,
-    rgba(28, 26, 22, 0.13) 7px
+    transparent 5px,
+    rgba(28, 26, 22, 0.14) 5px,
+    rgba(28, 26, 22, 0.14) 6px
   );
 }
 
 /* Row: solid binding | title ··· author */
 .book-spine-row {
-  height: 38px;
+  height: 44px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 15px 0 0; /* right pad clears page-edge strip */
+  gap: 13px;
+  padding: 0 17px 0 0; /* right pad clears page-edge strip */
   flex-shrink: 0;
 }
 
 /* Solid ink fill — this IS the spine binding */
 .book-spine-edge {
-  width: 7px;
+  width: 9px;
   align-self: stretch;
   background: #1c1a16;
   flex-shrink: 0;
+  /* Subtle inner-edge highlight: simulates the spine's rounded edge catching light */
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.10);
 }
 
 .book-spine-title {
@@ -907,6 +908,14 @@ body.focus-mode #text-container {
   letter-spacing: 0.10em;
   text-transform: uppercase;
 }
+.book-spine-author::before {
+  content: "·";
+  margin-right: 0.55em;
+  opacity: 0.45;
+  letter-spacing: 0;
+  font-style: normal;
+  text-transform: none;
+}
 
 .book-spine-badge {
   font-family: "Cormorant Garamond", serif;
@@ -919,7 +928,7 @@ body.focus-mode #text-container {
 
 /* Preview slides open on hover */
 .book-spine-preview {
-  padding: 8px 14px 12px 4px; /* right pad clears page-edge strip */
+  padding: 9px 18px 14px 4px; /* right pad clears page-edge strip */
   display: flex;
   flex-direction: column;
   gap: 8px;
