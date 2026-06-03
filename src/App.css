@@ -811,7 +811,7 @@ body.focus-mode #text-container {
 .book-spine {
   position: relative;
   width: 100%;
-  height: 44px;
+  height: 38px;
   overflow: hidden;
   background: #fffef9;
   cursor: pointer;
@@ -821,9 +821,28 @@ body.focus-mode #text-container {
   display: flex;
   flex-direction: column;
   border: 1.5px solid #1c1a16;
-  /* Flat offset shadow — drawn/stamped, not digital */
-  box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.14);
-  margin-bottom: 6px;
+  /*
+   * Layered shadow = physical page-stack depth:
+   * first layer is the warm cream of the cut page edges,
+   * second is the dark back-cover outline.
+   */
+  box-shadow:
+    2px 2px 0 #ddd6c8,
+    3px 3px 0 #1c1a16;
+  margin-bottom: 7px;
+}
+
+/* Inner decorative frame — every physical book cover has a thin ruled border inside the edge */
+.book-spine::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 12px;   /* clear 9px binding + 3px gap */
+  right: 14px;  /* clear 11px page-edge strip + 3px gap */
+  bottom: 3px;
+  border: 0.75px solid rgba(28, 26, 22, 0.20);
+  pointer-events: none;
+  z-index: 1;
 }
 
 /* Page fore-edge: sparse horizontal lines = pen-hatched page stack */
@@ -848,7 +867,7 @@ body.focus-mode #text-container {
 
 .book-spine:last-of-type { margin-bottom: 0; }
 
-.book-spine:hover { height: 172px; background: #fdfcf4; }
+.book-spine:hover { height: 162px; background: #fdfcf4; }
 
 /* Draft: dashed outline = rough/unbound manuscript */
 .book-spine.spine-draft {
@@ -867,7 +886,7 @@ body.focus-mode #text-container {
 
 /* Row: solid binding | title ··· author */
 .book-spine-row {
-  height: 44px;
+  height: 38px;
   display: flex;
   align-items: center;
   gap: 13px;
