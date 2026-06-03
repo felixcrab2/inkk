@@ -402,12 +402,6 @@ function getRelCount(rel) {
 }
 
 // ─── Likes ─────────────────────────────────────────────────────────────────
-async function fetchLikesForUser(userId) {
-  if (!supabase || !userId) return new Set();
-  const { data } = await supabase.from("likes").select("publication_id").eq("user_id", userId);
-  return new Set((data || []).map(r => r.publication_id));
-}
-
 async function togglePubLike(pubId, userId, currentlyLiked) {
   if (!supabase || !userId) return "Not signed in.";
   if (currentlyLiked) {
@@ -453,6 +447,61 @@ async function deleteCommentRow(commentId) {
   if (!supabase || !commentId) return "Not signed in.";
   const { error } = await supabase.from("comments").delete().eq("id", commentId);
   return error?.message || null;
+}
+
+// ─── Follows ──────────────────────────────────────────────────────────────────
+
+async function fetchFollowCounts(userId) {
+  if (!supabase || !userId) return { followers: 0, following: 0 };
+  try {
+    const [frs, fng] = await Promise.all([
+      supabase.from("follows").select("*", { count: "exact", head: true }).eq("following_id", userId),
+      supabase.from("follows").select("*", { count: "exact", head: true }).eq("follower_id", userId),
+    ]);
+    return { followers: frs.count || 0, following: fng.count || 0 };
+  } catch { return { followers: 0, following: 0 }; }
+}
+
+async function fetchIsFollowing(followerId, followingId) {
+  if (!supabase || !followerId || !followingId) return false;
+  try {
+    const { count } = await supabase.from("follows")
+      .select("*", { count: "exact", head: true })
+      .eq("follower_id", followerId).eq("following_id", followingId);
+    return (count || 0) > 0;
+  } catch { return false; }
+}
+
+async function toggleFollow(followerId, followingId, currentlyFollowing) {
+  if (!supabase || !followerId) return "Not signed in.";
+  try {
+    if (currentlyFollowing) {
+      const { error } = await supabase.from("follows").delete()
+        .eq("follower_id", followerId).eq("following_id", followingId);
+      return error?.message || null;
+    }
+    const { error } = await supabase.from("follows")
+      .insert({ follower_id: followerId, following_id: followingId });
+    return error?.message || null;
+  } catch (e) { return e.message || "Error"; }
+}
+
+async function fetchFollowingFeed(userId) {
+  if (!supabase || !userId) return [];
+  try {
+    const { data: follows } = await supabase.from("follows")
+      .select("following_id").eq("follower_id", userId);
+    const ids = (follows || []).map(f => f.following_id);
+    if (!ids.length) return [];
+    const { data } = await pubQuery(
+      PUB_SELECT_WITH_COUNTS, PUB_SELECT,
+      (sel) => supabase.from("publications").select(sel)
+        .in("user_id", ids)
+        .order("published_at", { ascending: false })
+        .limit(50),
+    );
+    return data || [];
+  } catch { return []; }
 }
 
 // Retry without the relation-count joins (likes/comments) if the schema
@@ -1068,11 +1117,51 @@ function DownloadModal({ onConfirm, onClose }) {
 
 // ─── Feed ─────────────────────────────────────────────────────────────────────
 
+function BookSpineCard({ pub, index, onRead, onAuthorClick, onLike }) {
+  const hook         = openingLine(pub.content);
+  const likeCount    = getRelCount(pub.like_count);
+  const commentCount = getRelCount(pub.comment_count);
+  const sc           = scoreFromRecord(pub);
+  return (
+    <article className="book-spine" style={{ "--card-index": index }} onClick={() => onRead(pub)}>
+      <div className="book-spine-row">
+        <div className="book-spine-edge" />
+        <span className="book-spine-title">{pub.title}</span>
+        {pub.author_name && (
+          <button
+            className="book-spine-author book-spine-author-btn"
+            onClick={e => { e.stopPropagation(); if (pub.user_id) onAuthorClick(pub.user_id); }}
+          >{pub.author_name}</button>
+        )}
+      </div>
+      <div className="book-spine-preview">
+        {hook && <p className="book-spine-hook">{hook}</p>}
+        <div className="book-spine-foot">
+          <span className="book-spine-meta">{formatDate(pub.published_at)} · {readingTime(pub.content)}</span>
+          <div className="book-spine-actions">
+            {sc && <HumanSignalBadge score={sc} />}
+            <button className="engage-btn engage-like" onClick={e => { e.stopPropagation(); onLike(pub); }}>
+              <Heart size={13} strokeWidth={1.6} fill="none" />
+              <span>{likeCount}</span>
+            </button>
+            <button className="engage-btn engage-comment" onClick={e => { e.stopPropagation(); onRead(pub, { focus: "comments" }); }}>
+              <MessageCircle size={13} strokeWidth={1.6} />
+              <span>{commentCount}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function Feed({ user, onRead, onHsModal, onAuthorClick, dropCapImages, onRequestAuth }) {
-  const [pubs, setPubs]       = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [likedSet, setLikedSet] = useState(new Set());
-  const [feedTab, setFeedTab] = useState("stories");
+  const [pubs, setPubs]               = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [feedTab, setFeedTab]         = useState("stories");
+  const [followingPubs, setFollowingPubs]   = useState([]);
+  const [followingLoading, setFollowingLoading] = useState(false);
+  const [followingFetched, setFollowingFetched] = useState(false);
   const inflightLikes = useRef(new Set());
 
   useEffect(() => {
@@ -1080,11 +1169,22 @@ function Feed({ user, onRead, onHsModal, onAuthorClick, dropCapImages, onRequest
   }, []);
 
   useEffect(() => {
-    if (user) fetchLikesForUser(user.id).then(setLikedSet);
-    else      setLikedSet(new Set());
+    if (feedTab === "following" && user && !followingFetched) {
+      setFollowingLoading(true);
+      fetchFollowingFeed(user.id).then(data => {
+        setFollowingPubs(data);
+        setFollowingLoading(false);
+        setFollowingFetched(true);
+      });
+    }
+  }, [feedTab, user, followingFetched]);
+
+  // Reset following cache when user changes
+  useEffect(() => {
+    setFollowingFetched(false);
+    setFollowingPubs([]);
   }, [user]);
 
-  // Derive unique writers from feed publications
   const writers = useMemo(() => {
     const seen = new Set();
     return pubs.filter(p => {
@@ -1094,47 +1194,52 @@ function Feed({ user, onRead, onHsModal, onAuthorClick, dropCapImages, onRequest
     });
   }, [pubs]);
 
-  const handleLike = useCallback(async (pub) => {
+  const makeLikeHandler = useCallback((pubList, setPubList) => async (pub) => {
     if (!user) { onRequestAuth?.(); return; }
     if (inflightLikes.current.has(pub.id)) return;
     inflightLikes.current.add(pub.id);
-    const wasLiked = likedSet.has(pub.id);
-    // Optimistic
-    setLikedSet(prev => {
-      const s = new Set(prev);
-      if (wasLiked) s.delete(pub.id); else s.add(pub.id);
-      return s;
-    });
-    setPubs(prev => prev.map(p => p.id !== pub.id ? p : {
+    setPubList(prev => prev.map(p => p.id !== pub.id ? p : {
       ...p,
-      like_count: [{ count: Math.max(0, getRelCount(p.like_count) + (wasLiked ? -1 : 1)) }],
+      like_count: [{ count: Math.max(0, getRelCount(p.like_count) + 1) }],
     }));
-    const err = await togglePubLike(pub.id, user.id, wasLiked);
+    const err = await togglePubLike(pub.id, user.id, false);
     inflightLikes.current.delete(pub.id);
     if (err) {
-      // Revert
-      setLikedSet(prev => {
-        const s = new Set(prev);
-        if (wasLiked) s.add(pub.id); else s.delete(pub.id);
-        return s;
-      });
-      setPubs(prev => prev.map(p => p.id !== pub.id ? p : {
+      setPubList(prev => prev.map(p => p.id !== pub.id ? p : {
         ...p,
-        like_count: [{ count: Math.max(0, getRelCount(p.like_count) + (wasLiked ? 1 : -1)) }],
+        like_count: [{ count: Math.max(0, getRelCount(p.like_count) - 1) }],
       }));
     }
-  }, [user, likedSet, onRequestAuth]);
+  }, [user, onRequestAuth]);
+
+  const handleLike          = useMemo(() => makeLikeHandler(pubs, setPubs), [makeLikeHandler, pubs]);
+  const handleFollowingLike = useMemo(() => makeLikeHandler(followingPubs, setFollowingPubs), [makeLikeHandler, followingPubs]);
 
   return (
     <div id="feed-container">
       <div id="feed-header">
         <h1 id="feed-title">Explore human writing.</h1>
         <div id="feed-tabs">
+          {user && (
+            <button className={`feed-tab${feedTab === "following" ? " active" : ""}`} onClick={() => setFeedTab("following")}>Following</button>
+          )}
           <button className={`feed-tab${feedTab === "stories" ? " active" : ""}`} onClick={() => setFeedTab("stories")}>Stories</button>
           <button className={`feed-tab${feedTab === "writers" ? " active" : ""}`} onClick={() => setFeedTab("writers")}>Writers{writers.length > 0 && <span className="feed-tab-count">{writers.length}</span>}</button>
         </div>
         <button id="hs-link" onClick={onHsModal}>What is Human Signal?</button>
       </div>
+
+      {feedTab === "following" && (
+        <div id="feed-list">
+          {followingLoading && <p className="feed-empty">loading…</p>}
+          {!followingLoading && followingFetched && followingPubs.length === 0 && (
+            <p className="feed-empty">No posts yet. Follow writers to see their work here.</p>
+          )}
+          {followingPubs.map((pub, i) => (
+            <BookSpineCard key={pub.id} pub={pub} index={i} onRead={onRead} onAuthorClick={onAuthorClick} onLike={handleFollowingLike} />
+          ))}
+        </div>
+      )}
 
       {feedTab === "writers" && (
         <div id="feed-list">
@@ -1162,48 +1267,9 @@ function Feed({ user, onRead, onHsModal, onAuthorClick, dropCapImages, onRequest
           {!loading && pubs.length === 0 && (
             <p className="feed-empty">nothing published yet — be the first.</p>
           )}
-          {pubs.map((pub, i) => {
-            const hook         = openingLine(pub.content);
-            const likeCount    = getRelCount(pub.like_count);
-            const commentCount = getRelCount(pub.comment_count);
-            const isLiked      = likedSet.has(pub.id);
-            const sc           = scoreFromRecord(pub);
-            return (
-              <article key={pub.id} className="book-spine" style={{ "--card-index": i }} onClick={() => onRead(pub)}>
-                <div className="book-spine-row">
-                  <div className="book-spine-edge" />
-                  <span className="book-spine-title">{pub.title}</span>
-                  <button
-                    className="book-spine-author book-spine-author-btn"
-                    onClick={e => { e.stopPropagation(); if (pub.user_id) onAuthorClick(pub.user_id); }}
-                  >{pub.author_name}</button>
-                </div>
-                <div className="book-spine-preview">
-                  {hook && <p className="book-spine-hook">{hook}</p>}
-                  <div className="book-spine-foot">
-                    <span className="book-spine-meta">{formatDate(pub.published_at)} · {readingTime(pub.content)}</span>
-                    <div className="book-spine-actions">
-                      {sc && <HumanSignalBadge score={sc} />}
-                      <button
-                        className={`engage-btn engage-like${isLiked ? " liked" : ""}`}
-                        onClick={e => { e.stopPropagation(); handleLike(pub); }}
-                      >
-                        <Heart size={13} strokeWidth={1.6} fill={isLiked ? "currentColor" : "none"} />
-                        <span>{likeCount}</span>
-                      </button>
-                      <button
-                        className="engage-btn engage-comment"
-                        onClick={e => { e.stopPropagation(); onRead(pub, { focus: "comments" }); }}
-                      >
-                        <MessageCircle size={13} strokeWidth={1.6} />
-                        <span>{commentCount}</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
+          {pubs.map((pub, i) => (
+            <BookSpineCard key={pub.id} pub={pub} index={i} onRead={onRead} onAuthorClick={onAuthorClick} onLike={handleLike} />
+          ))}
         </div>
       )}
     </div>
@@ -1605,13 +1671,14 @@ function SearchView({ onViewUser, dropCapImages }) {
         {loading && <p className="feed-empty">searching…</p>}
         {!loading && searched && results.length === 0 && <p className="feed-empty">no writers found.</p>}
         {!loading && !searched && <p className="feed-empty search-prompt">Search for a writer by username.</p>}
-        {results.map(p => (
-          <div key={p.id} className="user-card" onClick={() => onViewUser(p)}>
-            <DropCapAvatar letter={p.username?.[0]} avatarData={p.avatar_data} dropCapImages={dropCapImages} size={38} />
-            <div className="user-card-info">
-              <div className="user-card-username">@{p.username}</div>
-              {p.display_name && <div className="user-card-name">{p.display_name}</div>}
+        {results.map((p, i) => (
+          <div key={p.id} className="writer-card" style={{ "--card-index": i }} onClick={() => onViewUser(p)}>
+            <DropCapAvatar letter={p.username?.[0]} avatarData={p.avatar_data} dropCapImages={dropCapImages} size={36} />
+            <div className="writer-card-info">
+              <span className="writer-card-name">{p.display_name || `@${p.username}`}</span>
+              <span className="writer-card-meta">@{p.username}</span>
             </div>
+            <span className="writer-card-arrow">→</span>
           </div>
         ))}
       </div>
@@ -1621,40 +1688,82 @@ function SearchView({ onViewUser, dropCapImages }) {
 
 // ─── UserProfileView ──────────────────────────────────────────────────────────
 
-function UserProfileView({ profile, onRead, dropCapImages }) {
-  const [pubs, setPubs]       = useState([]);
-  const [loading, setLoading] = useState(true);
+function UserProfileView({ profile, onRead, dropCapImages, user, onRequestAuth }) {
+  const [pubs, setPubs]                 = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [following, setFollowing]       = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followBusy, setFollowBusy]     = useState(false);
+  const inflightLikes                   = useRef(new Set());
+
+  const isOwnProfile = user?.id === profile.id;
 
   useEffect(() => {
     fetchUserPublications(profile.id).then(data => { setPubs(data); setLoading(false); });
+    fetchFollowCounts(profile.id).then(({ followers }) => setFollowerCount(followers));
   }, [profile.id]);
+
+  useEffect(() => {
+    if (user && !isOwnProfile) fetchIsFollowing(user.id, profile.id).then(setFollowing);
+    else setFollowing(false);
+  }, [user, profile.id, isOwnProfile]);
+
+  const handleFollow = async () => {
+    if (!user) { onRequestAuth?.(); return; }
+    setFollowBusy(true);
+    const wasFollowing = following;
+    setFollowing(!wasFollowing);
+    setFollowerCount(c => Math.max(0, c + (wasFollowing ? -1 : 1)));
+    await toggleFollow(user.id, profile.id, wasFollowing);
+    setFollowBusy(false);
+  };
+
+  const handleLike = useCallback(async (pub) => {
+    if (!user) { onRequestAuth?.(); return; }
+    if (inflightLikes.current.has(pub.id)) return;
+    inflightLikes.current.add(pub.id);
+    setPubs(prev => prev.map(p => p.id !== pub.id ? p : {
+      ...p,
+      like_count: [{ count: Math.max(0, getRelCount(p.like_count) + 1) }],
+    }));
+    const err = await togglePubLike(pub.id, user.id, false);
+    inflightLikes.current.delete(pub.id);
+    if (err) {
+      setPubs(prev => prev.map(p => p.id !== pub.id ? p : {
+        ...p,
+        like_count: [{ count: Math.max(0, getRelCount(p.like_count) - 1) }],
+      }));
+    }
+  }, [user, onRequestAuth]);
 
   return (
     <div id="user-profile-container">
       <div id="user-profile-header">
-        <DropCapAvatar letter={profile.username?.[0]} avatarData={profile.avatar_data} dropCapImages={dropCapImages} size={44} />
-        <div>
+        <DropCapAvatar letter={profile.username?.[0]} avatarData={profile.avatar_data} dropCapImages={dropCapImages} size={52} />
+        <div id="user-profile-info">
           <div id="user-profile-username">@{profile.username}</div>
           {profile.display_name && <div id="user-profile-name">{profile.display_name}</div>}
+          <div id="user-profile-stats">
+            <span className="user-profile-stat">{pubs.length} {pubs.length === 1 ? "piece" : "pieces"}</span>
+            <span className="user-profile-stat-sep">·</span>
+            <span className="user-profile-stat">{followerCount} {followerCount === 1 ? "follower" : "followers"}</span>
+          </div>
         </div>
+        {!isOwnProfile && (
+          <button
+            className={`follow-btn${following ? " following" : ""}`}
+            onClick={handleFollow}
+            disabled={followBusy}
+          >
+            {following ? "Following" : "Follow"}
+          </button>
+        )}
       </div>
       <div id="user-profile-list">
         {loading && <p className="feed-empty">loading…</p>}
         {!loading && pubs.length === 0 && <p className="feed-empty">nothing published yet.</p>}
-        {pubs.map(pub => (
-          <article key={pub.id} className="pub-card" onClick={() => onRead(pub)}>
-            <div className="pub-card-meta">
-              <span className="pub-date">{formatDate(pub.published_at)}</span>
-              <span className="pub-dot">·</span>
-              <span className="pub-read-time">{readingTime(pub.content)}</span>
-            </div>
-            <h2 className="pub-card-title">{pub.title}</h2>
-            {pubPreview(pub.content) && <p className="pub-card-preview">{pubPreview(pub.content)}</p>}
-            {(() => {
-              const sc = scoreFromRecord(pub);
-              return sc ? <HumanSignalBadge score={sc} /> : null;
-            })()}
-          </article>
+        {pubs.map((pub, i) => (
+          <BookSpineCard key={pub.id} pub={pub} index={i} onRead={onRead} onAuthorClick={() => {}} onLike={handleLike} />
         ))}
       </div>
     </div>
@@ -3071,7 +3180,13 @@ export default function App() {
         <SearchView onViewUser={openUserProfile} dropCapImages={dropCapImages} />
       )}
       {view === "userProfile" && viewingUser && (
-        <UserProfileView profile={viewingUser} onRead={openReading} dropCapImages={dropCapImages} />
+        <UserProfileView
+          profile={viewingUser}
+          onRead={openReading}
+          dropCapImages={dropCapImages}
+          user={user}
+          onRequestAuth={() => setAuthOpen(true)}
+        />
       )}
       {view === "reading" && readingPub && (
         <ReadingView
