@@ -8,11 +8,6 @@
   --muted:       #575350;
   --subtle:      #8a8580;
   --border:      rgba(0, 0, 0, 0.13);
-  --spine-a:     hsl(30, 28%, 64%);
-  --spine-b:     hsl(148, 14%, 60%);
-  --spine-c:     hsl(350, 18%, 66%);
-  --spine-d:     hsl(218, 16%, 64%);
-  --spine-e:     hsl(55, 18%, 62%);
   --top-bar:     52px;
   --bottom-nav:  58px;
 }
@@ -723,49 +718,42 @@ body.focus-mode #text-container {
 .writer-card {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 16px 0 16px 20px;
-  border-left: 3px solid var(--_spine, var(--subtle));
-  border-bottom: none;
-  position: relative;
+  gap: 13px;
+  padding: 9px 14px;
+  border: 1.5px solid #1c1a16;
+  box-shadow: 2px 2px 0 #ddd6c8, 3px 3px 0 #1c1a16;
+  margin-bottom: 7px;
   cursor: pointer;
-  animation: cardIn 0.4s ease both;
+  background: #fffef9;
+  animation: cardIn 0.30s ease both;
   animation-delay: calc(var(--card-index, 0) * 0.04s);
-  transition: transform 0.18s ease;
+  transition: background 0.15s;
 }
-.writer-card::after {
-  content: '';
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  height: 1px;
-  background: var(--border);
-}
-.writer-card:nth-child(5n+1) { --_spine: var(--spine-a); }
-.writer-card:nth-child(5n+2) { --_spine: var(--spine-b); }
-.writer-card:nth-child(5n+3) { --_spine: var(--spine-c); }
-.writer-card:nth-child(5n+4) { --_spine: var(--spine-d); }
-.writer-card:nth-child(5n+0) { --_spine: var(--spine-e); }
-.writer-card:hover { transform: translateX(6px); }
-.writer-card:first-of-type { border-top: none; }
+.writer-card:hover { background: #fdfcf4; }
 .writer-card-info { flex: 1; min-width: 0; }
 .writer-card-name {
   display: block;
   font-family: "Cormorant Garamond", serif;
-  font-size: 1.05rem;
+  font-size: 0.98rem;
   font-weight: 500;
-  color: var(--text);
+  font-style: italic;
+  color: #1c1a16;
+  letter-spacing: 0.04em;
 }
 .writer-card-meta {
   display: block;
   font-family: "Cormorant Garamond", serif;
-  font-size: 0.78rem;
-  color: var(--subtle);
+  font-size: 0.7rem;
+  color: #3a3530;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
   margin-top: 2px;
 }
 .writer-card-arrow {
   font-family: "Cormorant Garamond", serif;
-  font-size: 1rem;
+  font-size: 0.9rem;
   color: var(--subtle);
+  flex-shrink: 0;
 }
 
 #hs-link {
@@ -934,6 +922,14 @@ body.focus-mode #text-container {
   letter-spacing: 0;
   font-style: normal;
   text-transform: none;
+}
+button.book-spine-author-btn {
+  font-family: "Cormorant Garamond", serif;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  outline: none;
 }
 
 .book-spine-badge {
@@ -1921,6 +1917,56 @@ body.focus-mode #text-container {
 #profile-info {
   text-align: center;
 }
+
+.profile-edit-btn {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 0;
+  margin-top: 5px;
+  transition: color 0.15s;
+}
+.profile-edit-btn:hover { color: var(--text); }
+
+.profile-edit-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 260px;
+}
+.profile-edit-input {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 1rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid rgba(0,0,0,0.22);
+  border-radius: 2px;
+  padding: 6px 10px;
+  width: 100%;
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+.profile-edit-input:focus { outline: none; border-color: #1c1a16; }
+.profile-edit-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 2px;
+}
+.profile-edit-error {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.8rem;
+  color: #a86060;
+  text-align: center;
+}
+
 #profile-username {
   font-family: "Cormorant Garamond", serif;
   font-size: 1.5rem;

@@ -1174,8 +1174,7 @@ function Feed({ user, onRead, onHsModal, onAuthorClick, dropCapImages, onRequest
                   <div className="book-spine-edge" />
                   <span className="book-spine-title">{pub.title}</span>
                   <button
-                    className="book-spine-author"
-                    style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}
+                    className="book-spine-author book-spine-author-btn"
                     onClick={e => { e.stopPropagation(); if (pub.user_id) onAuthorClick(pub.user_id); }}
                   >{pub.author_name}</button>
                 </div>
@@ -1213,7 +1212,7 @@ function Feed({ user, onRead, onHsModal, onAuthorClick, dropCapImages, onRequest
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
-function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapImages, onRead, onUnpublish, onSignIn, onSignOut, onAvatarChange, onEditDoc, onNewDoc, onDeleteDoc, onPublishDoc, researchOptIn, onToggleOptIn, onDownloadData, onDeleteData, onChangePassword }) {
+function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapImages, onRead, onUnpublish, onSignIn, onSignOut, onAvatarChange, onEditDoc, onNewDoc, onDeleteDoc, onPublishDoc, researchOptIn, onToggleOptIn, onDownloadData, onDeleteData, onChangePassword, onProfileUpdate }) {
   const [pubs, setPubs]           = useState([]);
   const [loading, setLoading]     = useState(!!user);
   const [uploading, setUploading] = useState(false);
@@ -1225,6 +1224,11 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
   const [confirmDeleteId, setConfirmDeleteId]     = useState(null);
   const [confirmUnpublishId, setConfirmUnpublishId] = useState(null);
   const [contribution, setContribution] = useState(null);
+  const [editingProfile, setEditingProfile]   = useState(false);
+  const [editUsername, setEditUsername]       = useState("");
+  const [editDisplayName, setEditDisplayName] = useState("");
+  const [profileSaving, setProfileSaving]     = useState(false);
+  const [profileError, setProfileError]       = useState("");
   const fileInputRef              = useRef(null);
 
   useEffect(() => {
@@ -1279,6 +1283,37 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
     setUploading(false);
   };
 
+  const startEditProfile = () => {
+    setEditUsername(profile?.username || "");
+    setEditDisplayName(profile?.display_name || "");
+    setProfileError("");
+    setEditingProfile(true);
+  };
+
+  const saveProfile = async () => {
+    const newUsername = editUsername.trim();
+    const newDisplayName = editDisplayName.trim();
+    if (newUsername.length < 3) { setProfileError("Username must be at least 3 characters."); return; }
+    setProfileSaving(true);
+    setProfileError("");
+    if (newUsername !== profile?.username) {
+      const existing = await fetchProfileByUsername(newUsername);
+      if (existing && existing.id !== user.id) {
+        setProfileError("That username is already taken.");
+        setProfileSaving(false);
+        return;
+      }
+    }
+    const err = await upsertProfile(user.id, newUsername, newDisplayName || null);
+    setProfileSaving(false);
+    if (err) {
+      setProfileError(err.includes("unique") || err.includes("duplicate") ? "Username already taken." : err);
+      return;
+    }
+    onProfileUpdate?.({ ...profile, username: newUsername, display_name: newDisplayName || null });
+    setEditingProfile(false);
+  };
+
   return (
     <div id="profile-container">
       <div id="profile-header">
@@ -1298,13 +1333,43 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
           <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFileChange} />
         </div>
         <div id="profile-info">
-          {profile?.username
-            ? <div id="profile-username">@{profile.username}</div>
-            : <div id="profile-email">{user.email}</div>
-          }
-          {profile?.display_name && <div id="profile-email">{profile.display_name}</div>}
-          {user.created_at && (
-            <div id="profile-joined">Member since {formatJoined(user.created_at)}</div>
+          {editingProfile ? (
+            <div className="profile-edit-form">
+              <input
+                className="profile-edit-input"
+                type="text"
+                value={editUsername}
+                onChange={e => setEditUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+                placeholder="username"
+                maxLength={20}
+                autoFocus
+              />
+              <input
+                className="profile-edit-input"
+                type="text"
+                value={editDisplayName}
+                onChange={e => setEditDisplayName(e.target.value)}
+                placeholder="display name (optional)"
+                maxLength={50}
+              />
+              {profileError && <p className="profile-edit-error">{profileError}</p>}
+              <div className="profile-edit-actions">
+                <button className="pub-mini-btn" onClick={() => { setEditingProfile(false); setProfileError(""); }} disabled={profileSaving}>Cancel</button>
+                <button className="pub-mini-btn" onClick={saveProfile} disabled={profileSaving || editUsername.length < 3}>{profileSaving ? "saving…" : "Save"}</button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {profile?.username
+                ? <div id="profile-username">@{profile.username}</div>
+                : <div id="profile-email">{user.email}</div>
+              }
+              {profile?.display_name && <div id="profile-email">{profile.display_name}</div>}
+              {user.created_at && (
+                <div id="profile-joined">Member since {formatJoined(user.created_at)}</div>
+              )}
+              <button className="profile-edit-btn" onClick={startEditProfile}>Edit profile</button>
+            </>
           )}
         </div>
       </div>
@@ -2999,6 +3064,7 @@ export default function App() {
           onDownloadData={downloadResearchData}
           onDeleteData={deleteResearchData}
           onChangePassword={() => setUpdatePasswordOpen(true)}
+          onProfileUpdate={(updatedProfile) => setProfile(updatedProfile)}
         />
       )}
       {view === "search" && (
