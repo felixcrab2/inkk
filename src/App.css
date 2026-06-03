@@ -857,6 +857,15 @@ body.focus-mode #text-container {
 
 .book-spine:hover { height: 162px; background: #fdfcf4; }
 
+/* Profile-owned cards: always show preview — no need to hover on your own work */
+.book-spine.profile-card {
+  height: auto;
+}
+.book-spine.profile-card:hover {
+  height: auto;
+  background: #fdfcf4;
+}
+
 /* Draft: dashed outline = rough/unbound manuscript */
 .book-spine.spine-draft {
   border-style: dashed;
@@ -1433,10 +1442,9 @@ button.book-spine-author-btn {
 
 #profile-header {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 10px;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 16px;
   width: 100%;
   max-width: 520px;
   margin-bottom: 28px;
@@ -1914,7 +1922,9 @@ button.book-spine-author-btn {
 }
 
 #profile-info {
-  text-align: center;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
 }
 
 .profile-edit-btn {
@@ -1935,10 +1945,9 @@ button.book-spine-author-btn {
 .profile-edit-form {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   width: 100%;
-  max-width: 260px;
 }
 .profile-edit-input {
   font-family: "Cormorant Garamond", serif;
@@ -1949,21 +1958,21 @@ button.book-spine-author-btn {
   border-radius: 2px;
   padding: 6px 10px;
   width: 100%;
-  text-align: center;
+  text-align: left;
   letter-spacing: 0.01em;
 }
 .profile-edit-input:focus { outline: none; border-color: #1c1a16; }
 .profile-edit-actions {
   display: flex;
   gap: 8px;
-  justify-content: center;
+  justify-content: flex-start;
   margin-top: 2px;
 }
 .profile-edit-error {
   font-family: "Cormorant Garamond", serif;
   font-size: 0.8rem;
   color: #a86060;
-  text-align: center;
+  text-align: left;
 }
 
 #profile-username {
@@ -2193,7 +2202,7 @@ button.book-spine-author-btn {
   max-width: 560px;
   min-width: 200px;
   margin: 0 auto;
-  padding: 22vh 8px 15vh;
+  padding: 36px 8px 15vh;
 }
 
 #reading-meta {
@@ -2239,13 +2248,13 @@ button.book-spine-author-btn {
 
 #reading-headline {
   font-family: "Cormorant Garamond", serif;
-  font-size: 1.35rem;
+  font-size: 2.4rem;
   font-weight: 600;
   font-style: italic;
   color: var(--text);
-  line-height: 1.35;
-  margin: 0 0 64px;
-  letter-spacing: 0.01em;
+  line-height: 1.2;
+  margin: 0 0 52px;
+  letter-spacing: -0.01em;
   text-align: center;
 }
 

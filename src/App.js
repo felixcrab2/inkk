@@ -1287,8 +1287,9 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
   const [confirmDel, setConfirmDel] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms,   setShowTerms]   = useState(false);
-  const [confirmDeleteId, setConfirmDeleteId]     = useState(null);
-  const [confirmUnpublishId, setConfirmUnpublishId] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId]         = useState(null);
+  const [confirmUnpublishId, setConfirmUnpublishId]   = useState(null);
+  const [confirmDeletePubId, setConfirmDeletePubId]   = useState(null);
   const [contribution, setContribution] = useState(null);
   const [editingProfile, setEditingProfile]   = useState(false);
   const [editUsername, setEditUsername]       = useState("");
@@ -1310,6 +1311,13 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
   const handleUnpublish = async (pub, e) => {
     e.stopPropagation();
     await doUnpublish(pub.doc_id);
+    setPubs(prev => prev.filter(p => p.id !== pub.id));
+    if (onUnpublish) onUnpublish(pub.doc_id);
+  };
+
+  const handleDeletePub = async (pub) => {
+    await doUnpublish(pub.doc_id);
+    onDeleteDoc(pub.doc_id);
     setPubs(prev => prev.filter(p => p.id !== pub.id));
     if (onUnpublish) onUnpublish(pub.doc_id);
   };
@@ -1482,7 +1490,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
                 const sc = d.humanScore != null && d.scoreTier ? { score: d.humanScore, tier: d.scoreTier, confidence: d.scoreFeatures?.confidence ?? 0.5, paste_ratio: d.scoreFeatures?.paste_ratio || 0, contributors: [] } : null;
                 const confirming = confirmDeleteId === d.id;
                 return (
-                  <article key={d.id} className="book-spine spine-draft" style={{ "--card-index": idx, height: confirming ? "auto" : undefined }} onClick={() => !confirming && onEditDoc(d.id)}>
+                  <article key={d.id} className="book-spine spine-draft profile-card" style={{ "--card-index": idx }} onClick={() => !confirming && onEditDoc(d.id)}>
                     <div className="book-spine-row">
                       <div className="book-spine-edge" />
                       <span className="book-spine-title">{title}</span>
@@ -1528,11 +1536,12 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
           <p className="feed-empty">Nothing published yet.</p>
         )}
         {pubs.map((pub, idx) => {
-          const confirming = confirmUnpublishId === pub.id;
+          const confirmingUnpublish = confirmUnpublishId === pub.id;
+          const confirmingDelete    = confirmDeletePubId === pub.id;
           const sc = scoreFromRecord(pub);
           const preview = pubPreview(pub.content);
           return (
-            <article key={pub.id} className="book-spine" style={{ "--card-index": idx }} onClick={() => !confirming && onEditDoc(pub.doc_id)}>
+            <article key={pub.id} className="book-spine profile-card" style={{ "--card-index": idx }} onClick={() => !confirmingUnpublish && !confirmingDelete && onEditDoc(pub.doc_id)}>
               <div className="book-spine-row">
                 <div className="book-spine-edge" />
                 <span className="book-spine-title">{pub.title}</span>
@@ -1545,14 +1554,25 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
                 <div className="book-spine-foot">
                   <span className="book-spine-meta">{formatDate(pub.published_at)}</span>
                   <div className="book-spine-actions" onClick={e => e.stopPropagation()}>
-                    <button className="pub-mini-btn" onClick={e => { e.stopPropagation(); onRead(pub); }}>Read</button>
-                    {!confirming ? (
-                      <button className="pub-mini-btn pub-mini-danger" onClick={e => { e.stopPropagation(); setConfirmUnpublishId(pub.id); }}>Remove</button>
-                    ) : (
+                    {!confirmingUnpublish && !confirmingDelete && (
+                      <>
+                        <button className="pub-mini-btn" onClick={e => { e.stopPropagation(); onRead(pub); }}>Read</button>
+                        <button className="pub-mini-btn pub-mini-danger" onClick={e => { e.stopPropagation(); setConfirmUnpublishId(pub.id); }}>Unpublish</button>
+                        <button className="pub-mini-btn pub-mini-danger" onClick={e => { e.stopPropagation(); setConfirmDeletePubId(pub.id); }}>Delete</button>
+                      </>
+                    )}
+                    {confirmingUnpublish && (
                       <span className="pub-confirm">
                         <span className="pub-confirm-text">Remove from feed?</span>
                         <button className="pub-mini-btn" onClick={() => setConfirmUnpublishId(null)}>Cancel</button>
                         <button className="pub-mini-btn pub-mini-danger" onClick={async (e) => { await handleUnpublish(pub, e); setConfirmUnpublishId(null); }}>Yes</button>
+                      </span>
+                    )}
+                    {confirmingDelete && (
+                      <span className="pub-confirm">
+                        <span className="pub-confirm-text">Delete permanently?</span>
+                        <button className="pub-mini-btn" onClick={() => setConfirmDeletePubId(null)}>Cancel</button>
+                        <button className="pub-mini-btn pub-mini-danger" onClick={() => { handleDeletePub(pub); setConfirmDeletePubId(null); }}>Yes</button>
                       </span>
                     )}
                   </div>
