@@ -171,21 +171,6 @@ function stripHtml(html) {
     .replace(/\n{3,}/g, "\n\n").trim();
 }
 
-function renderHtml(content) {
-  if (!content) return "";
-  if (/<(div|br|img|p)\b/i.test(content)) {
-    const d = document.createElement("div");
-    d.innerHTML = content;
-    d.querySelectorAll("script,style,link,meta,iframe,object,embed,form").forEach(n => n.remove());
-    d.querySelectorAll("*").forEach(el => {
-      for (const a of [...el.attributes])
-        if (a.name.startsWith("on") || (a.name === "href" && /javascript:/i.test(a.value))) el.removeAttribute(a.name);
-    });
-    return d.innerHTML;
-  }
-  return content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
-}
-
 function setEditorHtml(el, content) {
   if (!content) { el.innerHTML = ""; return; }
   if (/<(div|br|img|p)\b/i.test(content)) { el.innerHTML = content; }
@@ -1792,7 +1777,7 @@ function UserProfileView({ profile, onRead, dropCapImages, user, onRequestAuth }
 
 // ─── ReadingView ──────────────────────────────────────────────────────────────
 
-function ReadingView({ pub, font, user, dropCapImages, focus, onRequestAuth, onAuthorClick }) {
+function ReadingView({ pub, user, dropCapImages, focus, onRequestAuth, onAuthorClick }) {
   const containerRef = useRef(null);
   const commentsRef  = useRef(null);
   const [progress, setProgress] = useState(0);
@@ -1805,6 +1790,24 @@ function ReadingView({ pub, font, user, dropCapImages, focus, onRequestAuth, onA
   const [body, setBody]                 = useState("");
   const [posting, setPosting]           = useState(false);
   const [confirmDelId, setConfirmDelId] = useState(null);
+  const [pages, setPages]               = useState([]);
+  const [pagesLoading, setPagesLoading] = useState(true);
+
+  useEffect(() => {
+    setPages([]);
+    setPagesLoading(true);
+    renderBookPdfPages({
+      title: pub.title || "",
+      byline: pub.author_name || "",
+      html: pub.content || "",
+      options: { dropCap: true, justify: true, paragraphIndent: true, paperTexture: true },
+      async onPage(canvas) {
+        const url = canvas.toDataURL("image/jpeg", 0.95);
+        setPages(prev => [...prev, url]);
+      },
+    }).then(() => setPagesLoading(false))
+      .catch(() => setPagesLoading(false));
+  }, [pub.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setLikeCount(getRelCount(pub.like_count));
@@ -1905,11 +1908,14 @@ function ReadingView({ pub, font, user, dropCapImages, focus, onRequestAuth, onA
           </button>
         </div>
         <div id="reading-inner">
-          <div id="reading-title-block">
-            <h1 id="reading-headline">{pub.title}</h1>
-            {pub.author_name && <p id="reading-byline">— {pub.author_name} —</p>}
+          <div id="reading-pages">
+            {pagesLoading && pages.length === 0 && (
+              <p className="reading-pages-loading">rendering…</p>
+            )}
+            {pages.map((url, i) => (
+              <img key={i} className="reading-page-img" src={url} alt="" />
+            ))}
           </div>
-          <div id="reading-text" className={font === "arial" ? "font-arial" : ""} dangerouslySetInnerHTML={{ __html: renderHtml(pub.content) }} />
 
           {/* ── Like + Comments ──────────────────────────────────────────── */}
           <div id="reading-footer">
@@ -2036,7 +2042,9 @@ export default function App() {
   const [confirmUnpublishOpen, setConfirmUnpublishOpen] = useState(false);
   const [formatActive, setFormatActive] = useState({ bold: false, italic: false });
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
-  const [previewMode, setPreviewMode] = useState(false);
+  const [previewMode, setPreviewMode]     = useState(false);
+  const [previewPages, setPreviewPages]   = useState([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const editorRef      = useRef(null);
   const titleEditorRef = useRef(null);
@@ -2849,6 +2857,25 @@ export default function App() {
     } catch {}
   }, [onTitleInput, onInput]);
 
+  // ─ editor preview canvas rendering ─────────────────────────────────────────
+  useEffect(() => {
+    if (!previewMode) { setPreviewPages([]); return; }
+    setPreviewPages([]);
+    setPreviewLoading(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    renderBookPdfPages({
+      title: stripHtml(titleRef.current) || "Untitled",
+      byline: profileRef.current?.display_name || profileRef.current?.username || "",
+      html: contentRef.current || "",
+      options: { dropCap: true, justify: true, paragraphIndent: true, paperTexture: true },
+      async onPage(canvas) {
+        const url = canvas.toDataURL("image/jpeg", 0.95);
+        setPreviewPages(prev => [...prev, url]);
+      },
+    }).then(() => setPreviewLoading(false))
+      .catch(() => setPreviewLoading(false));
+  }, [previewMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ─ render ───────────────────────────────────────────────────────────────────
 
   const isEditor  = view === "editor";
@@ -3183,18 +3210,13 @@ export default function App() {
       {/* ── editor preview overlay ── */}
       {isEditor && previewMode && (
         <div id="editor-preview-container">
-          <div id="editor-preview-inner">
-            <div id="reading-title-block">
-              <h1 id="reading-headline">{stripHtml(titleRef.current) || "Untitled"}</h1>
-              {(profile?.display_name || profile?.username) && (
-                <p id="reading-byline">— {profile.display_name || profile.username} —</p>
-              )}
-            </div>
-            <div
-              id="reading-text"
-              className={font === "arial" ? "font-arial" : ""}
-              dangerouslySetInnerHTML={{ __html: renderHtml(contentRef.current || "") }}
-            />
+          <div id="reading-pages">
+            {previewLoading && previewPages.length === 0 && (
+              <p className="reading-pages-loading">rendering…</p>
+            )}
+            {previewPages.map((url, i) => (
+              <img key={i} className="reading-page-img" src={url} alt="" />
+            ))}
           </div>
         </div>
       )}
@@ -3250,7 +3272,6 @@ export default function App() {
       {view === "reading" && readingPub && (
         <ReadingView
           pub={readingPub}
-          font={font}
           user={user}
           dropCapImages={dropCapImages}
           focus={readingFocus}

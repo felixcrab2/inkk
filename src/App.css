@@ -2207,17 +2207,39 @@ button.book-spine-author-btn {
   overflow-y: auto;
   overflow-x: hidden;
   animation: viewIn 0.2s ease forwards;
-  background: #dedad3;
+  background: #ebebea;
 }
 
 #reading-inner {
-  width: calc(100% - 32px);
-  max-width: 580px;
+  width: 100%;
+  max-width: 560px;
   min-width: 200px;
-  margin: 28px auto 56px;
-  padding: 52px 64px 64px;
-  background: #f5f4f1;
-  box-shadow: 0 2px 24px rgba(0,0,0,0.07), 0 1px 4px rgba(0,0,0,0.04);
+  margin: 0 auto;
+  padding: 20px 16px 60px;
+}
+
+#reading-pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.reading-page-img {
+  width: 100%;
+  max-width: 480px;
+  display: block;
+  border-radius: 2px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.16), 0 1px 5px rgba(0,0,0,0.08);
+}
+
+.reading-pages-loading {
+  font-family: "Cormorant Garamond", serif;
+  font-style: italic;
+  color: #aaa;
+  text-align: center;
+  padding: 80px 0;
+  font-size: 1rem;
 }
 
 #reading-meta {
@@ -2261,76 +2283,6 @@ button.book-spine-author-btn {
 }
 #reading-copy:hover { color: var(--text); }
 
-#reading-title-block {
-  text-align: center;
-  margin: 0 0 56px;
-}
-
-#reading-headline {
-  font-family: "Cormorant Garamond", serif;
-  font-size: 1.35rem;
-  font-weight: 600;
-  font-style: italic;
-  color: var(--text);
-  line-height: 1.35;
-  margin: 0;
-  letter-spacing: 0.01em;
-}
-
-#reading-byline {
-  font-family: "Cormorant Garamond", serif;
-  font-size: 0.82rem;
-  font-style: italic;
-  color: #9a9590;
-  margin: 10px 0 0;
-  letter-spacing: 0.08em;
-}
-
-#reading-text {
-  overflow-wrap: break-word;
-  font-family: "Cormorant Garamond", serif;
-  font-size: 1.2rem;
-  line-height: 1.55;
-  color: var(--text);
-  margin-top: 0;
-  text-align: justify;
-  hyphens: auto;
-  -webkit-hyphens: auto;
-}
-#reading-text.font-arial { font-family: Arial, sans-serif; }
-
-/* Drop cap — only on prose paragraphs (no <br> inside = not poetry). */
-#reading-text > div:first-child:not(:has(br))::first-letter,
-#reading-text > p:first-child:not(:has(br))::first-letter {
-  font-family: "Cormorant Garamond", serif;
-  font-weight: 600;
-  font-size: 3em;
-  line-height: 0.9;
-  float: left;
-  padding: 0 0.14em 0 0;
-  margin-top: 0.06em;
-  color: var(--text);
-}
-
-/* Indent every prose paragraph after the first (book-style). */
-#reading-text > div + div:not(:has(br)),
-#reading-text > p + p:not(:has(br)) {
-  text-indent: 1.4em;
-}
-
-/* Poetry lines (divs/paras containing <br>): left-align, no indent, no hyphenation. */
-#reading-text div:has(br),
-#reading-text p:has(br) {
-  text-align: left;
-  text-indent: 0 !important;
-  hyphens: none;
-  -webkit-hyphens: none;
-}
-
-/* But don't indent lists / blockquotes. */
-#reading-text > div[data-list],
-#reading-text > p[data-list],
-#reading-text > blockquote { text-indent: 0; }
 
 /* ─── Editor preview overlay ─────────────────────────────────────────────── */
 #editor-preview-container {
@@ -2340,19 +2292,15 @@ button.book-spine-author-btn {
   left: 0;
   right: 0;
   overflow-y: auto;
-  background: #dedad3;
+  background: #ebebea;
   z-index: 10;
   animation: viewIn 0.2s ease forwards;
+  padding: 20px 16px 40px;
 }
 
-#editor-preview-inner {
-  width: calc(100% - 32px);
-  max-width: 580px;
-  min-width: 200px;
-  margin: 28px auto 56px;
-  padding: 52px 64px 64px;
-  background: #f5f4f1;
-  box-shadow: 0 2px 24px rgba(0,0,0,0.07), 0 1px 4px rgba(0,0,0,0.04);
+#editor-preview-container #reading-pages {
+  max-width: 560px;
+  margin: 0 auto;
 }
 
 /* ─── Feed card engagement row ──────────────────────────────────────────── */
@@ -2828,18 +2776,8 @@ button.book-spine-author-btn {
   }
 
   /* ── Reading ── */
-  #reading-inner {
-    width: calc(100% - 24px);
-    padding: 32px 24px 48px;
-    margin: 12px auto 40px;
-  }
-  #editor-preview-inner {
-    width: calc(100% - 24px);
-    padding: 32px 24px 48px;
-    margin: 12px auto 40px;
-  }
-  #reading-headline { font-size: 1.25rem; }
-  #reading-text { font-size: 1.12rem; line-height: 1.65; }
+  #reading-inner { padding: 12px 8px 40px; }
+  .reading-page-img { border-radius: 1px; }
 
   /* ── Feed ── */
   #feed-list, #feed-header { max-width: 100%; }
