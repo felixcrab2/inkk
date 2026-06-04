@@ -420,7 +420,7 @@ async function renderOnePage({ texture, drawInk, cw, ch, paperTexture }) {
     ctx.drawImage(texture, 0, 0, cw, ch);
     ctx.restore();
   } else {
-    ctx.fillStyle = "#faf9f7";
+    ctx.fillStyle = "#f3f2ef";
     ctx.fillRect(0, 0, cw, ch);
   }
 
@@ -469,7 +469,7 @@ async function renderOnePage({ texture, drawInk, cw, ch, paperTexture }) {
  *                                       images preserved).
  * @param {function} opts.onPage       — async fn(canvas, pageIndex, totalPages)
  */
-export async function renderBookPdfPages({ title, html, onPage, options = {} }) {
+export async function renderBookPdfPages({ title, byline, html, onPage, options = {} }) {
   await document.fonts.ready;
 
   const {
@@ -508,14 +508,16 @@ export async function renderBookPdfPages({ title, html, onPage, options = {} }) 
   const otherPageHeight = bodyBottom - bodyTop;
 
   // ── Title (wrapped) ──────────────────────────────────────────────────────
-  const titleStr = (title || "").trim();
+  const titleStr  = (title  || "").trim();
+  const bylineStr = (byline || "").trim();
   let titleLines = [];
   let titleBlockH = 0;
   if (titleStr) {
     mctx.font = font(T_TITLE, true, true);
     titleLines = wrapSegment(mctx, titleStr, fullWidth).map(l => l.text);
     if (!titleLines.length) titleLines = [titleStr];
-    titleBlockH = titleLines.length * T_TITLE * PX * TITLE_LINE_MULT + TITLE_BODY_GAP;
+    const bylineH = bylineStr ? Math.round(T_TITLE * 0.9 * PX * TITLE_LINE_MULT + 8 * PX) : 0;
+    titleBlockH = titleLines.length * T_TITLE * PX * TITLE_LINE_MULT + bylineH + TITLE_BODY_GAP;
   }
   const firstPageHeight = otherPageHeight - titleBlockH;
 
@@ -620,6 +622,13 @@ export async function renderBookPdfPages({ title, html, onPage, options = {} }) 
           for (const ln of titleLines) {
             ctx.fillText(ln, cw / 2, y + T_TITLE * PX);
             y += T_TITLE * PX * TITLE_LINE_MULT;
+          }
+          if (bylineStr) {
+            y += 8 * PX;
+            ctx.font = font(T_TITLE * 0.9, true, false);
+            ctx.fillStyle = INK_HEADER;
+            ctx.fillText(bylineStr, cw / 2, y + T_TITLE * 0.9 * PX);
+            y += T_TITLE * 0.9 * PX * TITLE_LINE_MULT;
           }
           y += TITLE_BODY_GAP - 8 * PX;   // space after title block (already partly used by titleBlockH calc)
         }

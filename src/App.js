@@ -12,7 +12,7 @@ import {
   Menu, ArrowLeft, PenLine, Globe, User,
   Share2, Check, Download, Maximize2, Minimize2,
   Copy, CheckCheck, Plus, Trash2, Type, Search,
-  Heart, MessageCircle,
+  Heart, MessageCircle, Eye, EyeOff,
 } from "lucide-react";
 import { createRecorder } from "./telemetry/recorder";
 import { extractFeatures } from "./telemetry/features";
@@ -1490,7 +1490,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
                 const sc = d.humanScore != null && d.scoreTier ? { score: d.humanScore, tier: d.scoreTier, confidence: d.scoreFeatures?.confidence ?? 0.5, paste_ratio: d.scoreFeatures?.paste_ratio || 0, contributors: [] } : null;
                 const confirming = confirmDeleteId === d.id;
                 return (
-                  <article key={d.id} className="book-spine spine-draft" style={{ "--card-index": idx, height: confirming ? "auto" : undefined }} onClick={() => !confirming && onEditDoc(d.id)}>
+                  <article key={d.id} className="book-spine spine-draft profile-card" style={{ "--card-index": idx, height: confirming ? "auto" : undefined }} onClick={() => !confirming && onEditDoc(d.id)}>
                     <div className="book-spine-row">
                       <div className="book-spine-edge" />
                       <span className="book-spine-title">{title}</span>
@@ -1905,7 +1905,10 @@ function ReadingView({ pub, font, user, dropCapImages, focus, onRequestAuth, onA
           </button>
         </div>
         <div id="reading-inner">
-          <h1 id="reading-headline">{pub.title}</h1>
+          <div id="reading-title-block">
+            <h1 id="reading-headline">{pub.title}</h1>
+            {pub.author_name && <p id="reading-byline">— {pub.author_name} —</p>}
+          </div>
           <div id="reading-text" className={font === "arial" ? "font-arial" : ""} dangerouslySetInnerHTML={{ __html: renderHtml(pub.content) }} />
 
           {/* ── Like + Comments ──────────────────────────────────────────── */}
@@ -2033,6 +2036,7 @@ export default function App() {
   const [confirmUnpublishOpen, setConfirmUnpublishOpen] = useState(false);
   const [formatActive, setFormatActive] = useState({ bold: false, italic: false });
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
 
   const editorRef      = useRef(null);
   const titleEditorRef = useRef(null);
@@ -2678,8 +2682,10 @@ export default function App() {
     try {
       if (format === "pdf") {
         const pdf = new jsPDF({ unit: "pt", format: [preset.w, preset.h], compress: true });
+        const byline = profile?.display_name || profile?.username || "";
         await renderBookPdfPages({
           title: titleStr,
+          byline,
           html: text,
           options: renderOptions,
           async onPage(canvas, pageIndex) {
@@ -2691,9 +2697,11 @@ export default function App() {
         pdf.save(`${safeName}.pdf`);
       } else {
         // PNG — only the first page becomes the image.
+        const byline = profile?.display_name || profile?.username || "";
         let pngBlob = null;
         await renderBookPdfPages({
           title: titleStr,
+          byline,
           html: text,
           options: renderOptions,
           async onPage(canvas, pageIndex) {
@@ -2715,7 +2723,8 @@ export default function App() {
       console.error("Download failed:", err);
       addToast("Download failed.");
     }
-  }, [addToast]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addToast, profile?.display_name, profile?.username]);
 
   const openDownloadModal = useCallback(() => {
     if (!stripHtml(contentRef.current || "").trim()) return;
@@ -2843,6 +2852,7 @@ export default function App() {
   // ─ render ───────────────────────────────────────────────────────────────────
 
   const isEditor  = view === "editor";
+  if (!isEditor && previewMode) setPreviewMode(false);
   const menuClass = menuVisible ? "menu-visible" : "menu-hidden";
 
   const sortedDocs   = [...docs].sort((a, b) => b.updatedAt - a.updatedAt);
@@ -2946,6 +2956,16 @@ export default function App() {
                 </div>
               )}
             </div>
+          )}
+          {isEditor && hasContent && (
+            <button
+              className={`icon-btn icon-btn-preview${previewMode ? " active" : ""}`}
+              onClick={() => setPreviewMode(v => !v)}
+              title={previewMode ? "Back to editing" : "Preview as published"}
+            >
+              {previewMode ? <EyeOff size={14} /> : <Eye size={14} />}
+              <span className="btn-label">{previewMode ? "Edit" : "Preview"}</span>
+            </button>
           )}
           {isEditor && hasContent && (
             <button id="pdf-btn" className={menuClass} onClick={openDownloadModal} title="Download  ⌘S">
@@ -3159,6 +3179,25 @@ export default function App() {
           title="Italic  ⌘I"
         ><i>I</i></button>
       </div>
+
+      {/* ── editor preview overlay ── */}
+      {isEditor && previewMode && (
+        <div id="editor-preview-container">
+          <div id="editor-preview-inner">
+            <div id="reading-title-block">
+              <h1 id="reading-headline">{stripHtml(titleRef.current) || "Untitled"}</h1>
+              {(profile?.display_name || profile?.username) && (
+                <p id="reading-byline">— {profile.display_name || profile.username} —</p>
+              )}
+            </div>
+            <div
+              id="reading-text"
+              className={font === "arial" ? "font-arial" : ""}
+              dangerouslySetInnerHTML={{ __html: renderHtml(contentRef.current || "") }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* ── views ── */}
       {view === "feed" && (

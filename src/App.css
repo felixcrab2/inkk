@@ -2,7 +2,7 @@
 
 /* ─── Design tokens ───────────────────────────────────────────────────────── */
 :root {
-  --bg:          #faf9f7;
+  --bg:          #f5f4f2;
   --surface:     #f2f1ee;
   --text:        #1a1a1a;
   --muted:       #575350;
@@ -135,6 +135,23 @@ body {
   color: var(--muted);
 }
 .icon-btn-labelled:hover .icon-btn-label { color: var(--text); }
+.icon-btn-preview {
+  padding: 6px 10px 6px 8px;
+  gap: 6px;
+  border-radius: 18px;
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+}
+.icon-btn-preview .btn-label {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.icon-btn-preview:hover .btn-label,
+.icon-btn-preview.active .btn-label { color: var(--text); }
+.icon-btn-preview.active { color: var(--text); background: rgba(0,0,0,0.05); }
 .icon-btn-count {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 18px; height: 18px;
@@ -724,7 +741,7 @@ body.focus-mode #text-container {
   box-shadow: 2px 2px 0 #ddd6c8, 3px 3px 0 #1c1a16;
   margin-bottom: 7px;
   cursor: pointer;
-  background: #fffef9;
+  background: #f8f8f5;
   animation: cardIn 0.30s ease both;
   animation-delay: calc(var(--card-index, 0) * 0.04s);
   transition: background 0.15s;
@@ -801,7 +818,7 @@ body.focus-mode #text-container {
   width: 100%;
   height: 38px;
   overflow: hidden;
-  background: #fffef9;
+  background: #f8f8f5;
   cursor: pointer;
   transition: height 0.26s cubic-bezier(0.4, 0, 0.2, 1), background 0.15s;
   animation: cardIn 0.30s ease both;
@@ -2050,7 +2067,7 @@ button.book-spine-author-btn {
   box-shadow: 2px 2px 0 #ddd6c8, 3px 3px 0 #1c1a16;
   margin-bottom: 7px;
   cursor: pointer;
-  background: #fffef9;
+  background: #f8f8f5;
   animation: cardIn 0.30s ease both;
   animation-delay: calc(var(--card-index, 0) * 0.04s);
   transition: background 0.15s;
@@ -2190,14 +2207,17 @@ button.book-spine-author-btn {
   overflow-y: auto;
   overflow-x: hidden;
   animation: viewIn 0.2s ease forwards;
+  background: #dedad3;
 }
 
 #reading-inner {
-  width: 44vw;
-  max-width: 560px;
+  width: calc(100% - 32px);
+  max-width: 580px;
   min-width: 200px;
-  margin: 0 auto;
-  padding: 36px 8px 15vh;
+  margin: 28px auto 56px;
+  padding: 52px 64px 64px;
+  background: #f5f4f1;
+  box-shadow: 0 2px 24px rgba(0,0,0,0.07), 0 1px 4px rgba(0,0,0,0.04);
 }
 
 #reading-meta {
@@ -2207,7 +2227,7 @@ button.book-spine-author-btn {
   gap: 6px;
   font-family: "Cormorant Garamond", serif;
   font-size: 0.82rem;
-  color: #aaa;
+  color: #b0ada8;
   letter-spacing: 0.02em;
   padding: 18px 24px 0;
   flex-wrap: wrap;
@@ -2241,6 +2261,11 @@ button.book-spine-author-btn {
 }
 #reading-copy:hover { color: var(--text); }
 
+#reading-title-block {
+  text-align: center;
+  margin: 0 0 56px;
+}
+
 #reading-headline {
   font-family: "Cormorant Garamond", serif;
   font-size: 1.35rem;
@@ -2248,9 +2273,17 @@ button.book-spine-author-btn {
   font-style: italic;
   color: var(--text);
   line-height: 1.35;
-  margin: 0 0 64px;
+  margin: 0;
   letter-spacing: 0.01em;
-  text-align: center;
+}
+
+#reading-byline {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 0.82rem;
+  font-style: italic;
+  color: #9a9590;
+  margin: 10px 0 0;
+  letter-spacing: 0.08em;
 }
 
 #reading-text {
@@ -2266,13 +2299,9 @@ button.book-spine-author-btn {
 }
 #reading-text.font-arial { font-family: Arial, sans-serif; }
 
-/* Drop cap on the first paragraph's first letter — a clean 2-line cap.
-   font-size 3em × line-height 0.9 = 2.7em float box ≈ 2.05 body lines,
-   so the cap-height (≈0.72 × 3em = 2.16em) sits cleanly inside the float
-   without bleeding into line 3. The small margin-top nudges the cap-line
-   to align with body line 1's ascender top. */
-#reading-text > div:first-child::first-letter,
-#reading-text > p:first-child::first-letter {
+/* Drop cap — only on prose paragraphs (no <br> inside = not poetry). */
+#reading-text > div:first-child:not(:has(br))::first-letter,
+#reading-text > p:first-child:not(:has(br))::first-letter {
   font-family: "Cormorant Garamond", serif;
   font-weight: 600;
   font-size: 3em;
@@ -2283,16 +2312,48 @@ button.book-spine-author-btn {
   color: var(--text);
 }
 
-/* Indent every paragraph after the first (book-style). */
-#reading-text > div + div,
-#reading-text > p + p {
+/* Indent every prose paragraph after the first (book-style). */
+#reading-text > div + div:not(:has(br)),
+#reading-text > p + p:not(:has(br)) {
   text-indent: 1.4em;
+}
+
+/* Poetry lines (divs/paras containing <br>): left-align, no indent, no hyphenation. */
+#reading-text div:has(br),
+#reading-text p:has(br) {
+  text-align: left;
+  text-indent: 0 !important;
+  hyphens: none;
+  -webkit-hyphens: none;
 }
 
 /* But don't indent lists / blockquotes. */
 #reading-text > div[data-list],
 #reading-text > p[data-list],
 #reading-text > blockquote { text-indent: 0; }
+
+/* ─── Editor preview overlay ─────────────────────────────────────────────── */
+#editor-preview-container {
+  position: fixed;
+  top: var(--top-bar);
+  bottom: var(--bottom-nav);
+  left: 0;
+  right: 0;
+  overflow-y: auto;
+  background: #dedad3;
+  z-index: 10;
+  animation: viewIn 0.2s ease forwards;
+}
+
+#editor-preview-inner {
+  width: calc(100% - 32px);
+  max-width: 580px;
+  min-width: 200px;
+  margin: 28px auto 56px;
+  padding: 52px 64px 64px;
+  background: #f5f4f1;
+  box-shadow: 0 2px 24px rgba(0,0,0,0.07), 0 1px 4px rgba(0,0,0,0.04);
+}
 
 /* ─── Feed card engagement row ──────────────────────────────────────────── */
 .pub-card-engagement {
@@ -2768,9 +2829,14 @@ button.book-spine-author-btn {
 
   /* ── Reading ── */
   #reading-inner {
-    width: calc(100% - 56px);
-    max-width: none;
-    padding: 9vh 0 18vh;
+    width: calc(100% - 24px);
+    padding: 32px 24px 48px;
+    margin: 12px auto 40px;
+  }
+  #editor-preview-inner {
+    width: calc(100% - 24px);
+    padding: 32px 24px 48px;
+    margin: 12px auto 40px;
   }
   #reading-headline { font-size: 1.25rem; }
   #reading-text { font-size: 1.12rem; line-height: 1.65; }
