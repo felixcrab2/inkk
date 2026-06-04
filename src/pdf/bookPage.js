@@ -34,8 +34,8 @@ const INK_FOOTER  = "#3e3326";
 const INK_HEADER  = "#a8967e";
 const INK_ALPHA   = 0.93;
 
-// Paper tone: slight desaturation pulls the yellow back without losing warmth.
-const PAPER_FILTER = "saturate(0.65) brightness(1.02)";
+// Paper tone: heavy desaturation + slight brightness for near-white paper.
+const PAPER_FILTER = "saturate(0.28) brightness(1.09)";
 
 // Header / footer offsets (pt). Margins are now computed proportionally
 // per page size inside renderBookPdfPages so non-default aspects still
@@ -449,7 +449,7 @@ async function renderOnePage({ texture, drawInk, cw, ch, paperTexture }) {
     //    photographs.
     ctx.save();
     ctx.globalCompositeOperation = "soft-light";
-    ctx.globalAlpha = 0.45;
+    ctx.globalAlpha = 0.18;
     ctx.filter = PAPER_FILTER;
     ctx.drawImage(texture, 0, 0, cw, ch);
     ctx.restore();

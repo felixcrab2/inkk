@@ -2212,10 +2212,10 @@ button.book-spine-author-btn {
 
 #reading-inner {
   width: 100%;
-  max-width: 560px;
+  max-width: 700px;
   min-width: 200px;
   margin: 0 auto;
-  padding: 20px 16px 60px;
+  padding: 20px 0 60px;
 }
 
 #reading-pages {
@@ -2227,10 +2227,9 @@ button.book-spine-author-btn {
 
 .reading-page-img {
   width: 100%;
-  max-width: 480px;
   display: block;
-  border-radius: 2px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.16), 0 1px 5px rgba(0,0,0,0.08);
+  border-radius: 1px;
+  box-shadow: 0 1px 8px rgba(0,0,0,0.10);
 }
 
 .reading-pages-loading {
@@ -2299,7 +2298,7 @@ button.book-spine-author-btn {
 }
 
 #editor-preview-container #reading-pages {
-  max-width: 560px;
+  max-width: 700px;
   margin: 0 auto;
 }
 
@@ -2776,8 +2775,7 @@ button.book-spine-author-btn {
   }
 
   /* ── Reading ── */
-  #reading-inner { padding: 12px 8px 40px; }
-  .reading-page-img { border-radius: 1px; }
+  #reading-inner { padding: 8px 0 40px; }
 
   /* ── Feed ── */
   #feed-list, #feed-header { max-width: 100%; }
