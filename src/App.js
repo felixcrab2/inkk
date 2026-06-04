@@ -1541,7 +1541,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
           const sc = scoreFromRecord(pub);
           const preview = pubPreview(pub.content);
           return (
-            <article key={pub.id} className="book-spine" style={{ "--card-index": idx, height: (confirmingUnpublish || confirmingDelete) ? "auto" : undefined }} onClick={() => !confirmingUnpublish && !confirmingDelete && onEditDoc(pub.doc_id)}>
+            <article key={pub.id} className="book-spine profile-card" style={{ "--card-index": idx, height: (confirmingUnpublish || confirmingDelete) ? "auto" : undefined }} onClick={() => !confirmingUnpublish && !confirmingDelete && onEditDoc(pub.doc_id)}>
               <div className="book-spine-row">
                 <div className="book-spine-edge" />
                 <span className="book-spine-title">{pub.title}</span>

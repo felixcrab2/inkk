@@ -857,6 +857,9 @@ body.focus-mode #text-container {
 
 .book-spine:hover { height: 162px; background: #fdfcf4; }
 
+/* Profile cards have 3 action buttons — let height be determined by content */
+.book-spine.profile-card:hover { height: auto; }
+
 
 /* Draft: dashed outline = rough/unbound manuscript */
 .book-spine.spine-draft {
