@@ -2228,8 +2228,6 @@ button.book-spine-author-btn {
 .reading-page-img {
   width: 100%;
   display: block;
-  border-radius: 1px;
-  box-shadow: 0 1px 8px rgba(0,0,0,0.10);
 }
 
 .reading-pages-loading {
