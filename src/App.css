@@ -2204,8 +2204,7 @@ button.book-spine-author-btn {
   bottom: 0;
   left: 0;
   right: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: auto;
   animation: viewIn 0.2s ease forwards;
   background: var(--bg);
 }
@@ -2242,13 +2241,12 @@ button.book-spine-author-btn {
 #reading-meta {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 6px;
   font-family: "Cormorant Garamond", serif;
   font-size: 0.82rem;
   color: #b0ada8;
   letter-spacing: 0.02em;
-  padding: 18px 24px 0;
+  padding: 18px 24px 12px;
   flex-wrap: wrap;
 }
 .reading-author-btn {
@@ -2265,6 +2263,25 @@ button.book-spine-author-btn {
 .reading-author-btn:disabled { cursor: default; }
 
 .reading-dot { color: #d0ceca; }
+
+.reading-zoom {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+.zoom-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--subtle);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 2px 7px;
+  border-radius: 3px;
+  transition: color 0.15s;
+}
+.zoom-btn:hover { color: var(--text); }
 
 #reading-copy {
   background: none;

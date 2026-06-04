@@ -1792,6 +1792,7 @@ function ReadingView({ pub, user, dropCapImages, focus, onRequestAuth, onAuthorC
   const [confirmDelId, setConfirmDelId] = useState(null);
   const [pages, setPages]               = useState([]);
   const [pagesLoading, setPagesLoading] = useState(true);
+  const [zoom, setZoom]                 = useState(1.0);
 
   useEffect(() => {
     setPages([]);
@@ -1906,8 +1907,12 @@ function ReadingView({ pub, user, dropCapImages, focus, onRequestAuth, onAuthorC
           <button id="reading-copy" onClick={copyText} title="Copy text">
             {copied ? <CheckCheck size={14} /> : <Copy size={14} />}
           </button>
+          <div className="reading-zoom">
+            <button className="zoom-btn" onClick={() => setZoom(z => Math.max(0.6, +(z - 0.2).toFixed(1)))} title="Zoom out">−</button>
+            <button className="zoom-btn" onClick={() => setZoom(z => Math.min(2.4, +(z + 0.2).toFixed(1)))} title="Zoom in">+</button>
+          </div>
         </div>
-        <div id="reading-inner">
+        <div id="reading-inner" style={{ maxWidth: `${700 * zoom}px` }}>
           <div id="reading-pages">
             {pagesLoading && pages.length === 0 && (
               <p className="reading-pages-loading">rendering…</p>

@@ -35,7 +35,7 @@ const INK_HEADER  = "#a8967e";
 const INK_ALPHA   = 0.93;
 
 // Paper tone: heavy desaturation + slight brightness for near-white paper.
-const PAPER_FILTER = "saturate(0.28) brightness(1.01)";
+const PAPER_FILTER = "saturate(0.45) brightness(1.01)";
 
 // Header / footer offsets (pt). Margins are now computed proportionally
 // per page size inside renderBookPdfPages so non-default aspects still
