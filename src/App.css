@@ -2207,7 +2207,7 @@ button.book-spine-author-btn {
   overflow-y: auto;
   overflow-x: hidden;
   animation: viewIn 0.2s ease forwards;
-  background: #ebebea;
+  background: var(--bg);
 }
 
 #reading-inner {
@@ -2291,7 +2291,7 @@ button.book-spine-author-btn {
   left: 0;
   right: 0;
   overflow-y: auto;
-  background: #ebebea;
+  background: var(--bg);
   z-index: 10;
   animation: viewIn 0.2s ease forwards;
   padding: 20px 16px 40px;
