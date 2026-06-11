@@ -292,12 +292,12 @@ body {
 .nav-tab.active { color: var(--text); }
 
 .nav-label {
-  font-size: 0.58rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  font-weight: 500;
-  margin-top: 3px;
+  font-size: 0.62rem;
+  letter-spacing: 0;
+  font-weight: 400;
+  margin-top: 2px;
   line-height: 1;
+  color: inherit;
 }
 
 .nav-avatar {
@@ -666,7 +666,6 @@ body.focus-mode #text-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 0;
   padding-bottom: 40px;
   animation: viewIn 0.2s ease forwards;
 }
@@ -681,6 +680,18 @@ body.focus-mode #text-container {
   z-index: 5;
 }
 
+#feed-eyebrow {
+  font-family: var(--font-serif);
+  font-size: 2rem;
+  font-weight: 400;
+  font-style: normal;
+  color: var(--text);
+  margin: 0;
+  padding: 22px 0 18px;
+  letter-spacing: -0.025em;
+  line-height: 1;
+}
+
 #feed-tabs {
   display: flex;
   gap: 0;
@@ -693,12 +704,11 @@ body.focus-mode #text-container {
   border: none;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
-  padding: 18px 0;
-  margin-right: 28px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  padding: 14px 0;
+  margin-right: 24px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
   color: var(--subtle);
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
@@ -724,14 +734,14 @@ body.focus-mode #text-container {
   padding: 20px 0;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
-  transition: opacity 0.12s;
-  animation: cardIn 0.3s ease both;
-  animation-delay: calc(var(--card-index, 0) * 0.04s);
+  transition: opacity 0.2s;
+  animation: cardIn 0.4s ease both;
+  animation-delay: calc(var(--card-index, 0) * 0.05s);
   background: none;
   box-shadow: none;
 }
 .writer-card:last-child { border-bottom: none; }
-.writer-card:hover { opacity: 0.6; }
+.writer-card:hover { opacity: 0.75; }
 .writer-card-info { flex: 1; min-width: 0; }
 .writer-card-name {
   display: block;
@@ -772,7 +782,7 @@ body.focus-mode #text-container {
 #feed-list {
   width: 100%;
   max-width: 600px;
-  padding: 0 24px 0;
+  padding: 20px 24px 0;
   overflow-x: hidden;
 }
 
@@ -796,39 +806,38 @@ body.focus-mode #text-container {
 
 /* ─── Feed cards ─────────────────────────────────────────────────────────── */
 @keyframes cardIn {
-  from { opacity: 0; transform: translateY(3px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .feed-item {
-  padding: 32px 0;
+  padding: 36px 0;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
-  animation: cardIn 0.3s ease both;
-  animation-delay: calc(var(--card-index, 0) * 0.04s);
-  transition: opacity 0.12s;
+  animation: cardIn 0.4s ease both;
+  animation-delay: calc(var(--card-index, 0) * 0.05s);
+  transition: opacity 0.2s;
 }
-.feed-item:first-child { padding-top: 0; }
-.feed-item:last-child { border-bottom: none; padding-bottom: 0; }
-.feed-item:hover { opacity: 0.6; }
+.feed-item:last-child { border-bottom: none; }
+.feed-item:hover { opacity: 0.75; }
 
 .feed-item-title {
   font-family: var(--font-serif);
-  font-size: 1.35rem;
-  font-weight: 500;
+  font-size: 1.55rem;
+  font-weight: 400;
   font-style: normal;
   color: var(--text);
-  margin: 0 0 8px;
-  line-height: 1.3;
-  letter-spacing: -0.01em;
+  margin: 0 0 10px;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
 }
 
 .feed-item-excerpt {
   font-family: var(--font-serif);
-  font-size: 0.98rem;
-  line-height: 1.65;
+  font-size: 1rem;
+  line-height: 1.68;
   color: var(--muted);
-  margin: 0 0 14px;
+  margin: 0 0 16px;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -838,20 +847,20 @@ body.focus-mode #text-container {
 .feed-item-meta {
   display: flex;
   align-items: center;
-  gap: 7px;
-  font-size: 0.73rem;
+  gap: 8px;
+  font-size: 0.72rem;
   color: var(--subtle);
   flex-wrap: wrap;
 }
 
-.feed-item-dot { color: #d0ccc8; }
+.feed-item-dot { color: #d8d4d0; }
 
 .feed-item-author {
   background: none;
   border: none;
   padding: 0;
   font: inherit;
-  color: inherit;
+  color: var(--muted);
   cursor: pointer;
   transition: color 0.12s;
 }
@@ -871,7 +880,7 @@ body.focus-mode #text-container {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.73rem;
+  font-size: 0.72rem;
   color: var(--subtle);
   cursor: pointer;
   transition: color 0.12s;
@@ -880,12 +889,14 @@ body.focus-mode #text-container {
 
 /* pub-card kept for reading-view inline use only — not used in list views */
 .pub-card {
-  padding: 24px 0;
+  padding: 32px 0;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   animation: cardIn 0.4s ease both;
   animation-delay: calc(var(--card-index, 0) * 0.05s);
+  transition: opacity 0.2s;
 }
+.pub-card:hover { opacity: 0.75; }
 .pub-card:first-of-type { border-top: 1px solid var(--border); }
 
 .pub-card-meta {
@@ -913,12 +924,12 @@ body.focus-mode #text-container {
 
 .pub-card-title {
   font-family: var(--font-serif);
-  font-size: 1.4rem;
-  font-weight: 500;
+  font-size: 1.55rem;
+  font-weight: 400;
   color: var(--text);
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   line-height: 1.2;
-  letter-spacing: -0.005em;
+  letter-spacing: -0.025em;
   transition: color 0.2s;
 }
 
@@ -1386,8 +1397,8 @@ body.focus-mode #text-container {
   align-items: baseline;
   gap: 4px;
   background: var(--surface);
-  padding: 7px 14px;
-  border-radius: 2px;
+  padding: 8px 16px;
+  border-radius: 6px;
 }
 
 .stat-chip-icon { font-size: 0.85rem; }
@@ -1405,11 +1416,10 @@ body.focus-mode #text-container {
 }
 
 #profile-section-label {
-  font-size: 0.68rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 500;
   color: var(--muted);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
 }
 .section-count {
   display: inline-block;
@@ -1427,9 +1437,9 @@ body.focus-mode #text-container {
   width: 100%;
   max-width: 520px;
   display: flex; align-items: baseline; justify-content: space-between;
-  margin-bottom: 2px;
-  padding-left: 10px;
-  border-left: 3px solid var(--subtle);
+  margin-bottom: 8px;
+  padding-left: 0;
+  border-left: none;
 }
 .section-action {
   background: none; border: none; padding: 4px 8px;
