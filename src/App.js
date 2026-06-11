@@ -1199,12 +1199,9 @@ function Feed({ user, onRead, onHsModal, onAuthorClick, dropCapImages, onRequest
   const handleLike          = useMemo(() => makeLikeHandler(pubs, setPubs), [makeLikeHandler, pubs]);
   const handleFollowingLike = useMemo(() => makeLikeHandler(followingPubs, setFollowingPubs), [makeLikeHandler, followingPubs]);
 
-  const feedTitle = feedTab === "following" ? "Following" : feedTab === "writers" ? "Writers" : "Stories";
-
   return (
     <div id="feed-container">
       <div id="feed-header">
-        <h1 id="feed-eyebrow">{feedTitle}</h1>
         <div id="feed-tabs">
           {user && (
             <button className={`feed-tab${feedTab === "following" ? " active" : ""}`} onClick={() => setFeedTab("following")}>Following</button>
