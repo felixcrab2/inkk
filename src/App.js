@@ -1139,7 +1139,7 @@ function FeedCard({ pub, index, onRead, onAuthorClick, onLike }) {
   );
 }
 
-function Feed({ user, onRead, onHsModal, onAuthorClick, dropCapImages, onRequestAuth }) {
+function Feed({ user, onRead, onAuthorClick, dropCapImages, onRequestAuth }) {
   const [pubs, setPubs]               = useState([]);
   const [loading, setLoading]         = useState(true);
   const [feedTab, setFeedTab]         = useState("stories");
@@ -1209,7 +1209,7 @@ function Feed({ user, onRead, onHsModal, onAuthorClick, dropCapImages, onRequest
           <button className={`feed-tab${feedTab === "stories" ? " active" : ""}`} onClick={() => setFeedTab("stories")}>Stories</button>
           <button className={`feed-tab${feedTab === "writers" ? " active" : ""}`} onClick={() => setFeedTab("writers")}>Writers{writers.length > 0 && <span className="feed-tab-count">{writers.length}</span>}</button>
         </div>
-        <button id="hs-link" onClick={onHsModal}>What is Human Signal?</button>
+
       </div>
 
       {feedTab === "following" && (
@@ -3202,7 +3202,6 @@ export default function App() {
         <Feed
           user={user}
           onRead={openReading}
-          onHsModal={() => setHsModalOpen(true)}
           onAuthorClick={openUserProfile}
           dropCapImages={dropCapImages}
           onRequestAuth={() => setAuthOpen(true)}

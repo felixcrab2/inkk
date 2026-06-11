@@ -44,7 +44,7 @@ const HEADER_Y  = 40;   // running header baseline (pt from top)
 const FOOTER_FROM_BOTTOM = 34;
 
 // Typography (pt).
-const T_TITLE   = 13.5;
+const T_TITLE   = 16;
 const T_HEADER  = 8.5;
 const T_BODY    = 11.25;
 const T_DROPCAP = 42;
@@ -513,7 +513,7 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
   let titleLines = [];
   let titleBlockH = 0;
   if (titleStr) {
-    mctx.font = font(T_TITLE, true, true);
+    mctx.font = font(T_TITLE, false, true);
     titleLines = wrapSegment(mctx, titleStr, fullWidth).map(l => l.text);
     if (!titleLines.length) titleLines = [titleStr];
     const bylineH = bylineStr ? Math.round(T_TITLE * 0.9 * PX * TITLE_LINE_MULT + 8 * PX) : 0;
@@ -616,7 +616,7 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
 
         // ── Page 1: small italic chapter title (wrapped) ────────────────
         if (isFirst && titleStr) {
-          ctx.font = font(T_TITLE, true, true);
+          ctx.font = font(T_TITLE, false, true);
           ctx.fillStyle = INK_TITLE;
           ctx.textAlign = "center";
           for (const ln of titleLines) {
