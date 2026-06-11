@@ -1,7 +1,7 @@
 {
   "files": {
-    "main.css": "/static/css/main.2bd3d089.css",
-    "main.js": "/static/js/main.5700decc.js",
+    "main.css": "/static/css/main.b45d1f4f.css",
+    "main.js": "/static/js/main.d4f36ed4.js",
     "static/js/239.d2863414.chunk.js": "/static/js/239.d2863414.chunk.js",
     "static/js/977.a1aca4e4.chunk.js": "/static/js/977.a1aca4e4.chunk.js",
     "static/js/732.d8915e0d.chunk.js": "/static/js/732.d8915e0d.chunk.js",
@@ -61,14 +61,14 @@
     "static/media/cormorant-garamond-vietnamese-400-normal.woff2": "/static/media/cormorant-garamond-vietnamese-400-normal.c3fc36bf9fbada2beb07.woff2",
     "static/media/eb-garamond-vietnamese-400-normal.woff2": "/static/media/eb-garamond-vietnamese-400-normal.92880281b2c4a1ac7022.woff2",
     "index.html": "/index.html",
-    "main.2bd3d089.css.map": "/static/css/main.2bd3d089.css.map",
-    "main.5700decc.js.map": "/static/js/main.5700decc.js.map",
+    "main.b45d1f4f.css.map": "/static/css/main.b45d1f4f.css.map",
+    "main.d4f36ed4.js.map": "/static/js/main.d4f36ed4.js.map",
     "239.d2863414.chunk.js.map": "/static/js/239.d2863414.chunk.js.map",
     "977.a1aca4e4.chunk.js.map": "/static/js/977.a1aca4e4.chunk.js.map",
     "732.d8915e0d.chunk.js.map": "/static/js/732.d8915e0d.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.2bd3d089.css",
-    "static/js/main.5700decc.js"
+    "static/css/main.b45d1f4f.css",
+    "static/js/main.d4f36ed4.js"
   ]
 }

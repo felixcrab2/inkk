@@ -281,20 +281,6 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
 }
 
-function pubPreview(content) {
-  const lines = stripHtml(content || "").trim().split("\n").filter(l => l.trim());
-  const body = lines.slice(1).join(" ").trim();
-  return body.length > 140 ? body.slice(0, 140).trimEnd() + "…" : body;
-}
-
-function openingLine(content) {
-  const lines = stripHtml(content || "").trim().split("\n").filter(l => l.trim());
-  const body = lines.slice(1).join(" ").trim();
-  if (!body) return "";
-  const m = body.match(/^(.{20,160}?[.!?])(?:\s|$)/);
-  if (m) return m[1];
-  return body.length > 140 ? body.slice(0, 140).trimEnd() + "…" : body;
-}
 
 function formatJoined(isoOrDate) {
   if (!isoOrDate) return "";
@@ -1102,38 +1088,51 @@ function DownloadModal({ onConfirm, onClose }) {
 
 // ─── Feed ─────────────────────────────────────────────────────────────────────
 
-function BookSpineCard({ pub, index, onRead, onAuthorClick, onLike }) {
-  const hook         = openingLine(pub.content);
+function FeedCard({ pub, index, onRead, onAuthorClick, onLike }) {
+  const excerpt = pub.content
+    ? stripHtml(pub.content).replace(/\s+/g, " ").trim().slice(0, 300)
+    : "";
   const likeCount    = getRelCount(pub.like_count);
   const commentCount = getRelCount(pub.comment_count);
   const sc           = scoreFromRecord(pub);
+
   return (
-    <article className="book-spine" style={{ "--card-index": index }} onClick={() => onRead(pub)}>
-      <div className="book-spine-row">
-        <div className="book-spine-edge" />
-        <span className="book-spine-title">{pub.title}</span>
+    <article
+      className="feed-item"
+      style={{ "--card-index": index }}
+      onClick={() => onRead(pub)}
+    >
+      <h2 className="feed-item-title">{pub.title || "Untitled"}</h2>
+      {excerpt && <p className="feed-item-excerpt">{excerpt}</p>}
+      <div className="feed-item-meta">
         {pub.author_name && (
           <button
-            className="book-spine-author book-spine-author-btn"
-            onClick={e => { e.stopPropagation(); if (pub.user_id) onAuthorClick(pub.user_id); }}
-          >{pub.author_name}</button>
+            className="feed-item-author"
+            onClick={e => { e.stopPropagation(); pub.user_id && onAuthorClick(pub.user_id); }}
+          >
+            {pub.author_name}
+          </button>
         )}
-      </div>
-      <div className="book-spine-preview">
-        {hook && <p className="book-spine-hook">{hook}</p>}
-        <div className="book-spine-foot">
-          <span className="book-spine-meta">{formatDate(pub.published_at)} · {readingTime(pub.content)}</span>
-          <div className="book-spine-actions">
-            {sc && <HumanSignalBadge score={sc} />}
-            <button className="engage-btn engage-like" onClick={e => { e.stopPropagation(); onLike(pub); }}>
-              <Heart size={13} strokeWidth={1.6} fill="none" />
-              <span>{likeCount}</span>
-            </button>
-            <button className="engage-btn engage-comment" onClick={e => { e.stopPropagation(); onRead(pub, { focus: "comments" }); }}>
-              <MessageCircle size={13} strokeWidth={1.6} />
-              <span>{commentCount}</span>
-            </button>
-          </div>
+        <span className="feed-item-dot">·</span>
+        <span>{readingTime(pub.content)}</span>
+        <span className="feed-item-dot">·</span>
+        <span>{formatDate(pub.published_at)}</span>
+        <div className="feed-item-actions">
+          {sc && <HumanSignalBadge score={sc} />}
+          <button
+            className="feed-item-engage"
+            onClick={e => { e.stopPropagation(); onLike(pub); }}
+          >
+            <Heart size={13} strokeWidth={1.5} fill="none" />
+            <span>{likeCount}</span>
+          </button>
+          <button
+            className="feed-item-engage"
+            onClick={e => { e.stopPropagation(); onRead(pub, { focus: "comments" }); }}
+          >
+            <MessageCircle size={13} strokeWidth={1.5} />
+            <span>{commentCount}</span>
+          </button>
         </div>
       </div>
     </article>
@@ -1203,7 +1202,6 @@ function Feed({ user, onRead, onHsModal, onAuthorClick, dropCapImages, onRequest
   return (
     <div id="feed-container">
       <div id="feed-header">
-        <h1 id="feed-title">Explore human writing.</h1>
         <div id="feed-tabs">
           {user && (
             <button className={`feed-tab${feedTab === "following" ? " active" : ""}`} onClick={() => setFeedTab("following")}>Following</button>
@@ -1221,7 +1219,7 @@ function Feed({ user, onRead, onHsModal, onAuthorClick, dropCapImages, onRequest
             <p className="feed-empty">No posts yet. Follow writers to see their work here.</p>
           )}
           {followingPubs.map((pub, i) => (
-            <BookSpineCard key={pub.id} pub={pub} index={i} onRead={onRead} onAuthorClick={onAuthorClick} onLike={handleFollowingLike} />
+            <FeedCard key={pub.id} pub={pub} index={i} onRead={onRead} onAuthorClick={onAuthorClick} onLike={handleFollowingLike} />
           ))}
         </div>
       )}
@@ -1253,7 +1251,7 @@ function Feed({ user, onRead, onHsModal, onAuthorClick, dropCapImages, onRequest
             <p className="feed-empty">nothing published yet — be the first.</p>
           )}
           {pubs.map((pub, i) => (
-            <BookSpineCard key={pub.id} pub={pub} index={i} onRead={onRead} onAuthorClick={onAuthorClick} onLike={handleLike} />
+            <FeedCard key={pub.id} pub={pub} index={i} onRead={onRead} onAuthorClick={onAuthorClick} onLike={handleLike} />
           ))}
         </div>
       )}
@@ -1470,37 +1468,25 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
               )}
               {drafts.map((d, idx) => {
                 const title = stripHtml(d.title || "") || docTitle(d.content);
-                const preview = pubPreview(d.content);
                 const wc = wordCount(d.content);
-                const sc = d.humanScore != null && d.scoreTier ? { score: d.humanScore, tier: d.scoreTier, confidence: d.scoreFeatures?.confidence ?? 0.5, paste_ratio: d.scoreFeatures?.paste_ratio || 0, contributors: [] } : null;
                 const confirming = confirmDeleteId === d.id;
                 return (
-                  <article key={d.id} className="book-spine spine-draft profile-card" style={{ "--card-index": idx, height: confirming ? "auto" : undefined }} onClick={() => !confirming && onEditDoc(d.id)}>
-                    <div className="book-spine-row">
-                      <div className="book-spine-edge" />
-                      <span className="book-spine-title">{title}</span>
-                      <span className="book-spine-badge">Draft</span>
-                      <span className="book-spine-author">{wc} words</span>
+                  <article key={d.id} className="profile-article-card" style={{ "--card-index": idx }} onClick={() => !confirming && onEditDoc(d.id)}>
+                    <div className="pac-main">
+                      <span className="pac-title">{title || "Untitled"}</span>
+                      <span className="pac-meta">{wc} words · {formatDate(new Date(d.updatedAt).toISOString())}</span>
                     </div>
-                    <div className="book-spine-preview">
-                      {preview && <p className="book-spine-hook">{preview}</p>}
-                      {sc && <HumanSignalBadge score={sc} />}
-                      <div className="book-spine-foot">
-                        <span className="book-spine-meta">{formatDate(new Date(d.updatedAt).toISOString())}</span>
-                        <div className="book-spine-actions" onClick={e => e.stopPropagation()}>
-                          <button className="pub-mini-btn" onClick={e => { e.stopPropagation(); onPublishDoc(d); }}>Publish</button>
-                          {!confirming ? (
-                            <button className="pub-mini-btn pub-mini-danger" onClick={e => { e.stopPropagation(); setConfirmDeleteId(d.id); }}>Delete</button>
-                          ) : (
-                            <span className="pub-confirm">
-                              <span className="pub-confirm-text">Delete?</span>
-                              <button className="pub-mini-btn" onClick={() => setConfirmDeleteId(null)}>Cancel</button>
-                              <button className="pub-mini-btn pub-mini-danger" onClick={() => { onDeleteDoc(d.id); setConfirmDeleteId(null); }}>Yes</button>
-                            </span>
-                          )}
-                        </div>
+                    {!confirming ? (
+                      <div className="pac-actions" onClick={e => e.stopPropagation()}>
+                        <button className="pac-btn" onClick={e => { e.stopPropagation(); onPublishDoc(d); }}>Publish</button>
+                        <button className="pac-btn pac-btn-danger" onClick={e => { e.stopPropagation(); setConfirmDeleteId(d.id); }}>Delete</button>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="pac-confirm" onClick={e => e.stopPropagation()}>
+                        <button className="pac-btn" onClick={() => setConfirmDeleteId(null)}>Cancel</button>
+                        <button className="pac-btn pac-btn-danger" onClick={() => { onDeleteDoc(d.id); setConfirmDeleteId(null); }}>Delete</button>
+                      </div>
+                    )}
                   </article>
                 );
               })}
@@ -1523,46 +1509,31 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
         {pubs.map((pub, idx) => {
           const confirmingUnpublish = confirmUnpublishId === pub.id;
           const confirmingDelete    = confirmDeletePubId === pub.id;
-          const sc = scoreFromRecord(pub);
-          const preview = pubPreview(pub.content);
           return (
-            <article key={pub.id} className="book-spine profile-card" style={{ "--card-index": idx, height: (confirmingUnpublish || confirmingDelete) ? "auto" : undefined }} onClick={() => !confirmingUnpublish && !confirmingDelete && onEditDoc(pub.doc_id)}>
-              <div className="book-spine-row">
-                <div className="book-spine-edge" />
-                <span className="book-spine-title">{pub.title}</span>
-                <span className="book-spine-badge">Published</span>
-                <span className="book-spine-author">{readingTime(pub.content)}</span>
+            <article key={pub.id} className="profile-article-card" style={{ "--card-index": idx }} onClick={() => !confirmingUnpublish && !confirmingDelete && onEditDoc(pub.doc_id)}>
+              <div className="pac-main">
+                <span className="pac-title">{pub.title || "Untitled"}</span>
+                <span className="pac-meta">{readingTime(pub.content)} · {formatDate(pub.published_at)}</span>
               </div>
-              <div className="book-spine-preview">
-                {preview && <p className="book-spine-hook">{preview}</p>}
-                {sc && <HumanSignalBadge score={sc} />}
-                <div className="book-spine-foot">
-                  <span className="book-spine-meta">{formatDate(pub.published_at)}</span>
-                  <div className="book-spine-actions" onClick={e => e.stopPropagation()}>
-                    {!confirmingUnpublish && !confirmingDelete && (
-                      <>
-                        <button className="pub-mini-btn" onClick={e => { e.stopPropagation(); onRead(pub); }}>Read</button>
-                        <button className="pub-mini-btn pub-mini-danger" onClick={e => { e.stopPropagation(); setConfirmUnpublishId(pub.id); }}>Unpublish</button>
-                        <button className="pub-mini-btn pub-mini-danger" onClick={e => { e.stopPropagation(); setConfirmDeletePubId(pub.id); }}>Delete</button>
-                      </>
-                    )}
-                    {confirmingUnpublish && (
-                      <span className="pub-confirm">
-                        <span className="pub-confirm-text">Remove from feed?</span>
-                        <button className="pub-mini-btn" onClick={() => setConfirmUnpublishId(null)}>Cancel</button>
-                        <button className="pub-mini-btn pub-mini-danger" onClick={async (e) => { await handleUnpublish(pub, e); setConfirmUnpublishId(null); }}>Yes</button>
-                      </span>
-                    )}
-                    {confirmingDelete && (
-                      <span className="pub-confirm">
-                        <span className="pub-confirm-text">Delete permanently?</span>
-                        <button className="pub-mini-btn" onClick={() => setConfirmDeletePubId(null)}>Cancel</button>
-                        <button className="pub-mini-btn pub-mini-danger" onClick={() => { handleDeletePub(pub); setConfirmDeletePubId(null); }}>Yes</button>
-                      </span>
-                    )}
-                  </div>
+              {!confirmingUnpublish && !confirmingDelete && (
+                <div className="pac-actions" onClick={e => e.stopPropagation()}>
+                  <button className="pac-btn" onClick={e => { e.stopPropagation(); onRead(pub); }}>Read</button>
+                  <button className="pac-btn pac-btn-danger" onClick={e => { e.stopPropagation(); setConfirmUnpublishId(pub.id); }}>Unpublish</button>
+                  <button className="pac-btn pac-btn-danger" onClick={e => { e.stopPropagation(); setConfirmDeletePubId(pub.id); }}>Delete</button>
                 </div>
-              </div>
+              )}
+              {confirmingUnpublish && (
+                <div className="pac-confirm" onClick={e => e.stopPropagation()}>
+                  <button className="pac-btn" onClick={() => setConfirmUnpublishId(null)}>Cancel</button>
+                  <button className="pac-btn pac-btn-danger" onClick={async (e) => { await handleUnpublish(pub, e); setConfirmUnpublishId(null); }}>Remove</button>
+                </div>
+              )}
+              {confirmingDelete && (
+                <div className="pac-confirm" onClick={e => e.stopPropagation()}>
+                  <button className="pac-btn" onClick={() => setConfirmDeletePubId(null)}>Cancel</button>
+                  <button className="pac-btn pac-btn-danger" onClick={() => { handleDeletePub(pub); setConfirmDeletePubId(null); }}>Delete</button>
+                </div>
+              )}
             </article>
           );
         })}
@@ -1768,7 +1739,7 @@ function UserProfileView({ profile, onRead, dropCapImages, user, onRequestAuth }
         {loading && <p className="feed-empty">loading…</p>}
         {!loading && pubs.length === 0 && <p className="feed-empty">nothing published yet.</p>}
         {pubs.map((pub, i) => (
-          <BookSpineCard key={pub.id} pub={pub} index={i} onRead={onRead} onAuthorClick={() => {}} onLike={handleLike} />
+          <FeedCard key={pub.id} pub={pub} index={i} onRead={onRead} onAuthorClick={() => {}} onLike={handleLike} />
         ))}
       </div>
     </div>
