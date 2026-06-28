@@ -279,14 +279,22 @@ export function HumanSignalLine({ score, words, saving, online, signedIn, publis
 }
 
 // Public-facing badge — kept intentionally quiet. No tier dots, no number,
-// just a small "process recorded" mark so readers know inkk captured the
-// writing. The full process view lives behind a dedicated reader-side toggle.
+// just a small mark so readers know inkk captured the writing. Reads
+// "human-verified" only when the signal is strong enough to earn it; otherwise
+// the quieter "process recorded". The full process view lives behind a
+// dedicated reader-side toggle.
+const VERIFIED_TIERS = new Set(["Strong", "Distinct"]);
+
 export function HumanSignalBadge({ score }) {
   if (!score) return null;
+  const verified = VERIFIED_TIERS.has(score.tier);
   return (
-    <span className="hs-badge" title="Written with inkk — process metadata recorded">
+    <span
+      className={`hs-badge${verified ? " hs-badge-verified" : ""}`}
+      title={verified ? "Human-verified in inkk — strong writing-process signal" : "Written with inkk — process metadata recorded"}
+    >
       <span className="hs-badge-mark" aria-hidden="true">◇</span>
-      <span className="hs-badge-text">process recorded</span>
+      <span className="hs-badge-text">{verified ? "human-verified" : "process recorded"}</span>
     </span>
   );
 }

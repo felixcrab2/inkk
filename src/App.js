@@ -27,6 +27,8 @@ import {
 import { claimAnonymous as claimAnonymousEvents, clearForUser as clearLocalForUser } from "./telemetry/store";
 import { HumanSignalBadge, HumanSignalPanel } from "./components/HumanSignal";
 import { PrivacyModal, TermsModal, TOS_VERSION } from "./components/Legal";
+import { VerifyView } from "./components/Verify";
+import { makeVerifyCode, hashContent, isVerifiedTier } from "./verify/code";
 
 // ─── local storage ────────────────────────────────────────────────────────────
 
@@ -364,7 +366,7 @@ function mergeDocs(local, cloud) {
 
 // ─── publications ─────────────────────────────────────────────────────────────
 
-const PUB_SELECT = "id, title, content, published_at, author_name, author_username, user_id, writing_time_seconds, revision_count, human_score, score_tier, score_features, keystrokes, deletions, pastes";
+const PUB_SELECT = "id, title, content, published_at, author_name, author_username, user_id, writing_time_seconds, revision_count, human_score, score_tier, score_features, keystrokes, deletions, pastes, verify_code, content_hash";
 const PUB_SELECT_WITH_COUNTS = PUB_SELECT + ", like_count:likes(count), comment_count:comments(count)";
 
 function getRelCount(rel) {
@@ -515,11 +517,28 @@ async function fetchMyPublications(userId) {
   return data;
 }
 
+// Publish (or re-publish) a document, and issue/refresh its human-signal
+// certificate. Returns { error, code, verified } — the code is the current
+// verification handle for the published piece.
 async function doPublish(doc, user, title, authorName, authorUsername) {
-  if (!supabase || !user) return "Not signed in.";
+  if (!supabase || !user) return { error: "Not signed in." };
   const { data: existing, error: fetchErr } = await supabase
-    .from("publications").select("id").eq("doc_id", doc.id).maybeSingle();
-  if (fetchErr) return fetchErr.message;
+    .from("publications").select("id, content_hash, verify_code").eq("doc_id", doc.id).maybeSingle();
+  if (fetchErr) return { error: fetchErr.message };
+
+  // Bind the certificate to the text. If the text is unchanged from the last
+  // publish, keep the same code (no-op re-publishes don't rotate it); if it
+  // changed, mint a fresh code so the old one keeps verifying the older text.
+  // A certificate is only meaningful with a content hash — without one (e.g.
+  // Web Crypto unavailable in an insecure context) we publish without touching
+  // the verify fields rather than write an unbacked code.
+  const contentHash = await hashContent(doc.content);
+  const verified    = isVerifiedTier(doc.scoreTier);
+  const unchanged   = !!(existing?.verify_code && existing.content_hash && contentHash
+                      && existing.content_hash === contentHash);
+  const code        = contentHash ? (unchanged ? existing.verify_code : makeVerifyCode())
+                                  : (existing?.verify_code || null);
+
   const payload = {
     title, content: doc.content, author_name: authorName,
     author_username: authorUsername || null,
@@ -533,13 +552,45 @@ async function doPublish(doc, user, title, authorName, authorUsername) {
     score_tier:     doc.scoreTier      ?? null,
     score_features: doc.scoreFeatures  ?? null,
   };
-  let error;
+  // Only write the verify fields when we actually have a hash to back them.
+  if (contentHash) {
+    payload.verify_code  = code;
+    payload.content_hash = contentHash;
+  }
+
+  let error, publicationId = existing?.id || null;
   if (existing) {
     ({ error } = await supabase.from("publications").update(payload).eq("id", existing.id));
   } else {
-    ({ error } = await supabase.from("publications").insert({ ...payload, doc_id: doc.id, user_id: user.id }));
+    const { data, error: insErr } = await supabase
+      .from("publications").insert({ ...payload, doc_id: doc.id, user_id: user.id })
+      .select("id").maybeSingle();
+    error = insErr;
+    publicationId = data?.id || null;
   }
-  return error ? error.message : null;
+  if (error) return { error: error.message };
+
+  // Append an immutable certificate to the ledger (skip when the code was
+  // reused — that exact certificate already exists). Best-effort: a failure
+  // here shouldn't block the publish itself.
+  if (!unchanged && contentHash) {
+    await supabase.from("verifications").insert({
+      code,
+      publication_id: publicationId,
+      doc_id: doc.id,
+      user_id: user.id,
+      title,
+      author_name: authorName,
+      author_username: authorUsername || null,
+      content_hash: contentHash,
+      word_count: wordCount(doc.content),
+      human_score: doc.humanScore ?? null,
+      score_tier:  doc.scoreTier  ?? null,
+      verified,
+    });
+  }
+
+  return { error: null, code, verified };
 }
 
 async function doUnpublish(docId) {
@@ -592,10 +643,11 @@ async function fetchProfileByUsername(username) {
   return data || null;
 }
 
-function viewToPath(view, pub, userProfile) {
+function viewToPath(view, pub, userProfile, code) {
   if (view === "feed")        return "/feed";
   if (view === "search")      return "/people";
   if (view === "profile")     return "/profile";
+  if (view === "verify")      return code ? `/v/${code}` : "/verify";
   if (view === "reading" && pub)          return `/read/${pub.id}`;
   if (view === "userProfile" && userProfile) return `/u/${userProfile.username}`;
   return "/";
@@ -604,6 +656,7 @@ function viewToPath(view, pub, userProfile) {
 function pathToView(path) {
   if (path.startsWith("/read/"))  return "reading";
   if (path.startsWith("/u/"))     return "userProfile";
+  if (path.startsWith("/v/") || path === "/verify") return "verify";
   if (path === "/feed")   return "feed";
   if (path === "/people") return "search";
   if (path === "/profile") return "profile";
@@ -1357,7 +1410,7 @@ function Feed({ user, onRead, onAuthorClick, dropCapImages, onRequestAuth }) {
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
-function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapImages, onRead, onUnpublish, onSignIn, onSignOut, onAvatarChange, onEditDoc, onNewDoc, onDeleteDoc, onPublishDoc, researchOptIn, onToggleOptIn, onDownloadData, onDeleteData, onChangePassword, onProfileUpdate }) {
+function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapImages, onRead, onUnpublish, onSignIn, onSignOut, onAvatarChange, onEditDoc, onNewDoc, onDeleteDoc, onPublishDoc, researchOptIn, onToggleOptIn, onDownloadData, onDeleteData, onChangePassword, onProfileUpdate, onOpenVerify }) {
   const [pubs, setPubs]           = useState([]);
   const [loading, setLoading]     = useState(!!user);
   const [uploading, setUploading] = useState(false);
@@ -1694,6 +1747,8 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
       </section>
 
       <div id="account-footer">
+        <button className="account-link" onClick={() => onOpenVerify?.()}>Verify a piece</button>
+        <span className="account-dot">·</span>
         <button className="account-link" onClick={onChangePassword}>Change password</button>
         <span className="account-dot">·</span>
         <a className="account-link" href="mailto:hello@inkk.example?subject=Hello%20Inkk">Contact</a>
@@ -1847,11 +1902,12 @@ function UserProfileView({ profile, onRead, dropCapImages, user, onRequestAuth }
 
 // ─── ReadingView ──────────────────────────────────────────────────────────────
 
-function ReadingView({ pub, user, dropCapImages, focus, onRequestAuth, onAuthorClick }) {
+function ReadingView({ pub, user, dropCapImages, focus, onRequestAuth, onAuthorClick, onVerify }) {
   const containerRef = useRef(null);
   const commentsRef  = useRef(null);
   const [progress, setProgress] = useState(0);
   const [copied, setCopied]     = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
   const [likeCount, setLikeCount]       = useState(getRelCount(pub.like_count));
   const [liked, setLiked]               = useState(false);
   const [likeBusy, setLikeBusy]         = useState(false);
@@ -1923,6 +1979,14 @@ function ReadingView({ pub, user, dropCapImages, focus, onRequestAuth, onAuthorC
     });
   }, [pub]);
 
+  const copyCode = useCallback(() => {
+    if (!pub.verify_code) return;
+    navigator.clipboard.writeText(pub.verify_code).then(() => {
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 2000);
+    });
+  }, [pub.verify_code]);
+
   const toggleLike = useCallback(async () => {
     if (!user) { onRequestAuth?.(); return; }
     if (likeBusy) return;
@@ -1991,6 +2055,25 @@ function ReadingView({ pub, user, dropCapImages, focus, onRequestAuth, onAuthorC
               <img key={i} className="reading-page-img" src={url} alt="" />
             ))}
           </div>
+
+          {/* ── Verification colophon ──────────────────────────────────────── */}
+          {pub.verify_code && (
+            <div className={`reading-verify${isVerifiedTier(pub.score_tier) ? " is-verified" : ""}`}>
+              <span className="rv-mark" aria-hidden="true">◇</span>
+              <div className="rv-body">
+                <span className="rv-status">
+                  {isVerifiedTier(pub.score_tier) ? "Human-verified" : "Written in inkk"}
+                </span>
+                <button className="rv-code" onClick={copyCode} title="Copy code">
+                  {pub.verify_code}
+                  <span className="rv-copy">{codeCopied ? "copied" : "copy"}</span>
+                </button>
+              </div>
+              <button className="rv-verify-link" onClick={() => onVerify?.(pub.verify_code)}>
+                Verify →
+              </button>
+            </div>
+          )}
 
           {/* ── Like + Comments ──────────────────────────────────────────── */}
           <div id="reading-footer">
@@ -2097,6 +2180,9 @@ export default function App() {
   const [readingPub, setReadingPub]   = useState(null);
   const [readingFocus, setReadingFocus] = useState(null);
   const [publishedDocIds, setPublishedDocIds] = useState(new Set());
+  const [pubCerts, setPubCerts]       = useState({});   // docId → { code, verified }
+  const [verifyCode, setVerifyCode]   = useState(() =>
+    window.location.pathname.startsWith("/v/") ? window.location.pathname.slice(3) : "");
   const [publishModalDoc, setPublishModalDoc] = useState(null);
   const [font, setFont]               = useState(() => localStorage.getItem("inkk_font") || "garamond");
   const [showLanding, setShowLanding] = useState(() => !localStorage.getItem("inkk_visited"));
@@ -2305,13 +2391,14 @@ export default function App() {
   }, [addToast]);
 
   const navigate = useCallback((newView, opts = {}) => {
-    const { pub, userProfile } = opts;
-    const url = viewToPath(newView, pub, userProfile);
+    const { pub, userProfile, code } = opts;
+    const url = viewToPath(newView, pub, userProfile, code);
     if (window.location.pathname !== url)
-      window.history.pushState({ view: newView, pubId: pub?.id, username: userProfile?.username }, "", url);
+      window.history.pushState({ view: newView, pubId: pub?.id, username: userProfile?.username, code }, "", url);
     setView(newView);
     if (pub       !== undefined) setReadingPub(pub);
     if (userProfile !== undefined) setViewingUser(userProfile);
+    if (newView === "verify") setVerifyCode(code || "");
   }, []);
 
   useEffect(() => {
@@ -2321,6 +2408,7 @@ export default function App() {
       setView(newView);
       if (newView !== "reading")     setReadingPub(null);
       if (newView !== "userProfile") setViewingUser(null);
+      if (newView === "verify")      setVerifyCode(s.code || "");
       if (newView === "reading" && s.pubId) {
         const pub = await fetchPublicationById(s.pubId);
         if (pub) setReadingPub(pub);
@@ -2389,6 +2477,10 @@ export default function App() {
       if (docToLoad) loadDocIntoEditor(docToLoad, { preserveLocalTitle: true });
       const myPubs = await fetchMyPublications(signedInUser.id);
       setPublishedDocIds(new Set(myPubs.map(p => p.doc_id).filter(Boolean)));
+      setPubCerts(Object.fromEntries(
+        myPubs.filter(p => p.doc_id && p.verify_code)
+          .map(p => [p.doc_id, { code: p.verify_code, verified: isVerifiedTier(p.score_tier) }])
+      ));
       const prof = await fetchProfile(signedInUser.id);
       if (prof) {
         setProfile(prof);
@@ -2532,13 +2624,15 @@ export default function App() {
   const confirmPublish = useCallback(async (title, authorName) => {
     if (!publishModalDoc) return "No document selected.";
     const wasAlreadyPublished = publishedDocIds.has(publishModalDoc.id);
-    const errMsg = await doPublish(publishModalDoc, userRef.current, title, authorName, profile?.username);
-    if (!errMsg) {
-      setPublishedDocIds(prev => new Set([...prev, publishModalDoc.id]));
+    const { error, code, verified } = await doPublish(publishModalDoc, userRef.current, title, authorName, profile?.username);
+    if (!error) {
+      const docId = publishModalDoc.id;
+      setPublishedDocIds(prev => new Set([...prev, docId]));
+      if (code) setPubCerts(prev => ({ ...prev, [docId]: { code, verified } }));
       setPublishModalDoc(null);
-      addToast(wasAlreadyPublished ? "Updated." : "Published to feed.");
+      addToast(verified ? "Published · human-verified." : (wasAlreadyPublished ? "Updated." : "Published to feed."));
     }
-    return errMsg;
+    return error;
   }, [publishModalDoc, publishedDocIds, profile, addToast]);
 
   const openUserProfile = useCallback(async (userIdOrProfile) => {
@@ -2752,6 +2846,12 @@ export default function App() {
     ];
     // PNG outputs default to inkk background; user can override.
     const paperTexture = style.paperTexture ?? (format === "pdf");
+    // Verification certificate for this piece, if it's published. Printed as a
+    // colophon and (for PDF) written into the document metadata.
+    const cert = pubCerts[activeId];
+    const verify = cert?.code
+      ? { code: cert.code, verified: !!cert.verified, host: window.location.host }
+      : null;
     const renderOptions = {
       pageW: preset.w,
       pageH: preset.h,
@@ -2760,12 +2860,25 @@ export default function App() {
       titleGap:        style.titleGap        ?? "normal",
       paragraphIndent: style.paragraphIndent ?? true,
       paperTexture,
+      verify,
     };
 
     try {
       if (format === "pdf") {
         const pdf = new jsPDF({ unit: "pt", format: [preset.w, preset.h], compress: true });
         const byline = profile?.display_name || profile?.username || "";
+        if (pdf.setProperties) {
+          pdf.setProperties({
+            title:   titleStr || "inkk",
+            author:  byline || "inkk",
+            creator: "inkk",
+            subject: verify
+              ? `${verify.verified ? "Human-verified" : "Written"} in inkk · verify at ${verify.host}/verify · ${verify.code}`
+              : "Written in inkk",
+            keywords: ["inkk", verify ? (verify.verified ? "human-verified" : "written-in-inkk") : null, verify?.code]
+              .filter(Boolean).join(", "),
+          });
+        }
         await renderBookPdfPages({
           title: titleStr,
           byline,
@@ -2807,7 +2920,7 @@ export default function App() {
       addToast("Download failed.");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [addToast, profile?.display_name, profile?.username]);
+  }, [addToast, profile?.display_name, profile?.username, pubCerts, activeId]);
 
   const openDownloadModal = useCallback(() => {
     if (!stripHtml(contentRef.current || "").trim()) return;
@@ -2855,7 +2968,7 @@ export default function App() {
     const initView = pathToView(initPath);
     // Preserve hash — Supabase reads #access_token from it during OAuth callback
     const initUrl = initPath + window.location.search + window.location.hash;
-    window.history.replaceState({ view: initView, pubId: initPath.startsWith("/read/") ? initPath.slice(6) : undefined, username: initPath.startsWith("/u/") ? initPath.slice(3) : undefined }, "", initUrl);
+    window.history.replaceState({ view: initView, pubId: initPath.startsWith("/read/") ? initPath.slice(6) : undefined, username: initPath.startsWith("/u/") ? initPath.slice(3) : undefined, code: initPath.startsWith("/v/") ? initPath.slice(3) : undefined }, "", initUrl);
     // If landing directly on a reading or user-profile URL, load the data
     if (initView === "reading") {
       const pubId = initPath.slice(6);
@@ -2966,6 +3079,18 @@ export default function App() {
     navigate("reading", { pub });
   }, [navigate]);
 
+  const openVerify = useCallback((code) => {
+    navigate("verify", { code: code || "" });
+  }, [navigate]);
+
+  // From the verify view: resolve a certificate's publication and open it.
+  const openPieceById = useCallback(async (pubId) => {
+    if (!pubId) return;
+    const pub = await fetchPublicationById(pubId);
+    if (pub) openReading(pub);
+    else addToast("That piece is no longer available.");
+  }, [openReading, addToast]);
+
   const goBack = useCallback(() => {
     window.history.back();
   }, []);
@@ -2997,7 +3122,7 @@ export default function App() {
               {docs.length > 1 && <span className="icon-btn-count">{docs.length}</span>}
             </button>
           )}
-          {(view === "reading" || view === "userProfile") && (
+          {(view === "reading" || view === "userProfile" || view === "verify") && (
             <button className="icon-btn" onClick={goBack} title="Back">
               <ArrowLeft size={18} />
             </button>
@@ -3028,6 +3153,22 @@ export default function App() {
                 <div id="publish-menu">
                   {!confirmUnpublishOpen ? (
                     <>
+                      {pubCerts[activeId]?.code && (
+                        <div className="publish-menu-cert">
+                          <span className="pmc-label">
+                            {pubCerts[activeId].verified ? "Human-verified" : "Verification code"}
+                          </span>
+                          <button
+                            className="pmc-code"
+                            title="Copy code"
+                            onClick={() => navigator.clipboard?.writeText(pubCerts[activeId].code).then(() => addToast("Code copied."))}
+                          >{pubCerts[activeId].code}</button>
+                          <button
+                            className="pmc-verify-link"
+                            onClick={() => { setPublishMenuOpen(false); openVerify(pubCerts[activeId].code); }}
+                          >Open verification →</button>
+                        </div>
+                      )}
                       <button className="publish-menu-item" onClick={() => {
                         setPublishMenuOpen(false);
                         const doc = docs.find(d => d.id === activeId);
@@ -3329,6 +3470,7 @@ export default function App() {
           onDeleteData={deleteResearchData}
           onChangePassword={() => setUpdatePasswordOpen(true)}
           onProfileUpdate={(updatedProfile) => setProfile(updatedProfile)}
+          onOpenVerify={() => openVerify()}
         />
       )}
       {view === "search" && (
@@ -3351,11 +3493,19 @@ export default function App() {
           focus={readingFocus}
           onRequestAuth={() => setAuthOpen(true)}
           onAuthorClick={openUserProfile}
+          onVerify={openVerify}
+        />
+      )}
+      {view === "verify" && (
+        <VerifyView
+          initialCode={verifyCode}
+          onOpenPiece={openPieceById}
+          onBrowse={() => navigate("feed")}
         />
       )}
 
       {/* ── bottom nav ── */}
-      {view !== "reading" && view !== "userProfile" && (
+      {view !== "reading" && view !== "userProfile" && view !== "verify" && (
         <nav id="bottom-nav" className={isEditor ? menuClass : ""}>
           <button className={`nav-tab ${isEditor ? "active" : ""}`} onClick={() => navigate("editor")}>
             <PenLine size={18} strokeWidth={1.75} />

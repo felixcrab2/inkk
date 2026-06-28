@@ -480,6 +480,7 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
     titleGap         = "normal",   // 'tight' | 'normal' | 'loose'
     paragraphIndent  = true,
     paperTexture     = true,
+    verify           = null,       // { code, host, verified } → printed colophon
   } = options;
 
   const texture = paperTexture ? await loadTexture() : null;
@@ -695,6 +696,22 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
         ctx.textAlign = "center";
         // En-spaces around dots for elegance.
         ctx.fillText(`· ${pageNum} ·`, cw / 2, footerBaseline);
+        // Verification colophon (last page only) — a printer's-mark so the
+        // code survives the export even as a screenshot; readers can confirm
+        // it at {host}/verify.
+        if (verify?.code && pi === totalPages - 1) {
+          const label = verify.verified ? "human-verified in inkk" : "written in inkk";
+          const line  = `${label}   ${verify.host ? verify.host + "/verify" : "verify"}   ${verify.code}`;
+          let size = T_HEADER;
+          ctx.font = font(size, true);
+          while (ctx.measureText(line).width > fullWidth && size > 5) {
+            size -= 0.5;
+            ctx.font = font(size, true);
+          }
+          ctx.fillStyle = INK_HEADER;
+          ctx.textAlign = "center";
+          ctx.fillText(line, cw / 2, (pageH - 15) * PX);
+        }
       },
     });
 

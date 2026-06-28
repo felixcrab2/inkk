@@ -176,3 +176,74 @@ drop policy if exists "comments_update_own"  on public.comments;
 create policy "comments_update_own"  on public.comments for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 drop policy if exists "comments_delete_own"  on public.comments;
 create policy "comments_delete_own"  on public.comments for delete using (auth.uid() = user_id);
+
+-- ── 10. Verification certificates ──────────────────────────────────────────
+-- An immutable ledger: one row per published version. It stores only metadata
+-- and a content hash — never a copy of the text and never the keystroke
+-- process — so the full audit trail of every version stays tiny. Editing a
+-- piece and re-publishing issues a NEW code; old codes keep verifying the
+-- older text via their stored hash. (The keystroke stream lives in
+-- writing_events, gated by opt-in; the certificate never duplicates it.)
+
+-- "Current" pointer on the publication for quick display / lookup.
+alter table public.publications
+  add column if not exists verify_code  text,
+  add column if not exists content_hash text;
+create unique index if not exists publications_verify_code_idx
+  on public.publications(verify_code) where verify_code is not null;
+
+create table if not exists public.verifications (
+  code            text primary key,                 -- INKK-XXXX-XXXX-XXXX
+  publication_id  uuid references public.publications(id) on delete set null,
+  doc_id          uuid,
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  title           text,
+  author_name     text,
+  author_username text,
+  content_hash    text not null,                    -- sha-256 of normalised text
+  word_count      integer,
+  human_score     smallint,
+  score_tier      text,
+  verified        boolean not null default false,   -- score_tier in (Strong, Distinct)
+  issued_at       timestamptz not null default now()
+);
+create index if not exists verifications_doc_idx on public.verifications(doc_id, issued_at desc);
+create index if not exists verifications_pub_idx on public.verifications(publication_id);
+
+alter table public.verifications enable row level security;
+
+-- Owners can see/insert/delete their own certificate rows. Public verification
+-- goes through the security-definer RPC below (exact-code lookup only — the
+-- table itself can't be listed/enumerated).
+drop policy if exists "ver_select_own" on public.verifications;
+create policy "ver_select_own" on public.verifications
+  for select using (auth.uid() = user_id);
+
+drop policy if exists "ver_insert_own" on public.verifications;
+create policy "ver_insert_own" on public.verifications
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "ver_delete_own" on public.verifications;
+create policy "ver_delete_own" on public.verifications
+  for delete using (auth.uid() = user_id);
+
+-- Public verify-by-code: returns one certificate by exact code, for anyone
+-- (readers checking an exported PDF are usually logged out). Exact match only.
+create or replace function public.verify_by_code(p_code text)
+returns table (
+  code text, publication_id uuid, title text, author_name text,
+  author_username text, content_hash text, word_count integer,
+  human_score smallint, score_tier text, verified boolean, issued_at timestamptz
+)
+language sql
+security definer
+set search_path = public
+as $$
+  select v.code, v.publication_id, v.title, v.author_name, v.author_username,
+         v.content_hash, v.word_count, v.human_score, v.score_tier, v.verified, v.issued_at
+  from public.verifications v
+  where v.code = upper(btrim(p_code))
+  limit 1;
+$$;
+
+grant execute on function public.verify_by_code(text) to anon, authenticated;
