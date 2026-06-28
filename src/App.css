@@ -3004,7 +3004,7 @@ body.focus-mode #text-container {
 #verify-view {
   position: absolute;
   top: var(--top-bar);
-  left: 0; right: 0; bottom: 0;
+  left: 0; right: 0; bottom: var(--bottom-nav);
   overflow-y: auto;
   background: var(--bg);
 }
@@ -3227,3 +3227,55 @@ body.focus-mode #text-container {
   .verify-cert { padding: 24px 20px; }
   .reading-verify { flex-wrap: wrap; }
 }
+
+/* ─── Verify nav tab + author code discovery ─────────────────────────────── */
+
+/* The ◇ signal mark as a bottom-nav icon — inherits the tab's colour. */
+.nav-diamond {
+  font-size: 1.05rem;
+  line-height: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Verification code on each published piece in Profile. */
+.pac-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  margin-top: 9px;
+}
+.pac-code-mark { color: var(--gold); font-size: 0.7rem; line-height: 1; }
+.pac-code-val {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 9px;
+}
+.pac-code-val:hover { color: var(--text); }
+.pac-code-copied {
+  font-size: 0.54rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--subtle);
+  opacity: 0.75;
+}
+.pac-code-link {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 0.64rem;
+  letter-spacing: 0.02em;
+  color: var(--subtle);
+}
+.pac-code-link:hover { color: var(--text); }

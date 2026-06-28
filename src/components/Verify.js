@@ -93,7 +93,7 @@ function Certificate({ cert, onOpenPiece }) {
   );
 }
 
-export function VerifyView({ initialCode = "", onOpenPiece, onBrowse }) {
+export function VerifyView({ initialCode = "", onOpenPiece }) {
   const [input, setInput]   = useState(initialCode);
   const [status, setStatus] = useState("idle"); // idle|loading|found|notfound|invalid|offline|error
   const [cert, setCert]     = useState(null);
@@ -150,10 +150,6 @@ export function VerifyView({ initialCode = "", onOpenPiece, onBrowse }) {
         {status === "error" && <p className="verify-msg verify-msg-warn">Something went wrong looking that up. Try again in a moment.</p>}
 
         {status === "found" && cert && <Certificate cert={cert} onOpenPiece={onOpenPiece} />}
-
-        <div className="verify-foot">
-          <button className="verify-link" onClick={onBrowse}>← Back to inkk</button>
-        </div>
       </div>
     </div>
   );
