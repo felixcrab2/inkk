@@ -6,6 +6,8 @@ import { CONTRIBUTOR_DESC } from "../telemetry/score";
 
 export const TIERS = ["Faint", "Developing", "Strong", "Distinct"];
 
+const clamp01 = (x) => Math.max(0, Math.min(1, x || 0));
+
 function tierIndex(tier) {
   const i = TIERS.indexOf(tier);
   return i < 0 ? 0 : i;
@@ -39,20 +41,97 @@ function buildSmoothPath(pts) {
   return d;
 }
 
-function VelocityChart({ series, peakWpm }) {
+// ─── Radar "fingerprint" ───────────────────────────────────────────────────
+// The nine sub-signals plotted on a single polygon. This is the at-a-glance
+// shape of how a piece was written; the contributor bars below give the detail.
+const RADAR_ORDER = [
+  "variance", "dwell", "rhythm", "velocity", "bursts",
+  "engagement", "pauses", "revisions", "corrections",
+];
+const RADAR_LABELS = {
+  variance: "Timing", dwell: "Contact", rhythm: "Rhythm", velocity: "Speed",
+  bursts: "Bursts", engagement: "Thought", pauses: "Pauses",
+  revisions: "Revision", corrections: "Edits",
+};
+
+function polar(cx, cy, r, ang) {
+  return [cx + Math.cos(ang) * r, cy + Math.sin(ang) * r];
+}
+
+// Resolve the nine dims from the persisted vector, falling back to the
+// contributor list for docs scored before `dims` was stored.
+function buildDims(score) {
+  if (Array.isArray(score.dims) && score.dims.length) {
+    const byKey = {};
+    score.dims.forEach(d => { byKey[d.key] = d; });
+    return RADAR_ORDER.map(k => ({
+      key: k, value: clamp01(byKey[k]?.value), conf: clamp01(byKey[k]?.conf),
+    }));
+  }
+  const byKey = {};
+  (score.contributors || []).forEach(c => { byKey[c.key] = c; });
+  return RADAR_ORDER.map(k => ({
+    key: k, value: clamp01(byKey[k]?.value), conf: clamp01(byKey[k]?.conf),
+  }));
+}
+
+function RadarChart({ dims }) {
+  const cx = 150, cy = 118, R = 74;
+  const N = dims.length;
+  const angOf = (i) => -Math.PI / 2 + i * ((2 * Math.PI) / N);
+  const rings = [0.25, 0.5, 0.75, 1];
+
+  const ringPath = (f) =>
+    dims.map((_, i) => {
+      const [x, y] = polar(cx, cy, R * f, angOf(i));
+      return `${i === 0 ? "M" : "L"} ${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(" ") + " Z";
+
+  const dataPts = dims.map((d, i) => polar(cx, cy, R * d.value, angOf(i)));
+  const dataPath =
+    dataPts.map((p, i) => `${i === 0 ? "M" : "L"} ${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ") + " Z";
+
+  return (
+    <svg viewBox="0 0 300 246" className="hs-radar-svg" role="img" aria-label="Writing-process fingerprint">
+      {rings.map((f, i) => (
+        <path key={`r${i}`} d={ringPath(f)} fill="none" stroke="#e4e1db" strokeWidth="0.7" />
+      ))}
+      {dims.map((_, i) => {
+        const [x, y] = polar(cx, cy, R, angOf(i));
+        return <line key={`a${i}`} x1={cx} y1={cy} x2={x.toFixed(1)} y2={y.toFixed(1)} stroke="#e4e1db" strokeWidth="0.7" />;
+      })}
+      <path d={dataPath} fill="rgba(42,42,42,0.07)" stroke="#2a2a2a" strokeWidth="1.6" strokeLinejoin="round" />
+      {dataPts.map((p, i) => (
+        <circle key={`p${i}`} cx={p[0].toFixed(1)} cy={p[1].toFixed(1)} r="2.4"
+          fill="#2a2a2a" opacity={(0.25 + 0.75 * dims[i].conf).toFixed(2)} />
+      ))}
+      {dims.map((d, i) => {
+        const ang = angOf(i);
+        const [lx, ly] = polar(cx, cy, R + 15, ang);
+        const cos = Math.cos(ang);
+        const anchor = Math.abs(cos) < 0.35 ? "middle" : (cos > 0 ? "start" : "end");
+        return (
+          <text key={`l${i}`} x={lx.toFixed(1)} y={(ly + 3).toFixed(1)} textAnchor={anchor} className="hs-radar-label">
+            {d.label || RADAR_LABELS[d.key]}
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
+
+function VelocityChart({ series, peakWpm, avgWpm }) {
   if (!series || series.length < 2) {
     return <div className="hs-chart-empty">Keep writing. Velocity builds with more data.</div>;
   }
-  const W = 440, H = 100;
-  const PAD = { t: 8, r: 8, b: 22, l: 30 };
+  const W = 440, H = 110;
+  const PAD = { t: 12, r: 8, b: 22, l: 30 };
   const pw = W - PAD.l - PAD.r;
   const ph = H - PAD.t - PAD.b;
   const maxY = Math.max(peakWpm || 1, 10);
+  const yOf = (v) => PAD.t + ph - Math.min(1, v / maxY) * ph;
 
-  const pts = series.map(p => [
-    PAD.l + p.pct * pw,
-    PAD.t + ph - Math.min(1, p.wpm / maxY) * ph,
-  ]);
+  const pts = series.map(p => [PAD.l + p.pct * pw, yOf(p.wpm)]);
 
   const linePath = buildSmoothPath(pts);
   const areaPath = linePath
@@ -65,6 +144,12 @@ function VelocityChart({ series, peakWpm }) {
     return m >= 1 ? `${m}m` : `${Math.floor(ms / 1000)}s`;
   };
 
+  // Peak marker.
+  let peakIdx = 0;
+  for (let i = 1; i < series.length; i++) if (series[i].wpm > series[peakIdx].wpm) peakIdx = i;
+  const peak = pts[peakIdx];
+  const avgY = avgWpm > 0 ? yOf(avgWpm) : null;
+
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="hs-chart-svg" aria-hidden="true">
       <defs>
@@ -74,7 +159,7 @@ function VelocityChart({ series, peakWpm }) {
         </linearGradient>
       </defs>
       {yTicks.map((v, i) => {
-        const y = PAD.t + ph - (v / maxY) * ph;
+        const y = yOf(v);
         return (
           <g key={i}>
             <line x1={PAD.l} y1={y.toFixed(1)} x2={PAD.l + pw} y2={y.toFixed(1)} stroke="#e4e1db" strokeWidth="0.6" />
@@ -83,10 +168,21 @@ function VelocityChart({ series, peakWpm }) {
         );
       })}
       <path d={areaPath} fill="url(#hsVelGrad)" />
+      {avgY != null && (
+        <g>
+          <line x1={PAD.l} y1={avgY.toFixed(1)} x2={PAD.l + pw} y2={avgY.toFixed(1)}
+            stroke="#a98a5c" strokeWidth="1" strokeDasharray="3 3" opacity="0.85" />
+          <text x={PAD.l + pw} y={avgY - 4} textAnchor="end" className="hs-chart-label" fill="#a98a5c">avg {avgWpm}</text>
+        </g>
+      )}
       <path d={linePath} fill="none" stroke="#2a2a2a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       {pts.map((p, i) => (
-        <circle key={i} cx={p[0].toFixed(1)} cy={p[1].toFixed(1)} r="2.2" fill="#2a2a2a" opacity="0.45" />
+        <circle key={i} cx={p[0].toFixed(1)} cy={p[1].toFixed(1)} r="2.2" fill="#2a2a2a" opacity="0.4" />
       ))}
+      <circle cx={peak[0].toFixed(1)} cy={peak[1].toFixed(1)} r="3.4" fill="#a98a5c" />
+      <text x={peak[0].toFixed(1)} y={(peak[1] - 7).toFixed(1)} textAnchor="middle" className="hs-chart-label" fill="#7a6440">
+        {series[peakIdx].wpm}
+      </text>
       {[0, series.length - 1].map(i => (
         <text key={i} x={pts[i][0].toFixed(1)} y={H - 3}
           textAnchor={i === 0 ? "start" : "end"} className="hs-chart-label">
@@ -94,6 +190,58 @@ function VelocityChart({ series, peakWpm }) {
         </text>
       ))}
     </svg>
+  );
+}
+
+// Pause distribution: micro-hesitations, thinking pauses, longer breaks.
+function PauseChart({ micro, think, long }) {
+  const rows = [
+    { label: "Micro", sub: "0.5–2s hesitations", v: micro },
+    { label: "Thinking", sub: "2–10s deliberation", v: think },
+    { label: "Long", sub: "10s+ breaks", v: long },
+  ];
+  const max = Math.max(micro, think, long, 1);
+  return (
+    <div className="hs-pause-list">
+      {rows.map(r => (
+        <div key={r.label} className="hs-pause-row">
+          <div className="hs-pause-label-block">
+            <span className="hs-pause-label">{r.label}</span>
+            <span className="hs-pause-sub">{r.sub}</span>
+          </div>
+          <div className="hs-pause-bar-wrap">
+            <div className="hs-pause-bar-fill" style={{ width: `${Math.round((r.v / max) * 100)}%` }} />
+          </div>
+          <span className="hs-pause-val">{r.v}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Where the characters came from: typed vs pasted, plus deletion churn.
+function CompositionBar({ typed, pasted, deleted }) {
+  const total = typed + pasted;
+  if (total <= 0) return null;
+  const typedPct = Math.round((typed / total) * 100);
+  const pastedPct = 100 - typedPct;
+  const churnPct = typed > 0 ? Math.round((deleted / typed) * 100) : 0;
+  return (
+    <div className="hs-comp">
+      <div className="hs-comp-bar">
+        <div className="hs-comp-seg typed" style={{ width: `${typedPct}%` }} />
+        <div className="hs-comp-seg pasted" style={{ width: `${pastedPct}%` }} />
+      </div>
+      <div className="hs-comp-legend">
+        <span className="hs-comp-key"><span className="hs-comp-dot typed" />typed {typedPct}%</span>
+        {pasted > 0 && <span className="hs-comp-key"><span className="hs-comp-dot pasted" />pasted {pastedPct}%</span>}
+      </div>
+      <div className="hs-comp-churn">
+        {deleted > 0
+          ? `${deleted.toLocaleString()} characters written then removed (${churnPct}% churn) — the visible trace of revising.`
+          : "No deletions recorded yet."}
+      </div>
+    </div>
   );
 }
 
@@ -125,6 +273,15 @@ export function HumanSignalPanel({ score, onClose }) {
     ? Math.round(((score.typo_corrections || 0) / words) * 100)
     : 0;
 
+  const dims = buildDims(score).map(d => ({ ...d, label: RADAR_LABELS[d.key] }));
+  const confidentDims = dims.filter(d => d.conf > 0.05).length;
+  const showRadar = confidentDims >= 3;
+
+  const micro = score.pause_micro ?? Math.max(0, (score.pause_count_500 || 0) - (score.thinking_pauses || 0));
+  const think = score.pause_think ?? (score.thinking_pauses || 0);
+  const long_ = score.pause_long ?? 0;
+  const hasPauses = (micro + think + long_) > 0;
+
   return (
     <div className="hs-panel-backdrop" onClick={onClose}>
       <div className="hs-panel-modal" onClick={e => e.stopPropagation()}>
@@ -153,9 +310,11 @@ export function HumanSignalPanel({ score, onClose }) {
               <p className="hs-panel-blurb">
                 Built from rhythm, pauses, corrections, and revision behaviour, not the words themselves.
               </p>
+              {showRadar && <RadarChart dims={dims} />}
               {contributors.length === 0 && (
                 <div className="hs-panel-empty">Keep writing. The signal builds with a little more typing.</div>
               )}
+              {contributors.length > 0 && <div className="hs-section-label">Strongest signals</div>}
               {contributors.map(c => (
                 <div key={c.key} className="hs-contrib-row">
                   <div className="hs-contrib-label-block">
@@ -177,25 +336,42 @@ export function HumanSignalPanel({ score, onClose }) {
           )}
           {tab === "Velocity" && (
             <div className="hs-tab-velocity">
-              <p className="hs-panel-blurb">Words per minute, in 30-second windows across the session.</p>
-              <VelocityChart series={score.velocity_series} peakWpm={score.peak_wpm} />
+              <p className="hs-panel-blurb">Words per minute across the session. The gold line is your average; the dot marks your peak.</p>
+              <VelocityChart series={score.velocity_series} peakWpm={score.peak_wpm} avgWpm={score.avg_wpm} />
               <div className="hs-stat-row">
-                <StatChip label="avg speed" value={score.avg_wpm ? `${score.avg_wpm} wpm` : "-"} />
-                <StatChip label="peak speed" value={score.peak_wpm ? `${score.peak_wpm} wpm` : "-"} />
-                <StatChip label="active time" value={score.active_time_ms > 0 ? fmtMin(score.active_time_ms) : "-"} />
+                <StatChip label="avg speed" value={score.avg_wpm ? `${score.avg_wpm}` : "-"} sub="words / min" />
+                <StatChip label="peak speed" value={score.peak_wpm ? `${score.peak_wpm}` : "-"} sub="words / min" />
+                <StatChip label="active time" value={score.active_time_ms > 0 ? fmtMin(score.active_time_ms) : "-"} sub="hands on keys" />
               </div>
             </div>
           )}
           {tab === "Patterns" && (
             <div className="hs-tab-patterns">
               <p className="hs-panel-blurb">Behavioural fingerprint, what the process metadata shows.</p>
+
+              {hasPauses && (<>
+                <div className="hs-section-label">Pace of thought</div>
+                <PauseChart micro={micro} think={think} long={long_} />
+              </>)}
+
+              {(score.typed_chars > 0 || score.pasted_chars > 0) && (<>
+                <div className="hs-section-label">Where the words came from</div>
+                <CompositionBar
+                  typed={score.typed_chars || 0}
+                  pasted={score.pasted_chars || 0}
+                  deleted={score.deleted_chars || 0}
+                />
+              </>)}
+
+              <div className="hs-section-label">At a glance</div>
               <div className="hs-stat-row hs-stat-row-grid">
                 <StatChip label="corrections" value={corrPer100} sub="per 100 words" />
                 <StatChip label="revisions" value={score.mid_revisions ?? "-"} sub="returned to rework" />
                 <StatChip label="thinking pauses" value={score.thinking_pauses ?? "-"} sub="2 to 10 s pauses" />
                 <StatChip label="engagement" value={score.active_ratio > 0 ? `${Math.round(score.active_ratio * 100)}%` : "-"} sub="of session active" />
                 <StatChip label="bursts" value={score.burst_count ?? "-"} sub="writing bursts" />
-                <StatChip label="typed" value={score.typed_chars || 0} sub="characters" />
+                <StatChip label="cadence" value={score.iki_median > 0 ? `${score.iki_median}` : "-"} sub="ms between keys" />
+                <StatChip label="typed" value={(score.typed_chars || 0).toLocaleString()} sub="characters" />
                 <StatChip label="sessions" value={score.session_count || 1} sub="visits to this doc" />
               </div>
             </div>
