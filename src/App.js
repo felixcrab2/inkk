@@ -2363,6 +2363,33 @@ export default function App() {
     return () => stopSync();
   }, []);
 
+  // ─── persist on tab-hide / unload ─────────────────────────────────────────
+  // The normal save is debounced 500ms; localStorage.setItem is synchronous, so
+  // this reliably lands the active doc even on a hard close/reload, where the
+  // debounce timer would otherwise be torn down and lose the last few words.
+  useEffect(() => {
+    const persistNow = () => {
+      const id = activeIdRef.current;
+      if (!id) return;
+      const liveSecs = writingSessionStartRef.current !== null
+        ? (Date.now() - writingSessionStartRef.current) / 1000 : 0;
+      const timeToSave = writingBaseRef.current + writingFlushRef.current + liveSecs;
+      const next = docsRef.current.map(d =>
+        d.id === id
+          ? { ...d, title: titleRef.current, content: contentRef.current, updatedAt: Date.now(), writingTimeSecs: timeToSave }
+          : d
+      );
+      saveState(next, id);
+    };
+    const onVisibility = () => { if (document.visibilityState === "hidden") persistNow(); };
+    window.addEventListener("pagehide", persistNow);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", persistNow);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
   const handleAvatarChange = useCallback(async (avatarData) => {
     if (!userRef.current) return;
     const err = await updateAvatar(userRef.current.id, avatarData);
