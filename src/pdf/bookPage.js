@@ -45,7 +45,7 @@ const PAPER_FILTER = "saturate(0.45) brightness(1.01)";
 // asymmetric staining). Kept warm and below pure white so it still reads as
 // paper, not bleached stock.
 const PAPER_LIFT_COLOR = "rgb(241, 236, 229)";
-const PAPER_LIFT_ALPHA = 0.7;
+const PAPER_LIFT_ALPHA = 0.85;
 
 // Header / footer offsets (pt). Margins are now computed proportionally
 // per page size inside renderBookPdfPages so non-default aspects still
