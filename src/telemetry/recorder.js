@@ -1,19 +1,34 @@
 // Telemetry recorder: captures keydown/keyup/input/paste/selection/focus events
-// from the contenteditable editor, classifies them privacy-safely (no raw
-// letter/digit characters), tags them with the current session_id, and pushes
-// them into both an in-memory ring (for live feature extraction) and the
-// IndexedDB queue (for offline-safe persistence and optional cloud sync).
+// from the contenteditable editor, records the key identity (letters, digits and
+// punctuation) alongside precise timing so the encoder can model keyboard-geometry
+// effects (e.g. faster digraphs for keys that sit closer together), tags them with
+// the current session_id, and pushes them into both an in-memory ring (for live
+// feature extraction) and the IndexedDB queue (for offline-safe persistence and
+// optional cloud sync). Key capture is disclosed in the Privacy Policy.
 
 import * as store from "./store";
 
+const SCHEMA_VERSION = 2;                // bump whenever the event shape changes
 const SESSION_GAP_MS = 60_000;           // inactivity that ends a session
 const MEMORY_LIMIT   = 8000;             // events kept in memory for features
 const FLUSH_MS       = 4000;             // periodic flush to IndexedDB
 const FLUSH_AT       = 80;               // flush when N events buffered
-const SELECTION_HZ   = 8;                // throttle selectionchange to 8 Hz
+const SELECTION_HZ   = 20;               // sample selectionchange at 20 Hz (caret/drag only — typing is NOT throttled; every key is captured)
 
 function uuid() {
   try { return crypto.randomUUID(); } catch { return "_" + Math.random().toString(36).slice(2) + Date.now(); }
+}
+
+// High-resolution, monotonic time in ms (sub-millisecond where the browser
+// allows it). Unlike Date.now() this never jumps on NTP sync / sleep / wake,
+// so inter-keystroke and dwell deltas derived from it are clean. We store it
+// *alongside* the wall-clock `t` (which we still need to align sessions to a
+// real calendar). Returns null in environments without `performance`.
+function nowPerf() {
+  try {
+    const p = (typeof performance !== "undefined" && performance.now) ? performance.now() : null;
+    return p == null ? null : Math.round(p * 1000) / 1000;
+  } catch { return null; }
 }
 
 function classifyKey(key) {
@@ -26,13 +41,41 @@ function classifyKey(key) {
   if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Home","End","PageUp","PageDown"].includes(key)) return ["nav", null];
   if (["Shift","Control","Alt","Meta","CapsLock"].includes(key)) return ["modifier", null];
   if (key.length === 1) {
-    if (/[a-zA-Z]/.test(key))    return ["letter", null];      // raw key NOT stored
-    if (/[0-9]/.test(key))       return ["digit",  null];      // raw key NOT stored
+    if (/[a-zA-Z]/.test(key))    return ["letter", key];       // key identity stored (digraph geometry)
+    if (/[0-9]/.test(key))       return ["digit",  key];
     if (/[\s]/.test(key))        return ["space",  null];
-    // Punctuation / symbol — research-useful, low PII. Store the char.
+    // Punctuation / symbol.
     return ["punct", key];
   }
   return ["other", null];
+}
+
+// Device / environment context recorded once per session (on session_start).
+// These are confounds the encoder needs to control for: input modality, OS,
+// language, time zone (→ local time-of-day / circadian effects), and viewport
+// (→ device class). Disclosed in the Privacy Policy (see components/Legal.js)
+// and deliberately coarse — no raw User-Agent string, no precise geolocation.
+function envContext() {
+  try {
+    const nav = typeof navigator !== "undefined" ? navigator : {};
+    const ctx = {
+      touch_capable:  (nav.maxTouchPoints || 0) > 0,
+      pointer_coarse: (typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches) || false,
+      platform:       nav.userAgentData?.platform || nav.platform || null,
+      locale:         (nav.languages && nav.languages[0]) || nav.language || null,
+    };
+    try { ctx.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || null; } catch {}
+    try {
+      if (typeof window !== "undefined") {
+        ctx.viewport_w = window.innerWidth  || null;
+        ctx.viewport_h = window.innerHeight || null;
+        ctx.dpr        = window.devicePixelRatio || null;
+      }
+    } catch {}
+    return ctx;
+  } catch {
+    return null;
+  }
 }
 
 function getCaretInfo() {
@@ -60,6 +103,8 @@ export function createRecorder({ getContext, onUpdate }) {
   let pending = [];                      // not-yet-persisted to IndexedDB
   let sessionId = null;
   let sessionStartedAt = 0;
+  let seq = 0;                           // per-session monotonic event index
+  let composing = false;                 // inside an IME composition (key→text is indirect)
   let lastActivityT = 0;
   let lastDocId = null;
   let lastUserId = null;
@@ -92,9 +137,13 @@ export function createRecorder({ getContext, onUpdate }) {
       }
       sessionId = uuid();
       sessionStartedAt = t;
+      seq = 0;                           // restart the ordering index for the new session
       lastDocId = docId;
       lastUserId = userId;
-      push({ kind: "session_start", t }, true);
+      // Stamp one-time environment context on the session opener so the encoder
+      // can control for input modality (a hard confound: touch / IME / speech
+      // produce very different keystroke dynamics from a physical keyboard).
+      push({ kind: "session_start", t, payload: envContext() }, true);
     }
   }
 
@@ -107,12 +156,16 @@ export function createRecorder({ getContext, onUpdate }) {
     if (!rollGuard) maybeRollSession(t);
     const ev = {
       id: uuid(),
+      schema_version: SCHEMA_VERSION,
       user_id: useUserId,
       doc_id: useDocId,
       session_id: sessionId,
-      t,
+      seq: seq++,                          // deterministic within-session ordering (breaks same-ms ties)
+      t,                                   // wall-clock epoch ms (calendar alignment)
+      pt: partial.pt ?? nowPerf(),         // monotonic hi-res ms (precise IKI / dwell)
       kind: partial.kind,
       key_class: partial.key_class ?? null,
+      key_char: partial.key_char ?? null,
       input_type: partial.input_type ?? null,
       len_delta: partial.len_delta ?? null,
       caret_pos: partial.caret_pos ?? null,
@@ -141,18 +194,19 @@ export function createRecorder({ getContext, onUpdate }) {
 
   // ── handlers ───────────────────────────────────────────────────────────────
   function onKeyDown(e) {
-    const [kc] = classifyKey(e.key);
+    const [kc, ch] = classifyKey(e.key);
     push({
       kind: "keydown",
       key_class: kc,
+      key_char: ch,                        // literal key for letters/digits/punct; null otherwise
       payload: e.shiftKey || e.metaKey || e.ctrlKey || e.altKey
         ? { mods: [e.shiftKey && "S", e.ctrlKey && "C", e.altKey && "A", e.metaKey && "M"].filter(Boolean).join("") }
         : null,
     });
   }
   function onKeyUp(e) {
-    const [kc] = classifyKey(e.key);
-    push({ kind: "keyup", key_class: kc });
+    const [kc, ch] = classifyKey(e.key);
+    push({ kind: "keyup", key_class: kc, key_char: ch });
   }
   function onBeforeInput(e) {
     const { caret, selLen } = getCaretInfo();
@@ -168,14 +222,32 @@ export function createRecorder({ getContext, onUpdate }) {
       }
     }
     const len = isDelete ? -Math.max(1, selLen || 1) : text.length;
+    let payload = null;
+    if (isPasteIt && text.length) payload = { paste_len: text.length };
+    // Mark text produced via IME composition (CJK, mobile autocorrect/swipe):
+    // here keystroke→character is indirect, so per-key timing is not a clean
+    // keystroke-dynamics signal and the encoder should treat it separately.
+    if (composing) payload = { ...(payload || {}), composing: true };
     push({
       kind: isPasteIt ? "paste" : (isDelete ? "delete" : "input"),
       input_type: it,
       len_delta: len,
       caret_pos: caret,
       selection_len: selLen,
-      payload: isPasteIt && text.length ? { paste_len: text.length } : null,
+      // Inserted text for typed/IME input (handles mobile/autocorrect where
+      // keydown carries no usable key). Pasted text is not duplicated here.
+      key_char: (!isPasteIt && !isDelete && text) ? text : null,
+      payload,
     });
+  }
+  function onCompositionStart() {
+    composing = true;
+    push({ kind: "compose_start" });
+  }
+  function onCompositionEnd(e) {
+    const len = (e?.data ?? "").length;
+    composing = false;
+    push({ kind: "compose_end", len_delta: len, payload: len ? { composed_len: len } : null });
   }
   function onPaste(e) {
     const text = e.clipboardData?.getData("text/plain") || "";
@@ -223,6 +295,8 @@ export function createRecorder({ getContext, onUpdate }) {
     editor.addEventListener("keydown", onKeyDown);
     editor.addEventListener("keyup", onKeyUp);
     editor.addEventListener("beforeinput", onBeforeInput);
+    editor.addEventListener("compositionstart", onCompositionStart);
+    editor.addEventListener("compositionend", onCompositionEnd);
     editor.addEventListener("paste", onPaste);
     editor.addEventListener("drop", onDrop);
     editor.addEventListener("focus", onFocus);
@@ -240,6 +314,8 @@ export function createRecorder({ getContext, onUpdate }) {
       editor.removeEventListener("keydown", onKeyDown);
       editor.removeEventListener("keyup", onKeyUp);
       editor.removeEventListener("beforeinput", onBeforeInput);
+      editor.removeEventListener("compositionstart", onCompositionStart);
+      editor.removeEventListener("compositionend", onCompositionEnd);
       editor.removeEventListener("paste", onPaste);
       editor.removeEventListener("drop", onDrop);
       editor.removeEventListener("focus", onFocus);
