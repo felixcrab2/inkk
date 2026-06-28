@@ -532,9 +532,10 @@ body.focus-mode #text-container {
   border: none;
   outline: none;
   font-family: var(--font-serif);
-  /* Small all-caps Cormorant with open tracking reads as a quiet, consistent
-     book title. The measure is narrower than the body so a long title wraps to
-     a second line sooner and never runs wider than the prose below it. */
+  /* Small all-caps Cormorant at its natural (tight) spacing, matching how the
+     caps read when typed directly. The measure is narrower than the body so a
+     long title wraps to a second line sooner and never runs wider than the
+     prose below it. */
   font-weight: 600;
   font-style: normal;
   font-size: clamp(1.1rem, 1.7vw, 1.3rem);
@@ -542,7 +543,7 @@ body.focus-mode #text-container {
   padding: 0 8px;
   margin-bottom: 22px;
   line-height: 1.32;
-  letter-spacing: 0.09em;
+  letter-spacing: -0.005em;
   text-transform: uppercase;
   text-align: center;
   text-wrap: balance;
