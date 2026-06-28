@@ -516,29 +516,34 @@ body.focus-mode #text-container {
   display: flex;
   flex-direction: column;
   align-items: center;
+  transition: padding-top 0.55s cubic-bezier(0.32, 0.72, 0, 1);
   -webkit-mask-image: linear-gradient(to bottom, black 0px, black calc(100% - 36px), transparent 100%);
   mask-image: linear-gradient(to bottom, black 0px, black calc(100% - 36px), transparent 100%);
 }
+/* Once writing has begun in the body, glide the page up so the empty top
+   space collapses and there is room to write downward. */
+#text-container.writing-started { padding-top: 9vh; }
 
 #title-input {
-  width: 44vw;
-  max-width: 560px;
-  min-width: 200px;
+  width: 40vw;
+  max-width: 440px;
+  min-width: 180px;
   background: none;
   border: none;
   outline: none;
   font-family: var(--font-serif);
-  /* Cormorant display Garamond, kept understated: only a little larger than the
-     body so it reads as a quiet book title, not a banner. Semibold gives it
-     enough presence at the small size without shouting. */
+  /* Small all-caps Cormorant with open tracking reads as a quiet, consistent
+     book title. The measure is narrower than the body so a long title wraps to
+     a second line sooner and never runs wider than the prose below it. */
   font-weight: 600;
   font-style: normal;
-  font-size: clamp(1.4rem, 2.2vw, 1.7rem);
+  font-size: clamp(1.1rem, 1.7vw, 1.3rem);
   color: var(--text);
   padding: 0 8px;
-  margin-bottom: 24px;
-  line-height: 1.2;
-  letter-spacing: -0.005em;
+  margin-bottom: 22px;
+  line-height: 1.32;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
   text-align: center;
   text-wrap: balance;
   display: block;
@@ -2832,7 +2837,7 @@ body.focus-mode #text-container {
 @media (max-width: 600px) {
   /* ── Editor ── */
   #text-container {
-    padding-top: 9vh;
+    padding-top: 16vh;
     padding-bottom: 18vh;
     padding-left: 0;
     padding-right: 0;
@@ -2840,15 +2845,16 @@ body.focus-mode #text-container {
     -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black 40px, black calc(100% - 28px), transparent 100%);
     mask-image: linear-gradient(to bottom, transparent 0px, black 40px, black calc(100% - 28px), transparent 100%);
   }
+  #text-container.writing-started { padding-top: 6vh; }
   #writing-area {
     width: calc(100% - 56px);
     max-width: none;
     min-width: 0;
   }
   #title-input {
-    width: 100%;
+    width: calc(100% - 88px);
     max-width: none;
-    font-size: clamp(1.35rem, 4.2vw, 1.6rem);
+    font-size: clamp(1.02rem, 3.4vw, 1.2rem);
   }
   #text {
     width: 100%;

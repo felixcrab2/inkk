@@ -3356,6 +3356,7 @@ export default function App() {
       <div
         id="text-container"
         ref={containerRef}
+        className={words > 0 ? "writing-started" : ""}
         style={{ display: isEditor ? "" : "none" }}
       >
         <div
