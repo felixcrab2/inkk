@@ -32,6 +32,7 @@ const INK_BODY    = "#241a12";
 const INK_TITLE   = "#1f1610";
 const INK_FOOTER  = "#3e3326";
 const INK_HEADER  = "#a8967e";
+const INK_BYLINE  = "#766550";   // muted sepia for the small-caps byline
 const INK_ALPHA   = 0.93;
 
 // Paper tone: heavy desaturation + slight brightness for near-white paper.
@@ -55,10 +56,16 @@ const FOOTER_FROM_BOTTOM = 34;
 
 // Typography (pt).
 const T_TITLE   = 16;
+const T_BYLINE  = 9.5;   // small-caps attribution under the title
 const T_HEADER  = 8.5;
 const T_BODY    = 11.25;
 const T_DROPCAP = 42;
 const T_FOOTER  = 10.5;
+
+// Letter-spacing (em) for the uppercase byline and running heads — the wide
+// tracking is what makes small caps read as deliberate rather than faded.
+const BYLINE_TRACK = 0.22;
+const HEADER_TRACK = 0.16;
 
 // Drop cap spans this many body lines.
 // At T_DROPCAP=42pt, cap-height ≈ 0.72 × 42 = 30.2pt = 1.73 body lines,
@@ -108,6 +115,31 @@ function loadImg(src) {
 
 function font(sizePt, italic = false, bold = false) {
   return `${italic ? "italic" : "normal"} ${bold ? "600" : "400"} ${sizePt * PX}px "Cormorant Garamond", "EB Garamond", Georgia, serif`;
+}
+
+// Width of `text` if drawn with per-character tracking (canvas has no native
+// letter-spacing we can rely on across export environments, so we measure and
+// place glyphs ourselves).
+function trackedWidth(ctx, text, sizePt, trackEm) {
+  const tracking = trackEm * sizePt * PX;
+  const chars = [...text];
+  let w = 0;
+  for (const ch of chars) w += ctx.measureText(ch).width;
+  return w + tracking * Math.max(0, chars.length - 1);
+}
+
+// Draw `text` centred on `cx` with even letter-spacing. Assumes ctx.font/
+// fillStyle are already set; restores textAlign afterwards.
+function drawTrackedCentered(ctx, text, cx, baseline, sizePt, trackEm) {
+  const tracking = trackEm * sizePt * PX;
+  const chars = [...text];
+  const widths = chars.map(ch => ctx.measureText(ch).width);
+  const total = widths.reduce((a, b) => a + b, 0) + tracking * Math.max(0, chars.length - 1);
+  const prevAlign = ctx.textAlign;
+  ctx.textAlign = "left";
+  let x = cx - total / 2;
+  chars.forEach((ch, i) => { ctx.fillText(ch, x, baseline); x += widths[i] + tracking; });
+  ctx.textAlign = prevAlign;
 }
 
 // Parse the editor HTML into an ordered list of blocks:
@@ -536,7 +568,7 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
     mctx.font = font(T_TITLE, false, true);
     titleLines = wrapSegment(mctx, titleStr, fullWidth).map(l => l.text);
     if (!titleLines.length) titleLines = [titleStr];
-    const bylineH = bylineStr ? Math.round(T_TITLE * 0.9 * PX * TITLE_LINE_MULT + 8 * PX) : 0;
+    const bylineH = bylineStr ? Math.round(T_BYLINE * PX * TITLE_LINE_MULT + 12 * PX) : 0;
     titleBlockH = titleLines.length * T_TITLE * PX * TITLE_LINE_MULT + bylineH + TITLE_BODY_GAP;
   }
   const firstPageHeight = otherPageHeight - titleBlockH;
@@ -644,28 +676,30 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
             y += T_TITLE * PX * TITLE_LINE_MULT;
           }
           if (bylineStr) {
-            y += 8 * PX;
-            ctx.font = font(T_TITLE * 0.9, false, false);
-            ctx.fillStyle = INK_HEADER;
-            ctx.fillText(bylineStr, cw / 2, y + T_TITLE * 0.9 * PX);
-            y += T_TITLE * 0.9 * PX * TITLE_LINE_MULT;
+            // Small letter-spaced caps — an editorial byline, not a faded line.
+            y += 12 * PX;
+            ctx.font = font(T_BYLINE, false, false);
+            ctx.fillStyle = INK_BYLINE;
+            drawTrackedCentered(ctx, bylineStr.toUpperCase(), cw / 2, y + T_BYLINE * PX, T_BYLINE, BYLINE_TRACK);
+            y += T_BYLINE * PX * TITLE_LINE_MULT;
           }
           y += TITLE_BODY_GAP - 8 * PX;   // space after title block (already partly used by titleBlockH calc)
         }
 
-        // ── Page 2+: tiny running header ────────────────────────────────
+        // ── Page 2+: tiny running head ──────────────────────────────────
+        // Book convention: verso (even pages) carries the author, recto (odd)
+        // carries the title. With no byline, every running head shows the title.
         if (!isFirst && titleStr) {
+          const showAuthor = bylineStr && pageNum % 2 === 0;
+          let hdr = (showAuthor ? bylineStr : titleStr).toUpperCase();
           ctx.font = font(T_HEADER, false);
           ctx.fillStyle = INK_HEADER;
-          ctx.textAlign = "center";
-          // For long titles, truncate header so it stays one line.
-          mctx.font = font(T_HEADER, false);
-          let hdr = titleStr;
-          if (mctx.measureText(hdr).width > fullWidth) {
-            while (hdr.length > 6 && mctx.measureText(hdr + "…").width > fullWidth) hdr = hdr.slice(0, -1);
+          // Truncate to a single tracked line.
+          if (trackedWidth(ctx, hdr, T_HEADER, HEADER_TRACK) > fullWidth) {
+            while (hdr.length > 6 && trackedWidth(ctx, hdr + "…", T_HEADER, HEADER_TRACK) > fullWidth) hdr = hdr.slice(0, -1);
             hdr += "…";
           }
-          ctx.fillText(hdr, cw / 2, HEADER_Y * PX);
+          drawTrackedCentered(ctx, hdr, cw / 2, HEADER_Y * PX, T_HEADER, HEADER_TRACK);
         }
 
         // ── Drop cap (page 1 only) ──────────────────────────────────────
