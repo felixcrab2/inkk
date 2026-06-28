@@ -15,6 +15,10 @@ const REV_FOLLOWUP_MS  = 3000;       // edit must follow caret jump within this 
 const TYPO_WINDOW_MS   = 1500;       // insert-then-delete pair window
 const DWELL_MAX_MS     = 800;        // keyup later than this from keydown is ignored
 
+// Prefer the monotonic hi-res clock for fine-grained timing (IKI, dwell);
+// fall back to wall-clock `t` for events recorded before pt existed.
+const ts = (e) => (typeof e.pt === "number" ? e.pt : e.t);
+
 function quantile(sorted, q) {
   if (!sorted.length) return 0;
   const i = (sorted.length - 1) * q;
@@ -146,7 +150,7 @@ export function extractFeatures(events, { words = 0 } = {}) {
   const ikis = [];
   const pauses = [];
   for (let i = 1; i < editEvents.length; i++) {
-    const gap = editEvents[i].t - editEvents[i - 1].t;
+    const gap = ts(editEvents[i]) - ts(editEvents[i - 1]);
     if (gap <= 0) continue;
     if (gap < IKI_CUTOFF_MS) ikis.push(gap);
     if (gap >= 500)    out.pause_count_500++;
@@ -165,10 +169,10 @@ export function extractFeatures(events, { words = 0 } = {}) {
   for (const e of sorted) {
     if (e.kind === "keydown" && e.key_class) {
       if (!downs.has(e.key_class)) downs.set(e.key_class, []);
-      downs.get(e.key_class).push(e.t);
+      downs.get(e.key_class).push(ts(e));
     } else if (e.kind === "keyup" && e.key_class && downs.get(e.key_class)?.length) {
       const t0 = downs.get(e.key_class).shift();
-      const d = e.t - t0;
+      const d = ts(e) - t0;
       if (d >= 0 && d <= DWELL_MAX_MS) dwells.push(d);
     }
   }

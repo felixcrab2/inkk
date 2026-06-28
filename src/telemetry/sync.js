@@ -23,8 +23,8 @@ async function drainOnce() {
     if (!batch.length) return;
 
     // Strip local-only fields just in case (no schema mismatch).
-    const rows = batch.map(({ id, user_id, doc_id, session_id, t, kind, key_class, input_type, len_delta, caret_pos, selection_len, payload }) =>
-      ({ id, user_id, doc_id, session_id, t, kind, key_class, input_type, len_delta, caret_pos, selection_len, payload }));
+    const rows = batch.map(({ id, schema_version, user_id, doc_id, session_id, seq, t, pt, kind, key_class, key_char, input_type, len_delta, caret_pos, selection_len, payload }) =>
+      ({ id, schema_version, user_id, doc_id, session_id, seq, t, pt, kind, key_class, key_char, input_type, len_delta, caret_pos, selection_len, payload }));
 
     const { error } = await supabase.from("writing_events").upsert(rows, { onConflict: "id", ignoreDuplicates: true });
     if (!error) {

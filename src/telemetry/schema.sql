@@ -37,60 +37,41 @@ alter table public.publications
   add column if not exists score_tier        text,
   add column if not exists score_features    jsonb;
 
--- 4. Writing sessions — one row per continuous writing session
-create table if not exists public.writing_sessions (
-  id            uuid primary key,
-  user_id       uuid not null references auth.users(id) on delete cascade,
-  doc_id        uuid not null,
-  started_at    bigint not null,             -- epoch ms
-  ended_at      bigint,                      -- epoch ms (null while open)
-  event_count   integer not null default 0,
-  chars_added   integer not null default 0,
-  chars_deleted integer not null default 0,
-  keystrokes    integer not null default 0,
-  pastes        integer not null default 0,
-  features      jsonb,
-  score         smallint,
-  created_at    timestamptz not null default now()
-);
-create index if not exists writing_sessions_user_doc_idx
-  on public.writing_sessions(user_id, doc_id, started_at desc);
-
-alter table public.writing_sessions enable row level security;
-
-drop policy if exists "ws_select_own" on public.writing_sessions;
-create policy "ws_select_own" on public.writing_sessions
-  for select using (auth.uid() = user_id);
-
-drop policy if exists "ws_insert_own" on public.writing_sessions;
-create policy "ws_insert_own" on public.writing_sessions
-  for insert with check (auth.uid() = user_id);
-
-drop policy if exists "ws_update_own" on public.writing_sessions;
-create policy "ws_update_own" on public.writing_sessions
-  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
-
-drop policy if exists "ws_delete_own" on public.writing_sessions;
-create policy "ws_delete_own" on public.writing_sessions
-  for delete using (auth.uid() = user_id);
+-- 4. Writing sessions: REMOVED.
+-- This table was never written by the client — sync.js only uploads
+-- writing_events — so it only ever held zero rows. Per-session aggregates are
+-- now derived on demand by the writing_session_features view (section 7b),
+-- which can never drift from the event stream. Drop the dead table if present.
+drop table if exists public.writing_sessions cascade;
 
 -- 5. Writing events — append-only fine-grained event stream
 -- Only synced when profile.research_opt_in = true (enforced client-side AND below).
 create table if not exists public.writing_events (
-  id            uuid primary key,
-  user_id       uuid not null references auth.users(id) on delete cascade,
-  doc_id        uuid not null,
-  session_id    uuid not null,
-  t             bigint not null,                -- epoch ms client-side
-  kind          text not null,                  -- keydown|keyup|input|delete|paste|drop|caret|focus|blur|visibility|session_start|session_end|doc_switch
-  key_class     text,                           -- letter|digit|punct|space|nav|edit|modifier|other  (raw key NEVER stored for letter/digit)
-  input_type    text,                           -- InputEvent.inputType
-  len_delta     integer,                        -- chars added/removed
-  caret_pos     integer,
-  selection_len integer,
-  payload       jsonb,
-  created_at    timestamptz not null default now()
+  id             uuid primary key,
+  schema_version smallint,                       -- recorder event-shape version (bumped when fields change)
+  user_id        uuid not null references auth.users(id) on delete cascade,
+  doc_id         uuid not null,
+  session_id     uuid not null,
+  seq            integer,                         -- monotonic order within a session (breaks same-ms ties)
+  t              bigint not null,                 -- epoch ms client-side (wall clock — calendar alignment)
+  pt             double precision,                -- monotonic hi-res ms (performance.now) — precise IKI / dwell
+  kind           text not null,                  -- keydown|keyup|input|delete|paste|drop|caret|focus|blur|visibility|compose_start|compose_end|session_start|session_end|doc_switch
+  key_class      text,                           -- letter|digit|punct|space|nav|edit|modifier|other
+  key_char       text,                           -- literal key/inserted text (letters, digits, punct); null for non-character keys & deletes/pastes
+  input_type     text,                           -- InputEvent.inputType
+  len_delta      integer,                        -- chars added/removed
+  caret_pos      integer,
+  selection_len  integer,
+  payload        jsonb,
+  created_at     timestamptz not null default now()
 );
+
+-- New columns for deployments where writing_events already exists (idempotent).
+alter table public.writing_events
+  add column if not exists schema_version smallint,
+  add column if not exists seq            integer,
+  add column if not exists pt             double precision,
+  add column if not exists key_char       text;
 
 create index if not exists writing_events_user_doc_t_idx
   on public.writing_events(user_id, doc_id, t);
@@ -125,7 +106,6 @@ language sql
 security invoker
 as $$
   delete from public.writing_events where user_id = auth.uid();
-  delete from public.writing_sessions where user_id = auth.uid();
 $$;
 
 -- 7. View: aggregate per-user counts (used by Profile)
@@ -137,6 +117,32 @@ create or replace view public.my_writing_event_counts as
   from public.writing_events
   where user_id = auth.uid()
   group by user_id;
+
+-- 7b. View: per-session aggregates reconstructed from the event stream.
+-- Replaces the old writing_sessions table (dropped in section 4): it derives
+-- clean per-session labels straight from the raw stream, so it can never drift
+-- from the events and needs no extra client writes.
+create or replace view public.writing_session_features as
+  select
+    session_id,
+    user_id,
+    doc_id,
+    min(t)                                                          as started_at,   -- epoch ms
+    max(t)                                                          as ended_at,
+    min(pt)                                                         as started_pt,   -- hi-res ms
+    max(pt)                                                         as ended_pt,
+    count(*)                                                        as event_count,
+    count(*) filter (where kind = 'input')                         as typing_events,
+    count(*) filter (where kind = 'delete')                        as deletion_events,
+    count(*) filter (where kind = 'paste')                         as paste_events,
+    count(*) filter (where kind = 'keydown')                       as keystrokes,
+    coalesce(sum(len_delta)  filter (where kind = 'input'  and len_delta > 0), 0) as chars_added,
+    coalesce(sum(-len_delta) filter (where kind = 'delete' and len_delta < 0), 0) as chars_deleted,
+    coalesce(sum(len_delta)  filter (where kind = 'paste'  and len_delta > 0), 0) as chars_pasted,
+    count(*) filter (where (payload->>'composing') = 'true')       as composed_events
+  from public.writing_events
+  where user_id = auth.uid()
+  group by session_id, user_id, doc_id;
 
 -- ── 8. Likes ─────────────────────────────────────────────────────────────
 -- Anyone signed in sees like counts; users insert/delete their own row.
