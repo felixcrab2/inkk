@@ -528,17 +528,17 @@ body.focus-mode #text-container {
   border: none;
   outline: none;
   font-family: var(--font-serif);
-  /* Cormorant is a display Garamond: at a restrained size with a confident
-     weight and tight tracking it reads as an elegant book title. Size is kept
-     modest on purpose; whitespace, not scale, gives a title its presence. */
+  /* Cormorant display Garamond, kept understated: only a little larger than the
+     body so it reads as a quiet book title, not a banner. Semibold gives it
+     enough presence at the small size without shouting. */
   font-weight: 600;
   font-style: normal;
-  font-size: clamp(1.75rem, 3.8vw, 2.2rem);
+  font-size: clamp(1.4rem, 2.2vw, 1.7rem);
   color: var(--text);
   padding: 0 8px;
-  margin-bottom: 30px;
-  line-height: 1.16;
-  letter-spacing: -0.01em;
+  margin-bottom: 24px;
+  line-height: 1.2;
+  letter-spacing: -0.005em;
   text-align: center;
   text-wrap: balance;
   display: block;
@@ -2848,7 +2848,7 @@ body.focus-mode #text-container {
   #title-input {
     width: 100%;
     max-width: none;
-    font-size: clamp(1.7rem, 7vw, 2.1rem);
+    font-size: clamp(1.35rem, 4.2vw, 1.6rem);
   }
   #text {
     width: 100%;
