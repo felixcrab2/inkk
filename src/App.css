@@ -400,7 +400,8 @@ body.focus-mode #text-container {
 
 .doc-item-title {
   display: block;
-  font-size: 0.83rem;
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
@@ -532,9 +533,10 @@ body.focus-mode #text-container {
   border: none;
   outline: none;
   font-family: var(--font-serif);
-  /* Small all-caps Cormorant with open tracking reads as a quiet, consistent
-     book title. The measure is narrower than the body so a long title wraps to
-     a second line sooner and never runs wider than the prose below it. */
+  /* Small all-caps Cormorant at its natural (tight) spacing, matching how the
+     caps read when typed directly. The measure is narrower than the body so a
+     long title wraps to a second line sooner and never runs wider than the
+     prose below it. */
   font-weight: 600;
   font-style: normal;
   font-size: clamp(1.1rem, 1.7vw, 1.3rem);
@@ -542,7 +544,7 @@ body.focus-mode #text-container {
   padding: 0 8px;
   margin-bottom: 22px;
   line-height: 1.32;
-  letter-spacing: 0.09em;
+  letter-spacing: -0.005em;
   text-transform: uppercase;
   text-align: center;
   text-wrap: balance;
@@ -847,10 +849,11 @@ body.focus-mode #text-container {
 
 .feed-lead-title {
   font-family: var(--font-serif);
-  font-size: 2.05rem;
+  font-size: 1.7rem;
   font-weight: 600;
-  line-height: 1.14;
-  letter-spacing: -0.022em;
+  line-height: 1.18;
+  letter-spacing: -0.005em;
+  text-transform: uppercase;
   color: var(--text);
   margin: 0 0 12px;
   transition: color 0.2s ease;
@@ -926,10 +929,11 @@ body.focus-mode #text-container {
 
 .feed-entry-title {
   font-family: var(--font-serif);
-  font-size: 1.34rem;
+  font-size: 1.2rem;
   font-weight: 600;
-  line-height: 1.26;
-  letter-spacing: -0.022em;
+  line-height: 1.3;
+  letter-spacing: -0.005em;
+  text-transform: uppercase;
   color: var(--text);
   margin: 0 0 7px;
   transition: color 0.2s ease;
@@ -1701,11 +1705,12 @@ body.focus-mode #text-container {
 .pac-title {
   display: block;
   font-family: var(--font-serif);
-  font-size: 1.08rem;
-  font-weight: 500;
+  font-size: 1.02rem;
+  font-weight: 600;
   font-style: normal;
   color: var(--text);
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
+  text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2873,9 +2878,9 @@ body.focus-mode #text-container {
   #feed-header { padding-left: 20px; padding-right: 20px; }
   #feed-list { padding-left: 20px; padding-right: 20px; }
   .feed-tagline { font-size: 1.08rem; max-width: none; }
-  .feed-lead-title { font-size: 1.7rem; }
+  .feed-lead-title { font-size: 1.42rem; }
   .feed-lead-excerpt { font-size: 1.02rem; }
-  .feed-entry-title { font-size: 1.24rem; }
+  .feed-entry-title { font-size: 1.1rem; }
   .pub-card-title { font-size: 1.2rem; }
 
   /* ── Profile ── */

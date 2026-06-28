@@ -375,6 +375,20 @@ function getRelCount(rel) {
   return rel?.count ?? 0;
 }
 
+// ─── Browser fullscreen ──────────────────────────────────────────────────────
+// Genuine fullscreen (hides the browser's tab strip / address bar). Must be
+// called from a user gesture; silently no-ops where unsupported (e.g. iOS Safari).
+function enterBrowserFullscreen() {
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (req) { try { Promise.resolve(req.call(el)).catch(() => {}); } catch {} }
+}
+function exitBrowserFullscreen() {
+  if (!(document.fullscreenElement || document.webkitFullscreenElement)) return;
+  const exit = document.exitFullscreen || document.webkitExitFullscreen;
+  if (exit) { try { Promise.resolve(exit.call(document)).catch(() => {}); } catch {} }
+}
+
 // ─── Likes ─────────────────────────────────────────────────────────────────
 async function togglePubLike(pubId, userId, currentlyLiked) {
   if (!supabase || !userId) return "Not signed in.";
@@ -2279,6 +2293,34 @@ export default function App() {
     else document.body.classList.remove("focus-mode");
   }, [focusMode]);
 
+  // Focus mode also drives genuine browser fullscreen. Both helpers must run
+  // straight off the user gesture (click / keypress), so toggle here rather
+  // than inside an effect.
+  const toggleFocusMode = useCallback(() => {
+    setFocusMode(prev => {
+      if (prev) exitBrowserFullscreen(); else enterBrowserFullscreen();
+      return !prev;
+    });
+  }, []);
+  const exitFocusMode = useCallback(() => {
+    exitBrowserFullscreen();
+    setFocusMode(false);
+  }, []);
+
+  // Keep focus mode in sync when the user leaves native fullscreen via Esc / F11.
+  useEffect(() => {
+    const onFsChange = () => {
+      const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      if (!isFs) setFocusMode(false);
+    };
+    document.addEventListener("fullscreenchange", onFsChange);
+    document.addEventListener("webkitfullscreenchange", onFsChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFsChange);
+      document.removeEventListener("webkitfullscreenchange", onFsChange);
+    };
+  }, []);
+
   useEffect(() => {
     if (!showLanding && !isMobileRef.current) editorRef.current?.focus();
   }, [showLanding]);
@@ -2397,6 +2439,33 @@ export default function App() {
       }),
     });
     return () => stopSync();
+  }, []);
+
+  // ─── persist on tab-hide / unload ─────────────────────────────────────────
+  // The normal save is debounced 500ms; localStorage.setItem is synchronous, so
+  // this reliably lands the active doc even on a hard close/reload, where the
+  // debounce timer would otherwise be torn down and lose the last few words.
+  useEffect(() => {
+    const persistNow = () => {
+      const id = activeIdRef.current;
+      if (!id) return;
+      const liveSecs = writingSessionStartRef.current !== null
+        ? (Date.now() - writingSessionStartRef.current) / 1000 : 0;
+      const timeToSave = writingBaseRef.current + writingFlushRef.current + liveSecs;
+      const next = docsRef.current.map(d =>
+        d.id === id
+          ? { ...d, title: titleRef.current, content: contentRef.current, updatedAt: Date.now(), writingTimeSecs: timeToSave }
+          : d
+      );
+      saveState(next, id);
+    };
+    const onVisibility = () => { if (document.visibilityState === "hidden") persistNow(); };
+    window.addEventListener("pagehide", persistNow);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", persistNow);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, []);
 
   const handleAvatarChange = useCallback(async (avatarData) => {
@@ -2915,8 +2984,20 @@ export default function App() {
     // the PDF's (invisible) document metadata only — the code is surfaced in
     // the app (Profile, reading view, Verify tab), not stamped on the page.
     const activeDoc = docsRef.current.find(d => d.id === activeIdRef.current);
-    const verify = activeDoc?.verifyCode
-      ? { code: activeDoc.verifyCode, verified: isVerifiedTier(activeDoc.scoreTier), host: window.location.host }
+    let certCode = activeDoc?.verifyCode || null;
+    let certTier = activeDoc?.scoreTier || null;
+    // Fallback: if the code isn't hydrated into local state yet (certified in
+    // another session), look it up so the PDF still reliably carries it.
+    if (!certCode && supabase && userRef.current) {
+      const { data } = await supabase
+        .from("documents")
+        .select("verify_code, score_tier")
+        .eq("id", activeIdRef.current)
+        .maybeSingle();
+      if (data?.verify_code) { certCode = data.verify_code; certTier = data.score_tier; }
+    }
+    const verify = certCode
+      ? { code: certCode, verified: isVerifiedTier(certTier), host: window.location.host }
       : null;
     const renderOptions = {
       pageW: preset.w,
@@ -2997,11 +3078,24 @@ export default function App() {
   useEffect(() => {
     const handler = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); if (view === "editor") openDownloadModal(); }
-      if ((e.metaKey || e.ctrlKey) && e.key === ".") { e.preventDefault(); if (view === "editor") setFocusMode(v => !v); }
-      // No italics anywhere: block the browser's default Cmd+I / Ctrl+I in the editor.
-      if ((e.metaKey || e.ctrlKey) && (e.key === "i" || e.key === "I")) { e.preventDefault(); }
+      if ((e.metaKey || e.ctrlKey) && e.key === ".") { e.preventDefault(); if (view === "editor") toggleFocusMode(); }
+      // Cmd/Ctrl+I toggles italic in the title or body editor.
+      if ((e.metaKey || e.ctrlKey) && (e.key === "i" || e.key === "I")) {
+        e.preventDefault();
+        const active = document.activeElement;
+        if (active === editorRef.current || active === titleEditorRef.current) {
+          document.execCommand("italic");
+          if (active === titleEditorRef.current) onTitleInput(); else onInput();
+          try {
+            setFormatActive({
+              bold:   document.queryCommandState("bold"),
+              italic: document.queryCommandState("italic"),
+            });
+          } catch {}
+        }
+      }
       if (e.key === "Escape") {
-        if (focusMode) { setFocusMode(false); return; }
+        if (focusMode) { exitFocusMode(); return; }
         if (certMenuOpen) { setCertMenuOpen(false); return; }
         if (publishMenuOpen) { setPublishMenuOpen(false); setConfirmUnpublishOpen(false); return; }
         if (publishModalDoc) { setPublishModalDoc(null); return; }
@@ -3013,7 +3107,7 @@ export default function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [openDownloadModal, view, focusMode, certMenuOpen, publishMenuOpen, publishModalDoc, downloadModalOpen, usernameModalOpen]);
+  }, [openDownloadModal, view, focusMode, certMenuOpen, toggleFocusMode, exitFocusMode, publishMenuOpen, publishModalDoc, downloadModalOpen, usernameModalOpen, onInput, onTitleInput]);
 
   // ─ mount ────────────────────────────────────────────────────────────────────
 
@@ -3313,8 +3407,8 @@ export default function App() {
           {isEditor && (
             <button
               className={`icon-btn focus-btn ${menuClass}`}
-              onClick={() => setFocusMode(v => !v)}
-              title={focusMode ? "Exit focus mode  ⌘." : "Focus mode  ⌘."}
+              onClick={toggleFocusMode}
+              title={focusMode ? "Exit fullscreen  ⌘." : "Fullscreen  ⌘."}
             >
               {focusMode ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
             </button>
@@ -3510,6 +3604,12 @@ export default function App() {
           onMouseDown={e => { e.preventDefault(); applyFormat("bold"); }}
           title="Bold  ⌘B"
         ><b>B</b></button>
+        <button
+          type="button"
+          className={`format-btn${formatActive.italic ? " active" : ""}`}
+          onMouseDown={e => { e.preventDefault(); applyFormat("italic"); }}
+          title="Italic  ⌘I"
+        ><i>I</i></button>
       </div>
 
       {/* ── editor preview overlay ── */}
@@ -3666,7 +3766,7 @@ export default function App() {
 
       {/* ── focus mode exit ── */}
       {focusMode && (
-        <button id="focus-exit" onClick={() => setFocusMode(false)} title="Exit focus mode  ⌘.">
+        <button id="focus-exit" onClick={exitFocusMode} title="Exit fullscreen  ⌘.">
           <Minimize2 size={14} />
         </button>
       )}
