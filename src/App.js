@@ -369,6 +369,20 @@ function getRelCount(rel) {
   return rel?.count ?? 0;
 }
 
+// ─── Browser fullscreen ──────────────────────────────────────────────────────
+// Genuine fullscreen (hides the browser's tab strip / address bar). Must be
+// called from a user gesture; silently no-ops where unsupported (e.g. iOS Safari).
+function enterBrowserFullscreen() {
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (req) { try { Promise.resolve(req.call(el)).catch(() => {}); } catch {} }
+}
+function exitBrowserFullscreen() {
+  if (!(document.fullscreenElement || document.webkitFullscreenElement)) return;
+  const exit = document.exitFullscreen || document.webkitExitFullscreen;
+  if (exit) { try { Promise.resolve(exit.call(document)).catch(() => {}); } catch {} }
+}
+
 // ─── Likes ─────────────────────────────────────────────────────────────────
 async function togglePubLike(pubId, userId, currentlyLiked) {
   if (!supabase || !userId) return "Not signed in.";
@@ -2262,6 +2276,34 @@ export default function App() {
     else document.body.classList.remove("focus-mode");
   }, [focusMode]);
 
+  // Focus mode also drives genuine browser fullscreen. Both helpers must run
+  // straight off the user gesture (click / keypress), so toggle here rather
+  // than inside an effect.
+  const toggleFocusMode = useCallback(() => {
+    setFocusMode(prev => {
+      if (prev) exitBrowserFullscreen(); else enterBrowserFullscreen();
+      return !prev;
+    });
+  }, []);
+  const exitFocusMode = useCallback(() => {
+    exitBrowserFullscreen();
+    setFocusMode(false);
+  }, []);
+
+  // Keep focus mode in sync when the user leaves native fullscreen via Esc / F11.
+  useEffect(() => {
+    const onFsChange = () => {
+      const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      if (!isFs) setFocusMode(false);
+    };
+    document.addEventListener("fullscreenchange", onFsChange);
+    document.addEventListener("webkitfullscreenchange", onFsChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFsChange);
+      document.removeEventListener("webkitfullscreenchange", onFsChange);
+    };
+  }, []);
+
   useEffect(() => {
     if (!showLanding && !isMobileRef.current) editorRef.current?.focus();
   }, [showLanding]);
@@ -2973,11 +3015,11 @@ export default function App() {
   useEffect(() => {
     const handler = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); if (view === "editor") openDownloadModal(); }
-      if ((e.metaKey || e.ctrlKey) && e.key === ".") { e.preventDefault(); if (view === "editor") setFocusMode(v => !v); }
+      if ((e.metaKey || e.ctrlKey) && e.key === ".") { e.preventDefault(); if (view === "editor") toggleFocusMode(); }
       // No italics anywhere: block the browser's default Cmd+I / Ctrl+I in the editor.
       if ((e.metaKey || e.ctrlKey) && (e.key === "i" || e.key === "I")) { e.preventDefault(); }
       if (e.key === "Escape") {
-        if (focusMode) { setFocusMode(false); return; }
+        if (focusMode) { exitFocusMode(); return; }
         if (publishMenuOpen) { setPublishMenuOpen(false); setConfirmUnpublishOpen(false); return; }
         if (publishModalDoc) { setPublishModalDoc(null); return; }
         if (downloadModalOpen) { setDownloadModalOpen(false); return; }
@@ -2988,7 +3030,7 @@ export default function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [openDownloadModal, view, focusMode, publishMenuOpen, publishModalDoc, downloadModalOpen, usernameModalOpen]);
+  }, [openDownloadModal, view, focusMode, toggleFocusMode, exitFocusMode, publishMenuOpen, publishModalDoc, downloadModalOpen, usernameModalOpen]);
 
   // ─ mount ────────────────────────────────────────────────────────────────────
 
@@ -3262,8 +3304,8 @@ export default function App() {
           {isEditor && (
             <button
               className={`icon-btn focus-btn ${menuClass}`}
-              onClick={() => setFocusMode(v => !v)}
-              title={focusMode ? "Exit focus mode  ⌘." : "Focus mode  ⌘."}
+              onClick={toggleFocusMode}
+              title={focusMode ? "Exit fullscreen  ⌘." : "Fullscreen  ⌘."}
             >
               {focusMode ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
             </button>
@@ -3615,7 +3657,7 @@ export default function App() {
 
       {/* ── focus mode exit ── */}
       {focusMode && (
-        <button id="focus-exit" onClick={() => setFocusMode(false)} title="Exit focus mode  ⌘.">
+        <button id="focus-exit" onClick={exitFocusMode} title="Exit fullscreen  ⌘.">
           <Minimize2 size={14} />
         </button>
       )}
