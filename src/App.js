@@ -1088,54 +1088,128 @@ function DownloadModal({ onConfirm, onClose }) {
 
 // ─── Feed ─────────────────────────────────────────────────────────────────────
 
-function FeedCard({ pub, index, onRead, onAuthorClick, onLike }) {
-  const excerpt = pub.content
-    ? stripHtml(pub.content).replace(/\s+/g, " ").trim().slice(0, 300)
-    : "";
+function isToday(iso) {
+  if (!iso) return false;
+  const d = new Date(iso), n = new Date();
+  return d.getDate() === n.getDate() && d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
+}
+
+// Word-boundary excerpt with an ellipsis when truncated.
+function feedExcerpt(content, limit) {
+  const raw = content ? stripHtml(content).replace(/\s+/g, " ").trim() : "";
+  if (raw.length <= limit) return raw;
+  return raw.slice(0, limit).replace(/\s+\S*$/, "") + "…";
+}
+
+// Shared engagement cluster — quiet diamond signal, likes, comments.
+function FeedActions({ pub, sc, likeCount, commentCount, onRead, onLike }) {
+  return (
+    <div className="feed-entry-actions">
+      {sc && <HumanSignalBadge score={sc} />}
+      <button className="feed-engage" onClick={e => { e.stopPropagation(); onLike(pub); }} aria-label="Like">
+        <Heart size={13} strokeWidth={1.5} fill="none" />
+        <span>{likeCount}</span>
+      </button>
+      <button className="feed-engage" onClick={e => { e.stopPropagation(); onRead(pub, { focus: "comments" }); }} aria-label="Comments">
+        <MessageCircle size={13} strokeWidth={1.5} />
+        <span>{commentCount}</span>
+      </button>
+    </div>
+  );
+}
+
+function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, onLike }) {
+  const excerpt      = feedExcerpt(pub.content, featured ? 300 : 168);
   const likeCount    = getRelCount(pub.like_count);
   const commentCount = getRelCount(pub.comment_count);
   const sc           = scoreFromRecord(pub);
+  const fresh        = isToday(pub.published_at);
+  const initial      = (pub.author_name || "?")[0];
+
+  const author = pub.author_name && (
+    <button
+      className="feed-entry-author"
+      onClick={e => { e.stopPropagation(); pub.user_id && onAuthorClick(pub.user_id); }}
+    >
+      {pub.author_name}
+    </button>
+  );
+
+  const dateline = (
+    <span className="feed-entry-date">
+      {fresh && <span className="feed-fresh-dot" title="Published today" />}
+      {formatDate(pub.published_at)}
+    </span>
+  );
+
+  if (featured) {
+    return (
+      <article className="feed-lead" style={{ "--card-index": index }} onClick={() => onRead(pub)}>
+        <span className="feed-lead-kicker">{fresh ? "Today’s lead" : "Latest"}</span>
+        <h2 className="feed-lead-title">{pub.title || "Untitled"}</h2>
+        {excerpt && <p className="feed-lead-excerpt">{excerpt}</p>}
+        <div className="feed-lead-byline">
+          <span className="feed-mark">
+            <DropCapAvatar letter={initial} avatarData={pub.avatar_data} dropCapImages={dropCapImages} size={44} />
+          </span>
+          <div className="feed-lead-byline-text">
+            {author}
+            <span className="feed-lead-sub">{readingTime(pub.content)} <span className="feed-dot">·</span> {dateline}</span>
+          </div>
+          <FeedActions pub={pub} sc={sc} likeCount={likeCount} commentCount={commentCount} onRead={onRead} onLike={onLike} />
+        </div>
+      </article>
+    );
+  }
 
   return (
-    <article
-      className="feed-item"
-      style={{ "--card-index": index }}
-      onClick={() => onRead(pub)}
-    >
-      <h2 className="feed-item-title">{pub.title || "Untitled"}</h2>
-      {excerpt && <p className="feed-item-excerpt">{excerpt}</p>}
-      <div className="feed-item-meta">
-        {pub.author_name && (
-          <button
-            className="feed-item-author"
-            onClick={e => { e.stopPropagation(); pub.user_id && onAuthorClick(pub.user_id); }}
-          >
-            {pub.author_name}
-          </button>
-        )}
-        <span className="feed-item-dot">·</span>
-        <span>{readingTime(pub.content)}</span>
-        <span className="feed-item-dot">·</span>
-        <span>{formatDate(pub.published_at)}</span>
-        <div className="feed-item-actions">
-          {sc && <HumanSignalBadge score={sc} />}
-          <button
-            className="feed-item-engage"
-            onClick={e => { e.stopPropagation(); onLike(pub); }}
-          >
-            <Heart size={13} strokeWidth={1.5} fill="none" />
-            <span>{likeCount}</span>
-          </button>
-          <button
-            className="feed-item-engage"
-            onClick={e => { e.stopPropagation(); onRead(pub, { focus: "comments" }); }}
-          >
-            <MessageCircle size={13} strokeWidth={1.5} />
-            <span>{commentCount}</span>
-          </button>
+    <article className="feed-entry" style={{ "--card-index": index }} onClick={() => onRead(pub)}>
+      <span className="feed-mark feed-mark-sm">
+        <DropCapAvatar letter={initial} avatarData={pub.avatar_data} dropCapImages={dropCapImages} size={34} />
+      </span>
+      <div className="feed-entry-body">
+        <h2 className="feed-entry-title">{pub.title || "Untitled"}</h2>
+        {excerpt && <p className="feed-entry-excerpt">{excerpt}</p>}
+        <div className="feed-entry-meta">
+          {author}
+          <span className="feed-dot">·</span>
+          <span>{readingTime(pub.content)}</span>
+          <span className="feed-dot">·</span>
+          {dateline}
+          <FeedActions pub={pub} sc={sc} likeCount={likeCount} commentCount={commentCount} onRead={onRead} onLike={onLike} />
         </div>
       </div>
     </article>
+  );
+}
+
+// Premium loading state — hairline shimmer rows that echo the entry shape.
+function FeedSkeleton({ count = 4 }) {
+  return (
+    <div className="feed-skeleton" aria-hidden="true">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="feed-skel-row" style={{ "--card-index": i }}>
+          <div className="feed-skel-mark" />
+          <div className="feed-skel-body">
+            <div className="feed-skel-line feed-skel-title" />
+            <div className="feed-skel-line w-92" />
+            <div className="feed-skel-line w-74" />
+            <div className="feed-skel-line feed-skel-meta w-40" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FeedEmpty({ title, sub, action }) {
+  return (
+    <div className="feed-empty-state">
+      <span className="feed-empty-mark" aria-hidden="true">◇</span>
+      <p className="feed-empty-title">{title}</p>
+      {sub && <p className="feed-empty-sub">{sub}</p>}
+      {action}
+    </div>
   );
 }
 
@@ -1199,8 +1273,26 @@ function Feed({ user, onRead, onAuthorClick, dropCapImages, onRequestAuth }) {
   const handleLike          = useMemo(() => makeLikeHandler(pubs, setPubs), [makeLikeHandler, pubs]);
   const handleFollowingLike = useMemo(() => makeLikeHandler(followingPubs, setFollowingPubs), [makeLikeHandler, followingPubs]);
 
+  const editionDate = useMemo(() => {
+    const d = new Date();
+    const weekday = d.toLocaleDateString("en-GB", { weekday: "long" });
+    const rest    = d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+    return `${weekday} · ${rest}`;
+  }, []);
+
+  const tagline = feedTab === "following"
+    ? "New work from the writers you follow."
+    : feedTab === "writers"
+      ? "The people writing by hand on inkk."
+      : "Fresh writing from the community — each piece still carrying the marks of its making.";
+
   return (
     <div id="feed-container">
+      <div id="feed-masthead">
+        <span className="feed-dateline">{editionDate}</span>
+        <p className="feed-tagline">{tagline}</p>
+      </div>
+
       <div id="feed-header">
         <div id="feed-tabs">
           {user && (
@@ -1209,26 +1301,28 @@ function Feed({ user, onRead, onAuthorClick, dropCapImages, onRequestAuth }) {
           <button className={`feed-tab${feedTab === "stories" ? " active" : ""}`} onClick={() => setFeedTab("stories")}>Stories</button>
           <button className={`feed-tab${feedTab === "writers" ? " active" : ""}`} onClick={() => setFeedTab("writers")}>Writers{writers.length > 0 && <span className="feed-tab-count">{writers.length}</span>}</button>
         </div>
-
       </div>
 
       {feedTab === "following" && (
         <div id="feed-list">
-          {followingLoading && <p className="feed-empty">loading…</p>}
+          {followingLoading && <FeedSkeleton />}
           {!followingLoading && followingFetched && followingPubs.length === 0 && (
-            <p className="feed-empty">No posts yet. Follow writers to see their work here.</p>
+            <FeedEmpty title="Your feed is quiet" sub="Follow writers and their newest work gathers here." />
           )}
-          {followingPubs.map((pub, i) => (
-            <FeedCard key={pub.id} pub={pub} index={i} onRead={onRead} onAuthorClick={onAuthorClick} onLike={handleFollowingLike} />
+          {!followingLoading && followingPubs.map((pub, i) => (
+            <FeedCard key={pub.id} pub={pub} index={i} featured={i === 0} dropCapImages={dropCapImages}
+              onRead={onRead} onAuthorClick={onAuthorClick} onLike={handleFollowingLike} />
           ))}
         </div>
       )}
 
       {feedTab === "writers" && (
         <div id="feed-list">
-          {loading && <p className="feed-empty">loading…</p>}
-          {!loading && writers.length === 0 && <p className="feed-empty">no writers yet.</p>}
-          {writers.map((w, i) => {
+          {loading && <FeedSkeleton count={5} />}
+          {!loading && writers.length === 0 && (
+            <FeedEmpty title="No writers yet" sub="The first published piece will introduce its author here." />
+          )}
+          {!loading && writers.map((w, i) => {
             const pieceCount = pubs.filter(p => p.user_id === w.user_id).length;
             return (
               <div key={w.user_id} className="writer-card" style={{ "--card-index": i }} onClick={() => w.user_id && onAuthorClick(w.user_id)}>
@@ -1246,12 +1340,13 @@ function Feed({ user, onRead, onAuthorClick, dropCapImages, onRequestAuth }) {
 
       {feedTab === "stories" && (
         <div id="feed-list">
-          {loading && <p className="feed-empty">loading…</p>}
+          {loading && <FeedSkeleton />}
           {!loading && pubs.length === 0 && (
-            <p className="feed-empty">nothing published yet — be the first.</p>
+            <FeedEmpty title="Nothing published yet" sub="Be the first to share something written by hand." />
           )}
-          {pubs.map((pub, i) => (
-            <FeedCard key={pub.id} pub={pub} index={i} onRead={onRead} onAuthorClick={onAuthorClick} onLike={handleLike} />
+          {!loading && pubs.map((pub, i) => (
+            <FeedCard key={pub.id} pub={pub} index={i} featured={i === 0} dropCapImages={dropCapImages}
+              onRead={onRead} onAuthorClick={onAuthorClick} onLike={handleLike} />
           ))}
         </div>
       )}
