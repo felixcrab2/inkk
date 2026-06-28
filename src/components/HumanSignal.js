@@ -41,7 +41,7 @@ function buildSmoothPath(pts) {
 
 function VelocityChart({ series, peakWpm }) {
   if (!series || series.length < 2) {
-    return <div className="hs-chart-empty">Keep writing — velocity builds with more data.</div>;
+    return <div className="hs-chart-empty">Keep writing. Velocity builds with more data.</div>;
   }
   const W = 440, H = 100;
   const PAD = { t: 8, r: 8, b: 22, l: 30 };
@@ -134,7 +134,7 @@ export function HumanSignalPanel({ score, onClose }) {
         </div>
         <div className="hs-panel-hero">
           <div className="hs-panel-score-block">
-            <span className="hs-panel-score-num">{score.score ?? "—"}</span>
+            <span className="hs-panel-score-num">{score.score ?? "-"}</span>
             <span className="hs-panel-score-denom">/100</span>
           </div>
           <div className="hs-panel-tier-block">
@@ -151,10 +151,10 @@ export function HumanSignalPanel({ score, onClose }) {
           {tab === "Signal" && (
             <div className="hs-tab-signal">
               <p className="hs-panel-blurb">
-                Built from rhythm, pauses, corrections, and revision behaviour — not the words themselves.
+                Built from rhythm, pauses, corrections, and revision behaviour, not the words themselves.
               </p>
               {contributors.length === 0 && (
-                <div className="hs-panel-empty">Keep writing — the signal builds with a little more typing.</div>
+                <div className="hs-panel-empty">Keep writing. The signal builds with a little more typing.</div>
               )}
               {contributors.map(c => (
                 <div key={c.key} className="hs-contrib-row">
@@ -170,7 +170,7 @@ export function HumanSignalPanel({ score, onClose }) {
               ))}
               {score.paste_ratio > 0.2 && (
                 <p className="hs-panel-warn">
-                  {Math.round(score.paste_ratio * 100)}% of content was pasted — score reduced accordingly.
+                  {Math.round(score.paste_ratio * 100)}% of content was pasted, score reduced accordingly.
                 </p>
               )}
             </div>
@@ -180,21 +180,21 @@ export function HumanSignalPanel({ score, onClose }) {
               <p className="hs-panel-blurb">Words per minute, in 30-second windows across the session.</p>
               <VelocityChart series={score.velocity_series} peakWpm={score.peak_wpm} />
               <div className="hs-stat-row">
-                <StatChip label="avg speed" value={score.avg_wpm ? `${score.avg_wpm} wpm` : "—"} />
-                <StatChip label="peak speed" value={score.peak_wpm ? `${score.peak_wpm} wpm` : "—"} />
-                <StatChip label="active time" value={score.active_time_ms > 0 ? fmtMin(score.active_time_ms) : "—"} />
+                <StatChip label="avg speed" value={score.avg_wpm ? `${score.avg_wpm} wpm` : "-"} />
+                <StatChip label="peak speed" value={score.peak_wpm ? `${score.peak_wpm} wpm` : "-"} />
+                <StatChip label="active time" value={score.active_time_ms > 0 ? fmtMin(score.active_time_ms) : "-"} />
               </div>
             </div>
           )}
           {tab === "Patterns" && (
             <div className="hs-tab-patterns">
-              <p className="hs-panel-blurb">Behavioural fingerprint — what the process metadata shows.</p>
+              <p className="hs-panel-blurb">Behavioural fingerprint, what the process metadata shows.</p>
               <div className="hs-stat-row hs-stat-row-grid">
                 <StatChip label="corrections" value={corrPer100} sub="per 100 words" />
-                <StatChip label="revisions" value={score.mid_revisions ?? "—"} sub="returned to rework" />
-                <StatChip label="thinking pauses" value={score.thinking_pauses ?? "—"} sub="2–10 s pauses" />
-                <StatChip label="engagement" value={score.active_ratio > 0 ? `${Math.round(score.active_ratio * 100)}%` : "—"} sub="of session active" />
-                <StatChip label="bursts" value={score.burst_count ?? "—"} sub="writing bursts" />
+                <StatChip label="revisions" value={score.mid_revisions ?? "-"} sub="returned to rework" />
+                <StatChip label="thinking pauses" value={score.thinking_pauses ?? "-"} sub="2 to 10 s pauses" />
+                <StatChip label="engagement" value={score.active_ratio > 0 ? `${Math.round(score.active_ratio * 100)}%` : "-"} sub="of session active" />
+                <StatChip label="bursts" value={score.burst_count ?? "-"} sub="writing bursts" />
                 <StatChip label="typed" value={score.typed_chars || 0} sub="characters" />
                 <StatChip label="sessions" value={score.session_count || 1} sub="visits to this doc" />
               </div>
@@ -216,7 +216,7 @@ export function HumanSignalPanel({ score, onClose }) {
                 </div>
                 <div className="hs-method-item">
                   <span className="hs-method-name">Pause distribution</span>
-                  <span className="hs-method-body">Pauses in human writing follow a log-normal distribution — mostly short hesitations, with occasional long stops for thought. Flat or absent pause distributions are a known marker of generated text.</span>
+                  <span className="hs-method-body">Pauses in human writing follow a log-normal distribution, mostly short hesitations, with occasional long stops for thought. Flat or absent pause distributions are a known marker of generated text.</span>
                 </div>
                 <div className="hs-method-item">
                   <span className="hs-method-name">In-line corrections</span>
@@ -228,7 +228,7 @@ export function HumanSignalPanel({ score, onClose }) {
                 </div>
                 <div className="hs-method-item">
                   <span className="hs-method-name">Writing burst patterns</span>
-                  <span className="hs-method-body">Sustained episodes of uninterrupted typing — flow states — followed by pauses. The shape and frequency of these bursts reflects the cognitive structure of composition.</span>
+                  <span className="hs-method-body">Sustained episodes of uninterrupted typing (flow states) followed by pauses. The shape and frequency of these bursts reflects the cognitive structure of composition.</span>
                 </div>
                 <div className="hs-method-item">
                   <span className="hs-method-name">Combined rhythm signature</span>
@@ -240,7 +240,7 @@ export function HumanSignalPanel({ score, onClose }) {
                 </div>
                 <div className="hs-method-item">
                   <span className="hs-method-name">Cognitive engagement</span>
-                  <span className="hs-method-body">Pauses of two to ten seconds — long enough to suggest genuine thought, short enough to remain part of active composition. Their presence, frequency, and distribution tell us something about the effort behind the text.</span>
+                  <span className="hs-method-body">Pauses of two to ten seconds, long enough to suggest genuine thought, short enough to remain part of active composition. Their presence, frequency, and distribution tell us something about the effort behind the text.</span>
                 </div>
               </div>
               <p className="hs-method-footer">
@@ -258,12 +258,12 @@ export function HumanSignalLine({ score, words, saving, online, signedIn, publis
   const hasScore = !!score?.tier && (score.confidence ?? 0) > 0.05;
   const status = saving
     ? (signedIn && online ? "saving…" : "saving locally…")
-    : (!signedIn ? "saved on this device" : (!online ? "offline — saved locally, will sync" : "saved"));
+    : (!signedIn ? "saved on this device" : (!online ? "offline, saved locally, will sync" : "saved"));
   return (
     <button id="hs-line" className="hs-line" onClick={hasScore ? onClick : undefined} type="button" disabled={!hasScore}>
       {hasScore && (
         <span className="hs-line-row">
-          <span className="hs-line-label">Process —</span>
+          <span className="hs-line-label">Process</span>
           {dotsRow(score.tier)}
           <span className="hs-line-tier">{score.tier}</span>
         </span>
@@ -284,7 +284,7 @@ export function HumanSignalLine({ score, words, saving, online, signedIn, publis
 export function HumanSignalBadge({ score }) {
   if (!score) return null;
   return (
-    <span className="hs-badge" title="Written with inkk — process metadata recorded">
+    <span className="hs-badge" title="Written with inkk. Process metadata recorded">
       <span className="hs-badge-mark" aria-hidden="true">◇</span>
       <span className="hs-badge-text">process recorded</span>
     </span>

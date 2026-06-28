@@ -1,5 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&display=swap");
-
 /* ─── Design tokens ───────────────────────────────────────────────────────── */
 :root {
   --bg:          #f5f4f2;
@@ -11,8 +9,9 @@
   --border:      rgba(0, 0, 0, 0.13);
   --top-bar:     52px;
   --bottom-nav:  58px;
-  --font-ui:     -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  --font-serif:  "Cormorant Garamond", Georgia, serif;
+  /* One sans for the whole interface; Garamond is reserved for written prose. */
+  --font-ui:     "Helvetica Neue", Helvetica, "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-body:   "EB Garamond", Georgia, "Times New Roman", serif;
 }
 
 /* ─── Reset ───────────────────────────────────────────────────────────────── */
@@ -57,7 +56,7 @@ body {
 }
 
 #landing-headline {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 2.2rem;
   color: var(--text);
   letter-spacing: -0.01em;
@@ -103,11 +102,11 @@ body {
 #top-bar-right { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 
 #brand {
-  font-family: "EB Garamond", serif;
-  font-size: 1.15rem;
-  font-weight: 500;
+  font-family: var(--font-ui);
+  font-size: 1.02rem;
+  font-weight: 600;
   color: var(--text);
-  letter-spacing: 0.01em;
+  letter-spacing: 0.02em;
   user-select: none;
 }
 
@@ -496,7 +495,7 @@ body.focus-mode #text-container {
 .ws-stat       { color: var(--text); }
 .ws-published  { font-variant: small-caps; letter-spacing: 0.08em; color: #6a5544; }
 .ws-sep        { color: var(--subtle); }
-.ws-status     { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-style: italic; }
+.ws-status     { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
 .ws-status .hs-status-dot           { background: #cfcdc8; }
 .ws-status.ok     .hs-status-dot    { background: #5a8a55; }
 .ws-status.saving .hs-status-dot    { background: #8a7a55; animation: hs-pulse 1.2s ease-in-out infinite; }
@@ -527,10 +526,9 @@ body.focus-mode #text-container {
   background: none;
   border: none;
   outline: none;
-  font-family: var(--font-serif);
-  /* Cormorant Garamond is a display face — its high stroke contrast only sings
-     at large sizes. Big + medium(500) gives an elegant editorial title; a small
-     faux-heavy title reads as a bolded first line, not a heading. */
+  font-family: var(--font-body);
+  /* The title is part of the written piece, so it shares the prose Garamond.
+     A medium weight at a large size reads as an editorial heading. */
   font-weight: 500;
   font-style: normal;
   font-size: clamp(1.9rem, 5.2vw, 2.6rem);
@@ -587,7 +585,6 @@ body.focus-mode #text-container {
   transition: color 0.15s, background 0.15s;
 }
 .format-btn b { font-weight: 600; font-style: normal; }
-.format-btn i { font-weight: 400; font-style: italic; }
 .format-btn:hover  { color: var(--text); }
 .format-btn.active { color: var(--text); background: rgba(0, 0, 0, 0.05); }
 
@@ -616,9 +613,9 @@ body.focus-mode #text-container {
   min-width: 0;
   white-space: pre-wrap;
   overflow-wrap: break-word;
-  font-family: var(--font-serif);
-  font-size: 1.2rem;
-  line-height: 1.55;
+  font-family: var(--font-body);
+  font-size: 1.25rem;
+  line-height: 1.62;
   color: var(--text);
   padding: 0 8px 8px;
   outline: none;
@@ -676,29 +673,19 @@ body.focus-mode #text-container {
   animation: viewIn 0.2s ease forwards;
 }
 
-/* ── Masthead — a daily edition, scrolls above the sticky tabs ─────────────── */
+/* ── Masthead — a quiet dateline above the sticky tabs ─────────────────────── */
 #feed-masthead {
   width: 100%;
   max-width: 600px;
-  padding: 30px 24px 18px;
+  padding: 26px 24px 14px;
 }
 .feed-dateline {
   display: block;
-  font-size: 0.64rem;
+  font-size: 0.62rem;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--gold);
+  color: var(--subtle);
   font-weight: 600;
-}
-.feed-tagline {
-  font-family: var(--font-serif);
-  font-size: 1.18rem;
-  font-style: italic;
-  line-height: 1.42;
-  color: var(--muted);
-  margin: 10px 0 0;
-  max-width: 30ch;
-  letter-spacing: 0.005em;
 }
 
 #feed-header {
@@ -851,17 +838,8 @@ body.focus-mode #text-container {
 }
 .feed-lead:hover { background: rgba(169, 138, 92, 0.05); }
 
-.feed-lead-kicker {
-  display: inline-block;
-  font-size: 0.6rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  font-weight: 600;
-  color: var(--gold);
-  margin-bottom: 10px;
-}
 .feed-lead-title {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 2.05rem;
   font-weight: 600;
   line-height: 1.14;
@@ -872,7 +850,7 @@ body.focus-mode #text-container {
 }
 .feed-lead:hover .feed-lead-title { color: #000; }
 .feed-lead-excerpt {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 1.07rem;
   line-height: 1.62;
   color: var(--muted);
@@ -940,7 +918,7 @@ body.focus-mode #text-container {
 .feed-entry-body { flex: 1; min-width: 0; }
 
 .feed-entry-title {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 1.34rem;
   font-weight: 600;
   line-height: 1.26;
@@ -952,7 +930,7 @@ body.focus-mode #text-container {
 .feed-entry:hover .feed-entry-title { color: #000; }
 
 .feed-entry-excerpt {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 0.97rem;
   line-height: 1.58;
   color: var(--muted);
@@ -996,6 +974,9 @@ body.focus-mode #text-container {
   margin-left: auto;
 }
 .feed-entry-actions .hs-badge { margin-top: 0; }
+/* In the feed, keep only the quiet diamond mark. The label repeats on every
+   card and reads as clutter; the full meaning stays in the hover tooltip. */
+.feed-entry-actions .hs-badge-text { display: none; }
 
 .feed-engage {
   background: none;
@@ -1063,7 +1044,7 @@ body.focus-mode #text-container {
   margin-bottom: 16px;
 }
 .feed-empty-title {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 1.32rem;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -1112,7 +1093,7 @@ body.focus-mode #text-container {
 .pub-read-time { font-size: 0.78rem; color: var(--subtle); }
 
 .pub-card-title {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 1.4rem;
   font-weight: 600;
   color: var(--text);
@@ -1123,7 +1104,7 @@ body.focus-mode #text-container {
 }
 
 .pub-card-opening {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 1rem;
   color: var(--muted);
   margin: 0 0 12px;
@@ -1450,7 +1431,7 @@ body.focus-mode #text-container {
 }
 
 #profile-signin-mark {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 2rem;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -1459,7 +1440,7 @@ body.focus-mode #text-container {
 }
 
 #profile-signin-title {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 1.5rem;
   font-weight: 500;
   color: var(--text);
@@ -1582,7 +1563,7 @@ body.focus-mode #text-container {
 }
 
 #profile-username {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 1.85rem;
   font-weight: 600;
   letter-spacing: -0.015em;
@@ -1629,7 +1610,7 @@ body.focus-mode #text-container {
 .stat-fig + .stat-fig { border-left: 1px solid var(--border); }
 
 .stat-fig-num {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 2.1rem;
   font-weight: 400;
   color: var(--text);
@@ -1712,7 +1693,7 @@ body.focus-mode #text-container {
 .pac-main { flex: 1; min-width: 0; }
 .pac-title {
   display: block;
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 1.08rem;
   font-weight: 500;
   font-style: normal;
@@ -1922,7 +1903,7 @@ body.focus-mode #text-container {
   margin-top: 24px;
 }
 #contribution-num {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-weight: 400;
   font-size: 3.4rem;
   color: var(--text);

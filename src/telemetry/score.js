@@ -143,7 +143,7 @@ export const CONTRIBUTOR_DESC = {
   variance:    "Natural irregularity in inter-keystroke timing",
   dwell:       "Physical variation in how long keys are held",
   pauses:      "Pauses distribute as a human thinking pattern",
-  corrections: "Genuine edits — deletions and immediate fixes",
+  corrections: "Genuine edits, deletions and immediate fixes",
   revisions:   "Jumping back to rework earlier passages",
   bursts:      "Periods of sustained, uninterrupted output",
   rhythm:      "IKI and dwell variance confirm each other",

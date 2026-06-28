@@ -97,7 +97,7 @@ function loadImg(src) {
 }
 
 function font(sizePt, italic = false, bold = false) {
-  return `${italic ? "italic" : "normal"} ${bold ? "600" : "400"} ${sizePt * PX}px "Cormorant Garamond", "EB Garamond", Georgia, serif`;
+  return `${italic ? "italic" : "normal"} ${bold ? "600" : "400"} ${sizePt * PX}px "EB Garamond", Georgia, "Times New Roman", serif`;
 }
 
 // Parse the editor HTML into an ordered list of blocks:
@@ -462,12 +462,12 @@ async function renderOnePage({ texture, drawInk, cw, ch, paperTexture }) {
  * Render the book PDF for the given HTML body.
  *
  * @param {object} opts
- * @param {string} opts.title          — used as a small italic chapter title
- *                                       on page 1 (wraps) and a tiny running
- *                                       header on subsequent pages.
- * @param {string} opts.html           — editor HTML (paragraphs, line breaks,
+ * @param {string} opts.title          used as a chapter title on page 1
+ *                                       (wraps) and a tiny running header on
+ *                                       subsequent pages.
+ * @param {string} opts.html           editor HTML (paragraphs, line breaks,
  *                                       images preserved).
- * @param {function} opts.onPage       — async fn(canvas, pageIndex, totalPages)
+ * @param {function} opts.onPage       async fn(canvas, pageIndex, totalPages)
  */
 export async function renderBookPdfPages({ title, byline, html, onPage, options = {} }) {
   await document.fonts.ready;
@@ -614,7 +614,7 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
         ctx.textBaseline = "alphabetic";
         let y = bodyTop;
 
-        // ── Page 1: small italic chapter title (wrapped) ────────────────
+        // ── Page 1: chapter title (wrapped) ─────────────────────────────
         if (isFirst && titleStr) {
           ctx.font = font(T_TITLE, false, true);
           ctx.fillStyle = INK_TITLE;
@@ -625,7 +625,7 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
           }
           if (bylineStr) {
             y += 8 * PX;
-            ctx.font = font(T_TITLE * 0.9, true, false);
+            ctx.font = font(T_TITLE * 0.9, false, false);
             ctx.fillStyle = INK_HEADER;
             ctx.fillText(bylineStr, cw / 2, y + T_TITLE * 0.9 * PX);
             y += T_TITLE * 0.9 * PX * TITLE_LINE_MULT;
@@ -633,13 +633,13 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
           y += TITLE_BODY_GAP - 8 * PX;   // space after title block (already partly used by titleBlockH calc)
         }
 
-        // ── Page 2+: tiny italic running header ─────────────────────────
+        // ── Page 2+: tiny running header ────────────────────────────────
         if (!isFirst && titleStr) {
-          ctx.font = font(T_HEADER, true);
+          ctx.font = font(T_HEADER, false);
           ctx.fillStyle = INK_HEADER;
           ctx.textAlign = "center";
-          // For long titles, truncate header — running header should be one line.
-          mctx.font = font(T_HEADER, true);
+          // For long titles, truncate header so it stays one line.
+          mctx.font = font(T_HEADER, false);
           let hdr = titleStr;
           if (mctx.measureText(hdr).width > fullWidth) {
             while (hdr.length > 6 && mctx.measureText(hdr + "…").width > fullWidth) hdr = hdr.slice(0, -1);
