@@ -1406,6 +1406,13 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
   const [confirmDeleteId, setConfirmDeleteId]         = useState(null);
   const [confirmUnpublishId, setConfirmUnpublishId]   = useState(null);
   const [confirmDeletePubId, setConfirmDeletePubId]   = useState(null);
+  const [copiedCode, setCopiedCode]                   = useState(null);
+  const copyCode = (code) => {
+    navigator.clipboard?.writeText(code).then(() => {
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode(c => (c === code ? null : c)), 1800);
+    });
+  };
   const [contribution, setContribution] = useState(null);
   const [editingProfile, setEditingProfile]   = useState(false);
   const [editUsername, setEditUsername]       = useState("");
@@ -1645,6 +1652,20 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
               <div className="pac-main">
                 <span className="pac-title">{pub.title || "Untitled"}</span>
                 <span className="pac-meta">{readingTime(pub.content)} · {formatDate(pub.published_at)}</span>
+                {pub.verify_code && (
+                  <div className="pac-code" onClick={e => e.stopPropagation()}>
+                    <span className="pac-code-mark" aria-hidden="true">◇</span>
+                    <button
+                      className="pac-code-val"
+                      title="Copy verification code"
+                      onClick={() => copyCode(pub.verify_code)}
+                    >
+                      {pub.verify_code}
+                      <span className="pac-code-copied">{copiedCode === pub.verify_code ? "copied" : "copy"}</span>
+                    </button>
+                    <button className="pac-code-link" onClick={() => onOpenVerify?.(pub.verify_code)}>Verify →</button>
+                  </div>
+                )}
               </div>
               {!confirmingUnpublish && !confirmingDelete && (
                 <div className="pac-actions" onClick={e => e.stopPropagation()}>
@@ -1731,8 +1752,6 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
       </section>
 
       <div id="account-footer">
-        <button className="account-link" onClick={() => onOpenVerify?.()}>Verify a piece</button>
-        <span className="account-dot">·</span>
         <button className="account-link" onClick={onChangePassword}>Change password</button>
         <span className="account-dot">·</span>
         <a className="account-link" href="mailto:hello@inkk.example?subject=Hello%20Inkk">Contact</a>
@@ -2857,12 +2876,13 @@ export default function App() {
     ];
     // PNG outputs default to inkk background; user can override.
     const paperTexture = style.paperTexture ?? (format === "pdf");
-    // Verification certificate for this piece, if it's published. Printed as a
-    // colophon and (for PDF) written into the document metadata.
+    // Verification certificate for this piece, if it's published. Written into
+    // the PDF's (invisible) document metadata; the code is surfaced in the app
+    // (Profile, reading view, Verify tab), not stamped on the page.
     let cert = pubCerts[activeId];
     // Fallback: if the cert isn't in local state yet (published in another
     // session, or state not hydrated before download), look it up directly so
-    // the PDF still carries the verification code in its metadata and colophon.
+    // the PDF still reliably carries the verification code in its metadata.
     if (!cert?.code && supabase && userRef.current) {
       const { data } = await supabase
         .from("publications")
@@ -2882,7 +2902,6 @@ export default function App() {
       titleGap:        style.titleGap        ?? "normal",
       paragraphIndent: style.paragraphIndent ?? true,
       paperTexture,
-      verify,
     };
 
     try {
@@ -3146,7 +3165,7 @@ export default function App() {
               {docs.length > 1 && <span className="icon-btn-count">{docs.length}</span>}
             </button>
           )}
-          {(view === "reading" || view === "userProfile" || view === "verify") && (
+          {(view === "reading" || view === "userProfile") && (
             <button className="icon-btn" onClick={goBack} title="Back">
               <ArrowLeft size={18} />
             </button>
@@ -3519,12 +3538,11 @@ export default function App() {
         <VerifyView
           initialCode={verifyCode}
           onOpenPiece={openPieceById}
-          onBrowse={() => navigate("feed")}
         />
       )}
 
       {/* ── bottom nav ── */}
-      {view !== "reading" && view !== "userProfile" && view !== "verify" && (
+      {view !== "reading" && view !== "userProfile" && (
         <nav id="bottom-nav" className={isEditor ? menuClass : ""}>
           <button className={`nav-tab ${isEditor ? "active" : ""}`} onClick={() => navigate("editor")}>
             <PenLine size={18} strokeWidth={1.75} />
@@ -3537,6 +3555,10 @@ export default function App() {
           <button className={`nav-tab ${view === "search" ? "active" : ""}`} onClick={() => navigate("search")}>
             <Search size={18} strokeWidth={1.75} />
             <span className="nav-label">People</span>
+          </button>
+          <button className={`nav-tab ${view === "verify" ? "active" : ""}`} onClick={() => navigate("verify")}>
+            <span className="nav-diamond" aria-hidden="true">◇</span>
+            <span className="nav-label">Verify</span>
           </button>
           <button
             className={`nav-tab ${view === "profile" ? "active" : ""}`}
