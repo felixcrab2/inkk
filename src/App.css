@@ -400,7 +400,8 @@ body.focus-mode #text-container {
 
 .doc-item-title {
   display: block;
-  font-size: 0.83rem;
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;

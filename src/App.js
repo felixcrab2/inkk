@@ -2974,8 +2974,21 @@ export default function App() {
     const handler = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); if (view === "editor") openDownloadModal(); }
       if ((e.metaKey || e.ctrlKey) && e.key === ".") { e.preventDefault(); if (view === "editor") setFocusMode(v => !v); }
-      // No italics anywhere: block the browser's default Cmd+I / Ctrl+I in the editor.
-      if ((e.metaKey || e.ctrlKey) && (e.key === "i" || e.key === "I")) { e.preventDefault(); }
+      // Cmd/Ctrl+I toggles italic in the title or body editor.
+      if ((e.metaKey || e.ctrlKey) && (e.key === "i" || e.key === "I")) {
+        e.preventDefault();
+        const active = document.activeElement;
+        if (active === editorRef.current || active === titleEditorRef.current) {
+          document.execCommand("italic");
+          if (active === titleEditorRef.current) onTitleInput(); else onInput();
+          try {
+            setFormatActive({
+              bold:   document.queryCommandState("bold"),
+              italic: document.queryCommandState("italic"),
+            });
+          } catch {}
+        }
+      }
       if (e.key === "Escape") {
         if (focusMode) { setFocusMode(false); return; }
         if (publishMenuOpen) { setPublishMenuOpen(false); setConfirmUnpublishOpen(false); return; }
@@ -2988,7 +3001,7 @@ export default function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [openDownloadModal, view, focusMode, publishMenuOpen, publishModalDoc, downloadModalOpen, usernameModalOpen]);
+  }, [openDownloadModal, view, focusMode, publishMenuOpen, publishModalDoc, downloadModalOpen, usernameModalOpen, onInput, onTitleInput]);
 
   // ─ mount ────────────────────────────────────────────────────────────────────
 
@@ -3459,6 +3472,12 @@ export default function App() {
           onMouseDown={e => { e.preventDefault(); applyFormat("bold"); }}
           title="Bold  ⌘B"
         ><b>B</b></button>
+        <button
+          type="button"
+          className={`format-btn${formatActive.italic ? " active" : ""}`}
+          onMouseDown={e => { e.preventDefault(); applyFormat("italic"); }}
+          title="Italic  ⌘I"
+        ><i>I</i></button>
       </div>
 
       {/* ── editor preview overlay ── */}
