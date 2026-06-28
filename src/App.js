@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import "@fontsource/eb-garamond/400.css";
 import "@fontsource/eb-garamond/500.css";
-import "@fontsource/eb-garamond/600.css";
+import "@fontsource/cormorant-garamond/400.css";
+import "@fontsource/cormorant-garamond/500.css";
+import "@fontsource/cormorant-garamond/600.css";
+import "@fontsource/cormorant-garamond/700.css";
 import { jsPDF } from "jspdf";
 import { supabase } from "./supabase";
 import { renderBookPdfPages, PAGE_PRESETS } from "./pdf/bookPage";
@@ -655,7 +658,7 @@ function DropCapAvatar({ letter, avatarData, dropCapImages, size = 36 }) {
   }
   return (
     <div style={{ ...circleStyle, background: "var(--text)", color: "var(--bg)",
-      fontFamily: '"EB Garamond", Georgia, serif', fontSize: size * 0.44 }}>
+      fontFamily: '"Cormorant Garamond", serif', fontSize: size * 0.44 }}>
       {(letter || "?").toUpperCase()}
     </div>
   );
