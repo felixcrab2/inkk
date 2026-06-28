@@ -37,6 +37,16 @@ const INK_ALPHA   = 0.93;
 // Paper tone: heavy desaturation + slight brightness for near-white paper.
 const PAPER_FILTER = "saturate(0.45) brightness(1.01)";
 
+// The scanned sheet has a warm "tea-dipped" darkening in its lower corners and
+// edges. Compositing a warm paper tone in `lighten` raises only the pixels
+// darker than the tone toward it, so the heavy corners come up to an even,
+// luminous paper while the bright field and fibre texture stay untouched (a
+// flat fill or symmetric vignette would wash out the texture or miss the
+// asymmetric staining). Kept warm and below pure white so it still reads as
+// paper, not bleached stock.
+const PAPER_LIFT_COLOR = "rgb(241, 236, 229)";
+const PAPER_LIFT_ALPHA = 0.85;
+
 // Header / footer offsets (pt). Margins are now computed proportionally
 // per page size inside renderBookPdfPages so non-default aspects still
 // look book-like.
@@ -418,6 +428,15 @@ async function renderOnePage({ texture, drawInk, cw, ch, paperTexture }) {
     ctx.save();
     ctx.filter = PAPER_FILTER;
     ctx.drawImage(texture, 0, 0, cw, ch);
+    ctx.restore();
+
+    // Lift the texture's dark, tea-stained corners/edges toward an even paper
+    // tone before any ink is laid down (so text stays crisp on top).
+    ctx.save();
+    ctx.globalCompositeOperation = "lighten";
+    ctx.globalAlpha = PAPER_LIFT_ALPHA;
+    ctx.fillStyle = PAPER_LIFT_COLOR;
+    ctx.fillRect(0, 0, cw, ch);
     ctx.restore();
   } else {
     ctx.fillStyle = "#f3f2ef";
