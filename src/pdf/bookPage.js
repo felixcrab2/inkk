@@ -37,6 +37,16 @@ const INK_ALPHA   = 0.93;
 // Paper tone: heavy desaturation + slight brightness for near-white paper.
 const PAPER_FILTER = "saturate(0.45) brightness(1.01)";
 
+// The scanned sheet has a warm "tea-dipped" darkening in its lower corners and
+// edges. Compositing a warm paper tone in `lighten` raises only the pixels
+// darker than the tone toward it, so the heavy corners come up to an even,
+// luminous paper while the bright field and fibre texture stay untouched (a
+// flat fill or symmetric vignette would wash out the texture or miss the
+// asymmetric staining). Kept warm and below pure white so it still reads as
+// paper, not bleached stock.
+const PAPER_LIFT_COLOR = "rgb(241, 236, 229)";
+const PAPER_LIFT_ALPHA = 0.85;
+
 // Header / footer offsets (pt). Margins are now computed proportionally
 // per page size inside renderBookPdfPages so non-default aspects still
 // look book-like.
@@ -419,6 +429,15 @@ async function renderOnePage({ texture, drawInk, cw, ch, paperTexture }) {
     ctx.filter = PAPER_FILTER;
     ctx.drawImage(texture, 0, 0, cw, ch);
     ctx.restore();
+
+    // Lift the texture's dark, tea-stained corners/edges toward an even paper
+    // tone before any ink is laid down (so text stays crisp on top).
+    ctx.save();
+    ctx.globalCompositeOperation = "lighten";
+    ctx.globalAlpha = PAPER_LIFT_ALPHA;
+    ctx.fillStyle = PAPER_LIFT_COLOR;
+    ctx.fillRect(0, 0, cw, ch);
+    ctx.restore();
   } else {
     ctx.fillStyle = "#f3f2ef";
     ctx.fillRect(0, 0, cw, ch);
@@ -462,12 +481,12 @@ async function renderOnePage({ texture, drawInk, cw, ch, paperTexture }) {
  * Render the book PDF for the given HTML body.
  *
  * @param {object} opts
- * @param {string} opts.title          — used as a small italic chapter title
- *                                       on page 1 (wraps) and a tiny running
- *                                       header on subsequent pages.
- * @param {string} opts.html           — editor HTML (paragraphs, line breaks,
+ * @param {string} opts.title          used as a chapter title on page 1
+ *                                       (wraps) and a tiny running header on
+ *                                       subsequent pages.
+ * @param {string} opts.html           editor HTML (paragraphs, line breaks,
  *                                       images preserved).
- * @param {function} opts.onPage       — async fn(canvas, pageIndex, totalPages)
+ * @param {function} opts.onPage       async fn(canvas, pageIndex, totalPages)
  */
 export async function renderBookPdfPages({ title, byline, html, onPage, options = {} }) {
   await document.fonts.ready;
@@ -615,7 +634,7 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
         ctx.textBaseline = "alphabetic";
         let y = bodyTop;
 
-        // ── Page 1: small italic chapter title (wrapped) ────────────────
+        // ── Page 1: chapter title (wrapped) ─────────────────────────────
         if (isFirst && titleStr) {
           ctx.font = font(T_TITLE, false, true);
           ctx.fillStyle = INK_TITLE;
@@ -626,7 +645,7 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
           }
           if (bylineStr) {
             y += 8 * PX;
-            ctx.font = font(T_TITLE * 0.9, true, false);
+            ctx.font = font(T_TITLE * 0.9, false, false);
             ctx.fillStyle = INK_HEADER;
             ctx.fillText(bylineStr, cw / 2, y + T_TITLE * 0.9 * PX);
             y += T_TITLE * 0.9 * PX * TITLE_LINE_MULT;
@@ -634,13 +653,13 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
           y += TITLE_BODY_GAP - 8 * PX;   // space after title block (already partly used by titleBlockH calc)
         }
 
-        // ── Page 2+: tiny italic running header ─────────────────────────
+        // ── Page 2+: tiny running header ────────────────────────────────
         if (!isFirst && titleStr) {
-          ctx.font = font(T_HEADER, true);
+          ctx.font = font(T_HEADER, false);
           ctx.fillStyle = INK_HEADER;
           ctx.textAlign = "center";
-          // For long titles, truncate header — running header should be one line.
-          mctx.font = font(T_HEADER, true);
+          // For long titles, truncate header so it stays one line.
+          mctx.font = font(T_HEADER, false);
           let hdr = titleStr;
           if (mctx.measureText(hdr).width > fullWidth) {
             while (hdr.length > 6 && mctx.measureText(hdr + "…").width > fullWidth) hdr = hdr.slice(0, -1);

@@ -1,5 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&display=swap");
-
 /* ─── Design tokens ───────────────────────────────────────────────────────── */
 :root {
   --bg:          #f5f4f2;
@@ -11,7 +9,9 @@
   --border:      rgba(0, 0, 0, 0.13);
   --top-bar:     52px;
   --bottom-nav:  58px;
-  --font-ui:     -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  /* Garamond is the voice of the writing (brand, titles, prose); the sans is a
+     quiet interface layer only (nav, meta, labels, buttons). */
+  --font-ui:     -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, sans-serif;
   --font-serif:  "Cormorant Garamond", Georgia, serif;
 }
 
@@ -103,7 +103,7 @@ body {
 #top-bar-right { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 
 #brand {
-  font-family: "EB Garamond", serif;
+  font-family: "EB Garamond", Georgia, serif;
   font-size: 1.15rem;
   font-weight: 500;
   color: var(--text);
@@ -496,7 +496,7 @@ body.focus-mode #text-container {
 .ws-stat       { color: var(--text); }
 .ws-published  { font-variant: small-caps; letter-spacing: 0.08em; color: #6a5544; }
 .ws-sep        { color: var(--subtle); }
-.ws-status     { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-style: italic; }
+.ws-status     { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
 .ws-status .hs-status-dot           { background: #cfcdc8; }
 .ws-status.ok     .hs-status-dot    { background: #5a8a55; }
 .ws-status.saving .hs-status-dot    { background: #8a7a55; animation: hs-pulse 1.2s ease-in-out infinite; }
@@ -528,17 +528,17 @@ body.focus-mode #text-container {
   border: none;
   outline: none;
   font-family: var(--font-serif);
-  /* Cormorant Garamond is a display face — its high stroke contrast only sings
-     at large sizes. Big + medium(500) gives an elegant editorial title; a small
-     faux-heavy title reads as a bolded first line, not a heading. */
-  font-weight: 500;
+  /* Cormorant is a display Garamond: at a restrained size with a confident
+     weight and tight tracking it reads as an elegant book title. Size is kept
+     modest on purpose; whitespace, not scale, gives a title its presence. */
+  font-weight: 600;
   font-style: normal;
-  font-size: clamp(1.9rem, 5.2vw, 2.6rem);
+  font-size: clamp(1.75rem, 3.8vw, 2.2rem);
   color: var(--text);
   padding: 0 8px;
-  margin-bottom: 32px;
-  line-height: 1.1;
-  letter-spacing: -0.012em;
+  margin-bottom: 30px;
+  line-height: 1.16;
+  letter-spacing: -0.01em;
   text-align: center;
   text-wrap: balance;
   display: block;
@@ -587,7 +587,6 @@ body.focus-mode #text-container {
   transition: color 0.15s, background 0.15s;
 }
 .format-btn b { font-weight: 600; font-style: normal; }
-.format-btn i { font-weight: 400; font-style: italic; }
 .format-btn:hover  { color: var(--text); }
 .format-btn.active { color: var(--text); background: rgba(0, 0, 0, 0.05); }
 
@@ -676,29 +675,19 @@ body.focus-mode #text-container {
   animation: viewIn 0.2s ease forwards;
 }
 
-/* ── Masthead — a daily edition, scrolls above the sticky tabs ─────────────── */
+/* ── Masthead — a quiet dateline above the sticky tabs ─────────────────────── */
 #feed-masthead {
   width: 100%;
   max-width: 600px;
-  padding: 30px 24px 18px;
+  padding: 26px 24px 14px;
 }
 .feed-dateline {
   display: block;
-  font-size: 0.64rem;
+  font-size: 0.62rem;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--gold);
+  color: var(--subtle);
   font-weight: 600;
-}
-.feed-tagline {
-  font-family: var(--font-serif);
-  font-size: 1.18rem;
-  font-style: italic;
-  line-height: 1.42;
-  color: var(--muted);
-  margin: 10px 0 0;
-  max-width: 30ch;
-  letter-spacing: 0.005em;
 }
 
 #feed-header {
@@ -851,15 +840,6 @@ body.focus-mode #text-container {
 }
 .feed-lead:hover { background: rgba(169, 138, 92, 0.05); }
 
-.feed-lead-kicker {
-  display: inline-block;
-  font-size: 0.6rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  font-weight: 600;
-  color: var(--gold);
-  margin-bottom: 10px;
-}
 .feed-lead-title {
   font-family: var(--font-serif);
   font-size: 2.05rem;
@@ -896,8 +876,8 @@ body.focus-mode #text-container {
 .feed-lead-author {
   background: none; border: none; padding: 0;
   font-family: var(--font-ui);
-  font-size: 0.86rem;
-  font-weight: 600;
+  font-size: 0.8rem;
+  font-weight: 500;
   letter-spacing: 0.01em;
   color: var(--text);
   cursor: pointer;
@@ -996,6 +976,9 @@ body.focus-mode #text-container {
   margin-left: auto;
 }
 .feed-entry-actions .hs-badge { margin-top: 0; }
+/* In the feed, keep only the quiet diamond mark. The label repeats on every
+   card and reads as clutter; the full meaning stays in the hover tooltip. */
+.feed-entry-actions .hs-badge-text { display: none; }
 
 .feed-engage {
   background: none;

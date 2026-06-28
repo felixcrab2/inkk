@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import "@fontsource/eb-garamond/400.css";
+import "@fontsource/eb-garamond/500.css";
 import "@fontsource/cormorant-garamond/400.css";
 import "@fontsource/cormorant-garamond/500.css";
 import "@fontsource/cormorant-garamond/600.css";
-import "@fontsource/cormorant-garamond/400-italic.css";
-import "@fontsource/cormorant-garamond/600-italic.css";
+import "@fontsource/cormorant-garamond/700.css";
 import { jsPDF } from "jspdf";
 import { supabase } from "./supabase";
 import { renderBookPdfPages, PAGE_PRESETS } from "./pdf/bookPage";
@@ -131,12 +131,6 @@ function applySmartTypography() {
     }
   }
 
-  // Em-dash: -- → —
-  if (before.endsWith("--")) {
-    node.nodeValue = before.slice(0, -2) + "—" + after;
-    setCaret(node, offset - 1);
-    return;
-  }
   // Ellipsis: ... → …
   if (before.endsWith("...")) {
     node.nodeValue = before.slice(0, -3) + "…" + after;
@@ -783,7 +777,7 @@ function LandingScreen({ onDone }) {
       <div id="landing-inner">
         <div id="landing-headline">{display}<span id="landing-cursor" /></div>
         <p id="landing-subtitle" style={{ opacity: showSubtitle ? 1 : 0 }}>
-          Inkk records the writing process — drafts, revisions, and time spent — so readers can see signs of real human thought.
+          Inkk records the writing process, from drafts to revisions to time spent, so readers can see signs of real human thought.
         </p>
       </div>
     </div>
@@ -799,7 +793,7 @@ function HumanSignalModal({ onClose }) {
         <button id="auth-close" onClick={onClose}>×</button>
         <div id="hs-modal-title">A small study of writing.</div>
         <p id="hs-modal-body">
-          When you write in Inkk, the rhythm of your typing — pauses, revisions, bursts — is recorded as anonymous, character-free metadata. We use it to study what human writing process looks like in latent space, so we can one day separate it from machine-written text on its own terms.
+          When you write in Inkk, the rhythm of your typing (pauses, revisions, bursts) is recorded as anonymous, character-free metadata. We use it to study what human writing process looks like in latent space, so we can one day separate it from machine-written text on its own terms.
         </p>
         <p className="hs-modal-body" style={{ marginTop: "12px" }}>
           You can opt out, download, or delete your contribution at any time from your Profile.
@@ -852,7 +846,7 @@ function AuthModal({ onClose }) {
     } else if (mode === "signup") {
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) setError(error.message);
-      else if (data.user?.identities?.length === 0) setError("An account with this email already exists — try signing in.");
+      else if (data.user?.identities?.length === 0) setError("An account with this email already exists. Try signing in.");
       else if (!data.session) setMessage("Check your email to confirm your account.");
     } else if (mode === "reset") {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -879,7 +873,7 @@ function AuthModal({ onClose }) {
             <div id="auth-tabs">
               <button className="active" style={{ cursor: "default" }}>reset password</button>
             </div>
-            <p className="auth-blurb">Enter the email you signed up with — we'll send you a link to set a new password.</p>
+            <p className="auth-blurb">Enter the email you signed up with and we'll send you a link to set a new password.</p>
             <form onSubmit={submit}>
               <input type="email" placeholder="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus />
               {error && <p className="auth-error">{error}</p>}
@@ -1199,7 +1193,6 @@ function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, 
   if (featured) {
     return (
       <article className="feed-lead" style={{ "--card-index": index }} onClick={() => onRead(pub)}>
-        <span className="feed-lead-kicker">{fresh ? "Today’s lead" : "Latest"}</span>
         <h2 className="feed-lead-title">{pub.title || "Untitled"}</h2>
         {excerpt && <p className="feed-lead-excerpt">{excerpt}</p>}
         <div className="feed-lead-byline">
@@ -1208,7 +1201,7 @@ function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, 
           </span>
           <div className="feed-lead-byline-text">
             {author}
-            <span className="feed-lead-sub">{readingTime(pub.content)} <span className="feed-dot">·</span> {dateline}</span>
+            <span className="feed-lead-sub">{dateline}</span>
           </div>
           <FeedActions pub={pub} sc={sc} likeCount={likeCount} commentCount={commentCount} onRead={onRead} onLike={onLike} />
         </div>
@@ -1226,8 +1219,6 @@ function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, 
         {excerpt && <p className="feed-entry-excerpt">{excerpt}</p>}
         <div className="feed-entry-meta">
           {author}
-          <span className="feed-dot">·</span>
-          <span>{readingTime(pub.content)}</span>
           <span className="feed-dot">·</span>
           {dateline}
           <FeedActions pub={pub} sc={sc} likeCount={likeCount} commentCount={commentCount} onRead={onRead} onLike={onLike} />
@@ -1334,17 +1325,10 @@ function Feed({ user, onRead, onAuthorClick, dropCapImages, onRequestAuth }) {
     return `${weekday} · ${rest}`;
   }, []);
 
-  const tagline = feedTab === "following"
-    ? "New work from the writers you follow."
-    : feedTab === "writers"
-      ? "The people writing by hand on inkk."
-      : "Fresh writing from the community — each piece still carrying the marks of its making.";
-
   return (
     <div id="feed-container">
       <div id="feed-masthead">
         <span className="feed-dateline">{editionDate}</span>
-        <p className="feed-tagline">{tagline}</p>
       </div>
 
       <div id="feed-header">
@@ -1470,7 +1454,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
         <div id="profile-signin">
           <div id="profile-signin-mark">Inkk</div>
           <h2 id="profile-signin-title">Join the conversation</h2>
-          <p id="profile-signin-sub">Write privately, or publish to the feed — all with Human&nbsp;Signal tracking.</p>
+          <p id="profile-signin-sub">Write privately, or publish to the feed, all with Human&nbsp;Signal tracking.</p>
           <div id="profile-signin-actions">
             <button className="profile-cta" onClick={onSignIn}>Sign in</button>
             <button className="profile-cta-ghost" onClick={onSignIn}>Create account</button>
@@ -1534,7 +1518,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
             <button
               id="avatar-remove-btn"
               onClick={handleRemoveAvatar}
-              title="Remove photo — revert to default"
+              title="Remove photo, revert to default"
               disabled={uploading}
             >×</button>
           )}
@@ -1692,7 +1676,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
           <h2 className="profile-section-label">Research</h2>
         </div>
         <p id="research-blurb">
-          When you write in Inkk, the rhythm of your typing — pauses, revisions, bursts — is recorded as anonymous, character-free metadata. We use it to study what human writing looks like in latent space. You can turn this off at any time, and the editor keeps working exactly as before.
+          When you write in Inkk, the rhythm of your typing (pauses, revisions, bursts) is recorded as anonymous, character-free metadata. We use it to study what human writing looks like in latent space. You can turn this off at any time, and the editor keeps working exactly as before.
         </p>
 
         {researchOptIn && contribution && contribution.event_count > 0 && (
@@ -2933,6 +2917,8 @@ export default function App() {
     const handler = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); if (view === "editor") openDownloadModal(); }
       if ((e.metaKey || e.ctrlKey) && e.key === ".") { e.preventDefault(); if (view === "editor") setFocusMode(v => !v); }
+      // No italics anywhere: block the browser's default Cmd+I / Ctrl+I in the editor.
+      if ((e.metaKey || e.ctrlKey) && (e.key === "i" || e.key === "I")) { e.preventDefault(); }
       if (e.key === "Escape") {
         if (focusMode) { setFocusMode(false); return; }
         if (publishMenuOpen) { setPublishMenuOpen(false); setConfirmUnpublishOpen(false); return; }
@@ -3305,7 +3291,7 @@ export default function App() {
               ? (user && online ? "saving…" : "saving locally…")
               : (!user
                 ? "saved on this device"
-                : (online ? "saved" : "offline — saved locally, will sync"));
+                : (online ? "saved" : "offline, saved locally, will sync"));
             return (
               <div className="writing-stats">
                 <span className="ws-stat">{words.toLocaleString()} {words === 1 ? "word" : "words"}</span>
@@ -3356,7 +3342,7 @@ export default function App() {
           className={menuClass}
           onClick={() => setHsModalOpen(true)}
           aria-label="About inkk research"
-          title="Click for info — your typing patterns contribute to a research study (no characters stored)"
+          title="Click for info. Your typing patterns contribute to a research study (no characters stored)"
         >
           <span className="research-pulse" aria-hidden="true" />
           <span className="research-strip-text">
@@ -3415,12 +3401,6 @@ export default function App() {
           onMouseDown={e => { e.preventDefault(); applyFormat("bold"); }}
           title="Bold  ⌘B"
         ><b>B</b></button>
-        <button
-          type="button"
-          className={`format-btn${formatActive.italic ? " active" : ""}`}
-          onMouseDown={e => { e.preventDefault(); applyFormat("italic"); }}
-          title="Italic  ⌘I"
-        ><i>I</i></button>
       </div>
 
       {/* ── editor preview overlay ── */}

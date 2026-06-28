@@ -16,7 +16,7 @@ When you write in Inkk, we record metadata about the writing process:
 • Caret-movement and selection events
 • For accounts: your email, username, and the documents you create and publish
 
-We do NOT store the literal letters or digits you type. Letter and digit keys are recorded only as "a letter was typed" with timing — the specific character is discarded before storage. Punctuation marks are stored as they appear, since they are research-relevant and not typically sensitive.
+We do NOT store the literal letters or digits you type. Letter and digit keys are recorded only as "a letter was typed" with timing, and the specific character is discarded before storage. Punctuation marks are stored as they appear, since they are research-relevant and not typically sensitive.
 
 The content of the documents you save or publish IS stored, because the editor needs it to work across devices and the feed needs it to display publications. This content remains yours.
 
@@ -26,7 +26,7 @@ Inkk is being used in a research study of human writing process. The goal is to 
 
 HOW WE USE IT
 
-• Anonymised research analysis — you are identified only by an internal ID, never by name or email, in research outputs.
+• Anonymised research analysis. You are identified only by an internal ID, never by name or email, in research outputs.
 • Computing your visible Human Signal score.
 • Standard product features: editing, publishing, accounts.
 
@@ -34,10 +34,10 @@ We do not sell your data. We do not share data with third parties beyond our dat
 
 YOUR RIGHTS
 
-• Download — export all your captured process data as JSON at any time from your Profile.
-• Delete — permanently delete your captured process data at any time from your Profile.
-• Opt out — turn off sharing at any time in your Profile. After opt-out, no new data is recorded to our servers. (Local recording continues only to power your own Human Signal score, and is cleared from your device on opt-out.)
-• Account deletion — contact us to remove your account entirely.
+• Download: export all your captured process data as JSON at any time from your Profile.
+• Delete: permanently delete your captured process data at any time from your Profile.
+• Opt out: turn off sharing at any time in your Profile. After opt-out, no new data is recorded to our servers. (Local recording continues only to power your own Human Signal score, and is cleared from your device on opt-out.)
+• Account deletion: contact us to remove your account entirely.
 
 DATA RETENTION
 
