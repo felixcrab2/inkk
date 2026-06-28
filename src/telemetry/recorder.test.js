@@ -84,7 +84,7 @@ describe("recorder ↔ features ↔ score (integration)", () => {
     rec.detach();
   });
 
-  test("letter keys are recorded with key_class='letter' and NO raw character", () => {
+  test("letter keys are recorded with key_class='letter' and the literal key in key_char", () => {
     const host = setupHost();
     const rec = createRecorder({
       getContext: () => ({ userId: "u1", docId: "d1", optedIn: false }),
@@ -96,12 +96,12 @@ describe("recorder ↔ features ↔ score (integration)", () => {
     const { events } = rec.snapshot("d1");
     const keydowns = events.filter(e => e.kind === "keydown");
     expect(keydowns.length).toBe(2);
-    for (const kd of keydowns) {
-      expect(kd.key_class).toBe("letter");
-      // never stash the literal character anywhere
-      expect(JSON.stringify(kd)).not.toMatch(/"key"\s*:\s*"h"/);
-      expect(JSON.stringify(kd)).not.toMatch(/"key"\s*:\s*"i"/);
-    }
+    for (const kd of keydowns) expect(kd.key_class).toBe("letter");
+    // the key identity is now captured (needed for digraph geometry)
+    expect(keydowns.map(k => k.key_char)).toEqual(["h", "i"]);
+    // and the inserted text shows up on the corresponding input events too
+    const inputs = events.filter(e => e.kind === "input");
+    expect(inputs.map(i => i.key_char)).toEqual(["h", "i"]);
     rec.detach();
   });
 
@@ -152,6 +152,50 @@ describe("recorder ↔ features ↔ score (integration)", () => {
     fireKey(host, "b", 1_000_200);
     const after = rec.snapshot("d1").events.length;
     expect(after).toBe(before);
+  });
+
+  test("every event carries schema_version, a monotonic per-session seq, and hi-res pt", () => {
+    const host = setupHost();
+    const rec = createRecorder({
+      getContext: () => ({ userId: "u1", docId: "d1", optedIn: false }),
+      onUpdate: () => {},
+    });
+    rec.attach(host);
+    fireKey(host, "a", 1_000_000);
+    fireKey(host, "b", 1_000_120);
+    const { events } = rec.snapshot("d1");
+    expect(events.length).toBeGreaterThan(0);
+    for (const e of events) {
+      expect(e.schema_version).toBe(2);
+      expect(typeof e.seq).toBe("number");
+      expect(typeof e.pt).toBe("number");
+    }
+    // seq starts at 0 on session_start and increases by 1 with no gaps
+    const seqs = events.map(e => e.seq);
+    expect(seqs[0]).toBe(0);
+    for (let i = 1; i < seqs.length; i++) expect(seqs[i]).toBe(seqs[i - 1] + 1);
+    rec.detach();
+  });
+
+  test("IME composition is recorded and composed input is flagged", () => {
+    const host = setupHost();
+    const rec = createRecorder({
+      getContext: () => ({ userId: "u1", docId: "d1", optedIn: false }),
+      onUpdate: () => {},
+    });
+    rec.attach(host);
+    host.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+    host.dispatchEvent(new InputEvent("beforeinput", {
+      inputType: "insertCompositionText", data: "字", bubbles: true, cancelable: true,
+    }));
+    host.dispatchEvent(new CompositionEvent("compositionend", { data: "字", bubbles: true }));
+
+    const { events } = rec.snapshot("d1");
+    expect(events.some(e => e.kind === "compose_start")).toBe(true);
+    expect(events.some(e => e.kind === "compose_end")).toBe(true);
+    const composedInput = events.find(e => e.kind === "input");
+    expect(composedInput?.payload?.composing).toBe(true);
+    rec.detach();
   });
 
   test("doc switch closes session and tags subsequent events with the new doc id", () => {

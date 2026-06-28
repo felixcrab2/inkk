@@ -1,24 +1,25 @@
 // Privacy Policy and Terms of Service text + modal components.
 // Versioned by TOS_VERSION so we can prompt re-acceptance on material changes.
 
-export const TOS_VERSION = "2026-05-20";
+export const TOS_VERSION = "2026-06-28";
 
 export const PRIVACY_POLICY = `Inkk Privacy Policy
-Effective 20 May 2026
+Effective 28 June 2026
 
 Inkk is a writing tool that records how you write so researchers can study human writing patterns. This page explains, in plain English, what we collect, why, and what control you have.
 
 WHAT WE COLLECT
 
 When you write in Inkk, we record metadata about the writing process:
-• Timing of keystrokes, pauses, and deletions
+• The keys you press — including letters and digits — and the timing of keystrokes, pauses, and deletions
 • Word counts and revision counts
 • Caret-movement and selection events
+• Basic device and environment context for each writing session — input method (touch or physical keyboard), operating-system platform, browser language, time zone, and the size of your browser window. This lets researchers account for differences between devices and is not used to identify you.
 • For accounts: your email, username, and the documents you create and publish
 
-We do NOT store the literal letters or digits you type. Letter and digit keys are recorded only as "a letter was typed" with timing, and the specific character is discarded before storage. Punctuation marks are stored as they appear, since they are research-relevant and not typically sensitive.
+We record the keys you press, together with their precise timing. This is what lets researchers study the fine-grained mechanics of typing — for example, that some letter pairs are typed faster because the keys sit closer together on the keyboard. Because the keystroke stream itself is recorded, text you type and later delete can in principle be reconstructed from it, not only the text you ultimately keep.
 
-The content of the documents you save or publish IS stored, because the editor needs it to work across devices and the feed needs it to display publications. This content remains yours.
+The content of the documents you save or publish is also stored, because the editor needs it to work across devices and the feed needs it to display publications. This content remains yours.
 
 WHY WE COLLECT IT
 
@@ -53,7 +54,7 @@ hello@inkk.example
 `;
 
 export const TERMS_OF_SERVICE = `Inkk Terms of Service
-Effective 20 May 2026
+Effective 28 June 2026
 
 By creating an Inkk account or using the service, you agree to these terms.
 
