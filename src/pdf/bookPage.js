@@ -32,7 +32,6 @@ const INK_BODY    = "#241a12";
 const INK_TITLE   = "#1f1610";
 const INK_FOOTER  = "#3e3326";
 const INK_HEADER  = "#a8967e";
-const INK_BYLINE  = "#766550";   // muted sepia for the small-caps byline
 const INK_ALPHA   = 0.93;
 
 // Paper tone: heavy desaturation + slight brightness for near-white paper.
@@ -56,15 +55,13 @@ const FOOTER_FROM_BOTTOM = 34;
 
 // Typography (pt).
 const T_TITLE   = 16;
-const T_BYLINE  = 9.5;   // small-caps attribution under the title
 const T_HEADER  = 8.5;
 const T_BODY    = 11.25;
 const T_DROPCAP = 42;
 const T_FOOTER  = 10.5;
 
-// Letter-spacing (em) for the uppercase byline and running heads — the wide
-// tracking is what makes small caps read as deliberate rather than faded.
-const BYLINE_TRACK = 0.22;
+// Letter-spacing (em) for the uppercase running head — the wide tracking is
+// what makes small caps read as deliberate rather than faded.
 const HEADER_TRACK = 0.16;
 
 // Drop cap spans this many body lines.
@@ -569,8 +566,9 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
     mctx.font = font(T_TITLE, false, true);
     titleLines = wrapSegment(mctx, titleStr, fullWidth).map(l => l.text);
     if (!titleLines.length) titleLines = [titleStr];
-    const bylineH = bylineStr ? Math.round(T_BYLINE * PX * TITLE_LINE_MULT + 12 * PX) : 0;
-    titleBlockH = titleLines.length * T_TITLE * PX * TITLE_LINE_MULT + bylineH + TITLE_BODY_GAP;
+    // The author lives in the running head (book convention), not under the
+    // title — so the title block reserves only the title lines plus the gap.
+    titleBlockH = titleLines.length * T_TITLE * PX * TITLE_LINE_MULT + TITLE_BODY_GAP;
   }
   const firstPageHeight = otherPageHeight - titleBlockH;
 
@@ -667,7 +665,26 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
         ctx.textBaseline = "alphabetic";
         let y = bodyTop;
 
-        // ── Page 1: chapter title (wrapped) ─────────────────────────────
+        // ── Running head (top of page, small tracked caps) ──────────────
+        // Book convention: the author sits at the top of the opening page and
+        // every verso (even) page; the title runs on recto (odd) continuation
+        // pages. With no author, the opener stays clean and the title runs on
+        // later pages. This is where attribution lives — never under the title.
+        let headText = null;
+        if (bylineStr && (isFirst || pageNum % 2 === 0)) headText = bylineStr;
+        else if (!isFirst && titleStr)                   headText = titleStr;
+        if (headText) {
+          headText = headText.toUpperCase();
+          ctx.font = font(T_HEADER, false);
+          ctx.fillStyle = INK_HEADER;
+          if (trackedWidth(ctx, headText, T_HEADER, HEADER_TRACK) > fullWidth) {
+            while (headText.length > 6 && trackedWidth(ctx, headText + "…", T_HEADER, HEADER_TRACK) > fullWidth) headText = headText.slice(0, -1);
+            headText += "…";
+          }
+          drawTrackedCentered(ctx, headText, cw / 2, HEADER_Y * PX, T_HEADER, HEADER_TRACK);
+        }
+
+        // ── Page 1: title (wrapped, centred) ────────────────────────────
         if (isFirst && titleStr) {
           ctx.font = font(T_TITLE, false, true);
           ctx.fillStyle = INK_TITLE;
@@ -676,31 +693,7 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
             ctx.fillText(ln, cw / 2, y + T_TITLE * PX);
             y += T_TITLE * PX * TITLE_LINE_MULT;
           }
-          if (bylineStr) {
-            // Small letter-spaced caps — an editorial byline, not a faded line.
-            y += 12 * PX;
-            ctx.font = font(T_BYLINE, false, false);
-            ctx.fillStyle = INK_BYLINE;
-            drawTrackedCentered(ctx, bylineStr.toUpperCase(), cw / 2, y + T_BYLINE * PX, T_BYLINE, BYLINE_TRACK);
-            y += T_BYLINE * PX * TITLE_LINE_MULT;
-          }
-          y += TITLE_BODY_GAP - 8 * PX;   // space after title block (already partly used by titleBlockH calc)
-        }
-
-        // ── Page 2+: tiny running head ──────────────────────────────────
-        // Book convention: verso (even pages) carries the author, recto (odd)
-        // carries the title. With no byline, every running head shows the title.
-        if (!isFirst && titleStr) {
-          const showAuthor = bylineStr && pageNum % 2 === 0;
-          let hdr = (showAuthor ? bylineStr : titleStr).toUpperCase();
-          ctx.font = font(T_HEADER, false);
-          ctx.fillStyle = INK_HEADER;
-          // Truncate to a single tracked line.
-          if (trackedWidth(ctx, hdr, T_HEADER, HEADER_TRACK) > fullWidth) {
-            while (hdr.length > 6 && trackedWidth(ctx, hdr + "…", T_HEADER, HEADER_TRACK) > fullWidth) hdr = hdr.slice(0, -1);
-            hdr += "…";
-          }
-          drawTrackedCentered(ctx, hdr, cw / 2, HEADER_Y * PX, T_HEADER, HEADER_TRACK);
+          y += TITLE_BODY_GAP;
         }
 
         // ── Drop cap (page 1 only) ──────────────────────────────────────
