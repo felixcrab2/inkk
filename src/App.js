@@ -2859,7 +2859,18 @@ export default function App() {
     const paperTexture = style.paperTexture ?? (format === "pdf");
     // Verification certificate for this piece, if it's published. Printed as a
     // colophon and (for PDF) written into the document metadata.
-    const cert = pubCerts[activeId];
+    let cert = pubCerts[activeId];
+    // Fallback: if the cert isn't in local state yet (published in another
+    // session, or state not hydrated before download), look it up directly so
+    // the PDF still carries the verification code in its metadata and colophon.
+    if (!cert?.code && supabase && userRef.current) {
+      const { data } = await supabase
+        .from("publications")
+        .select("verify_code, score_tier")
+        .eq("doc_id", activeId)
+        .maybeSingle();
+      if (data?.verify_code) cert = { code: data.verify_code, verified: isVerifiedTier(data.score_tier) };
+    }
     const verify = cert?.code
       ? { code: cert.code, verified: !!cert.verified, host: window.location.host }
       : null;

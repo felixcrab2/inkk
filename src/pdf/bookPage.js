@@ -54,7 +54,9 @@ const HEADER_Y  = 40;   // running header baseline (pt from top)
 const FOOTER_FROM_BOTTOM = 34;
 
 // Typography (pt).
-const T_TITLE   = 16;
+// Title is kept only slightly larger than the body so the rendered page
+// matches the editor, where the title sits just above the prose size.
+const T_TITLE   = 12.5;
 const T_HEADER  = 8.5;
 const T_BODY    = 11.25;
 const T_DROPCAP = 42;
