@@ -1414,11 +1414,13 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
     return (
       <div id="profile-container">
         <div id="profile-signin">
-          <div id="profile-signin-icon"><User size={28} strokeWidth={1.5} /></div>
-          <h2 id="profile-signin-title">Join the conversation.</h2>
-          <p id="profile-signin-sub">Write privately, or publish to the feed — all with Human Signal tracking.</p>
-          <button className="profile-cta" onClick={onSignIn}>Sign in</button>
-          <button className="profile-cta-ghost" onClick={onSignIn}>Create account</button>
+          <div id="profile-signin-mark">Inkk</div>
+          <h2 id="profile-signin-title">Join the conversation</h2>
+          <p id="profile-signin-sub">Write privately, or publish to the feed — all with Human&nbsp;Signal tracking.</p>
+          <div id="profile-signin-actions">
+            <button className="profile-cta" onClick={onSignIn}>Sign in</button>
+            <button className="profile-cta-ghost" onClick={onSignIn}>Create account</button>
+          </div>
         </div>
       </div>
     );
@@ -1468,9 +1470,9 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
 
   return (
     <div id="profile-container">
-      <div id="profile-header">
+      <header id="profile-header">
         <div id="profile-avatar-wrap">
-          <DropCapAvatar letter={avatarLetter} avatarData={profile?.avatar_data} dropCapImages={dropCapImages} size={60} />
+          <DropCapAvatar letter={avatarLetter} avatarData={profile?.avatar_data} dropCapImages={dropCapImages} size={78} />
           <button id="avatar-upload-btn" onClick={() => fileInputRef.current?.click()} title="Change photo">
             {uploading ? "…" : "✎"}
           </button>
@@ -1484,63 +1486,58 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
           )}
           <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFileChange} />
         </div>
-        <div id="profile-info">
-          {editingProfile ? (
-            <div className="profile-edit-form">
-              <input
-                className="profile-edit-input"
-                type="text"
-                value={editUsername}
-                onChange={e => setEditUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
-                placeholder="username"
-                maxLength={20}
-                autoFocus
-              />
-              <input
-                className="profile-edit-input"
-                type="text"
-                value={editDisplayName}
-                onChange={e => setEditDisplayName(e.target.value)}
-                placeholder="display name (optional)"
-                maxLength={50}
-              />
-              {profileError && <p className="profile-edit-error">{profileError}</p>}
-              <div className="profile-edit-actions">
-                <button className="pub-mini-btn" onClick={() => { setEditingProfile(false); setProfileError(""); }} disabled={profileSaving}>Cancel</button>
-                <button className="pub-mini-btn" onClick={saveProfile} disabled={profileSaving || editUsername.length < 3}>{profileSaving ? "saving…" : "Save"}</button>
-              </div>
+
+        {editingProfile ? (
+          <div className="profile-edit-form">
+            <input
+              className="profile-edit-input"
+              type="text"
+              value={editUsername}
+              onChange={e => setEditUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+              placeholder="username"
+              maxLength={20}
+              autoFocus
+            />
+            <input
+              className="profile-edit-input"
+              type="text"
+              value={editDisplayName}
+              onChange={e => setEditDisplayName(e.target.value)}
+              placeholder="display name (optional)"
+              maxLength={50}
+            />
+            {profileError && <p className="profile-edit-error">{profileError}</p>}
+            <div className="profile-edit-actions">
+              <button className="text-btn" onClick={() => { setEditingProfile(false); setProfileError(""); }} disabled={profileSaving}>Cancel</button>
+              <button className="text-btn text-btn-accent" onClick={saveProfile} disabled={profileSaving || editUsername.length < 3}>{profileSaving ? "saving…" : "Save"}</button>
             </div>
-          ) : (
-            <>
-              {profile?.username
-                ? <div id="profile-username">@{profile.username}</div>
-                : <div id="profile-email">{user.email}</div>
-              }
-              {profile?.display_name && <div id="profile-email">{profile.display_name}</div>}
-              {user.created_at && (
-                <div id="profile-joined">Member since {formatJoined(user.created_at)}</div>
-              )}
-              <button className="profile-edit-btn" onClick={startEditProfile}>Edit profile</button>
-            </>
-          )}
-        </div>
-      </div>
+          </div>
+        ) : (
+          <div id="profile-identity">
+            <h1 id="profile-username">{profile?.username ? `@${profile.username}` : user.email}</h1>
+            {profile?.display_name && <div id="profile-displayname">{profile.display_name}</div>}
+            {user.created_at && (
+              <div id="profile-joined">Member since {formatJoined(user.created_at)}</div>
+            )}
+            <button className="profile-edit-btn" onClick={startEditProfile}>Edit profile</button>
+          </div>
+        )}
+      </header>
 
       <div id="profile-stats">
         {streak > 0 && (
-          <div className="stat-chip">
-            <span className="stat-chip-icon">🔥</span>
-            <span className="stat-chip-value">{streak}</span>
-            <span className="stat-chip-label">day streak</span>
+          <div className="stat-fig">
+            <span className="stat-fig-num">{streak}</span>
+            <span className="stat-fig-label">Day streak</span>
           </div>
         )}
-        <div className="stat-chip">
-          <span className="stat-chip-value">{pubs.length}</span>
-          <span className="stat-chip-label">published</span>
+        <div className="stat-fig">
+          <span className="stat-fig-num">{pubs.length}</span>
+          <span className="stat-fig-label">Published</span>
         </div>
-        <div className="stat-chip">
-          <span className="stat-chip-value">{totalWords.toLocaleString()}</span>
-          <span className="stat-chip-label">words written</span>
+        <div className="stat-fig">
+          <span className="stat-fig-num">{totalWords.toLocaleString()}</span>
+          <span className="stat-fig-label">Words</span>
         </div>
       </div>
 
@@ -1550,10 +1547,10 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
           .filter(d => !publishedDocIds?.has(d.id) && stripHtml(d.content).trim().length > 0)
           .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
         return (
-          <>
+          <section className="profile-section">
             <div className="profile-section-head">
-              <div id="profile-section-label">Drafts <span className="section-count">{drafts.length}</span></div>
-              <button className="section-action" onClick={onNewDoc}>+ New</button>
+              <h2 className="profile-section-label">Drafts<span className="section-count">{drafts.length}</span></h2>
+              <button className="section-action" onClick={onNewDoc}>New draft</button>
             </div>
             <p className="profile-section-sub">Saved on your device and synced to your account. Only you can see them.</p>
 
@@ -1586,13 +1583,14 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
                 );
               })}
             </div>
-          </>
+          </section>
         );
       })()}
 
       {/* ── Published ──────────────────────────────────────────────────── */}
-      <div className="profile-section-head" style={{ marginTop: 22 }}>
-        <div id="profile-section-label">Published <span className="section-count">{pubs.length}</span></div>
+      <section className="profile-section">
+      <div className="profile-section-head">
+        <h2 className="profile-section-label">Published<span className="section-count">{pubs.length}</span></h2>
       </div>
       <p className="profile-section-sub">Visible to anyone on the feed.</p>
 
@@ -1633,8 +1631,16 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
           );
         })}
       </div>
+      </section>
 
-      <div id="research-section">
+      <section id="research-section">
+        <div className="profile-section-head">
+          <h2 className="profile-section-label">Research</h2>
+        </div>
+        <p id="research-blurb">
+          When you write in Inkk, the rhythm of your typing — pauses, revisions, bursts — is recorded as anonymous, character-free metadata. We use it to study what human writing looks like in latent space. You can turn this off at any time, and the editor keeps working exactly as before.
+        </p>
+
         {researchOptIn && contribution && contribution.event_count > 0 && (
           <div id="contribution-card">
             <div id="contribution-num">{Number(contribution.event_count).toLocaleString()}</div>
@@ -1644,42 +1650,33 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
             )}
           </div>
         )}
-        <div id="research-head">
-          <div id="research-title">Research participation</div>
-          <p id="research-blurb">
-            When you write in Inkk, the rhythm of your typing — pauses, revisions, bursts — is recorded as anonymous, character-free metadata. We use it to study what human writing looks like in latent space. You can turn this off at any time, and the editor keeps working exactly as before.
-          </p>
-          <label className="research-toggle">
-            <input
-              type="checkbox"
-              checked={!!researchOptIn}
-              disabled={optBusy}
-              onChange={async (e) => {
-                setOptBusy(true);
-                await onToggleOptIn(e.target.checked);
-                setOptBusy(false);
-              }}
-            />
-            <span className="research-toggle-track" aria-hidden="true"><span className="research-toggle-thumb" /></span>
-            <span className="research-toggle-label">{researchOptIn ? "Sharing on" : "Sharing off"}</span>
-          </label>
-          <div id="research-legal-links">
-            <button type="button" className="tos-link" onClick={() => setShowPrivacy(true)}>Privacy Policy</button>
-            <span className="research-legal-dot">·</span>
-            <button type="button" className="tos-link" onClick={() => setShowTerms(true)}>Terms</button>
-          </div>
-        </div>
+
+        <label className="research-toggle">
+          <input
+            type="checkbox"
+            checked={!!researchOptIn}
+            disabled={optBusy}
+            onChange={async (e) => {
+              setOptBusy(true);
+              await onToggleOptIn(e.target.checked);
+              setOptBusy(false);
+            }}
+          />
+          <span className="research-toggle-track" aria-hidden="true"><span className="research-toggle-thumb" /></span>
+          <span className="research-toggle-label">{researchOptIn ? "Sharing on" : "Sharing off"}</span>
+        </label>
+
         {researchOptIn && (
           <div id="research-controls">
-            <button className="research-btn" onClick={onDownloadData}>Download my data</button>
+            <button className="text-btn" onClick={onDownloadData}>Download my data</button>
             {!confirmDel ? (
-              <button className="research-btn research-btn-danger" onClick={() => setConfirmDel(true)}>Delete my data</button>
+              <button className="text-btn text-btn-danger" onClick={() => setConfirmDel(true)}>Delete my data</button>
             ) : (
               <div className="research-confirm">
                 <span>Delete all your captured writing-process data?</span>
-                <button className="research-btn" onClick={() => setConfirmDel(false)}>Cancel</button>
+                <button className="text-btn" onClick={() => setConfirmDel(false)}>Cancel</button>
                 <button
-                  className="research-btn research-btn-danger"
+                  className="text-btn text-btn-danger"
                   disabled={delBusy}
                   onClick={async () => { setDelBusy(true); await onDeleteData(); setDelBusy(false); setConfirmDel(false); }}
                 >{delBusy ? "Deleting…" : "Yes, delete"}</button>
@@ -1687,7 +1684,13 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
             )}
           </div>
         )}
-      </div>
+
+        <div id="research-legal-links">
+          <button type="button" className="tos-link" onClick={() => setShowPrivacy(true)}>Privacy Policy</button>
+          <span className="research-legal-dot">·</span>
+          <button type="button" className="tos-link" onClick={() => setShowTerms(true)}>Terms</button>
+        </div>
+      </section>
 
       <div id="account-footer">
         <button className="account-link" onClick={onChangePassword}>Change password</button>
