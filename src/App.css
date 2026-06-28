@@ -337,9 +337,13 @@ body.focus-mode #hs-editor-status {
 body.focus-mode #text-container {
   top: 0 !important;
   bottom: 0 !important;
+  padding-top: 14vh;
   -webkit-mask-image: none !important;
   mask-image: none !important;
 }
+/* In fullscreen the viewport is taller, so the default 22vh→9vh settle travels
+   far more pixels and reads as a large jump. Keep the title/body nearly put. */
+body.focus-mode #text-container.writing-started { padding-top: 11vh; }
 
 /* ─── Document panel ──────────────────────────────────────────────────────── */
 #panel-backdrop {
