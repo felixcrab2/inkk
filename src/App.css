@@ -337,9 +337,13 @@ body.focus-mode #hs-editor-status {
 body.focus-mode #text-container {
   top: 0 !important;
   bottom: 0 !important;
+  padding-top: 14vh;
   -webkit-mask-image: none !important;
   mask-image: none !important;
 }
+/* In fullscreen the viewport is taller, so the default 22vh→9vh settle travels
+   far more pixels and reads as a large jump. Keep the title/body nearly put. */
+body.focus-mode #text-container.writing-started { padding-top: 11vh; }
 
 /* ─── Document panel ──────────────────────────────────────────────────────── */
 #panel-backdrop {
@@ -400,7 +404,8 @@ body.focus-mode #text-container {
 
 .doc-item-title {
   display: block;
-  font-size: 0.83rem;
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
@@ -3355,3 +3360,92 @@ body.focus-mode #text-container {
   color: var(--subtle);
 }
 .pac-code-link:hover { color: var(--text); }
+
+/* ─── Certify (get a code without publishing) ────────────────────────────── */
+#cert-menu-wrap { position: relative; }
+#cert-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  padding: 5px 12px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+#cert-btn:hover { color: var(--text); border-color: #aaa; }
+#cert-btn:disabled { opacity: 0.6; cursor: default; }
+#cert-btn.is-certified { color: var(--text); border-color: rgba(169, 138, 92, 0.5); }
+#cert-btn .cert-diamond { font-size: 0.9rem; line-height: 1; }
+#cert-btn.is-certified .cert-diamond { color: var(--gold); }
+
+#cert-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 15px 16px 14px;
+  width: 272px;
+  z-index: 200;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  text-align: left;
+}
+.cert-menu-label {
+  font-size: 0.56rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--subtle);
+}
+.cert-menu-code {
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  letter-spacing: 0.12em;
+  color: var(--text);
+  cursor: pointer;
+}
+.cert-menu-code:hover { color: var(--gold); }
+.cert-menu-note {
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 2px 0 5px;
+}
+.cert-menu-link {
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font-size: 0.74rem;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+  cursor: pointer;
+}
+.cert-menu-link:hover { color: var(--text); }
+.cert-menu-recertify { color: var(--subtle); font-size: 0.68rem; }
+
+/* Private-certificate note in the verify view */
+.verify-cert-private {
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--muted);
+  margin: 0;
+  padding: 13px 15px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 1px;
+}
