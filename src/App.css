@@ -528,22 +528,26 @@ body.focus-mode #text-container {
   border: none;
   outline: none;
   font-family: var(--font-serif);
-  font-weight: 600;
+  /* Cormorant Garamond is a display face — its high stroke contrast only sings
+     at large sizes. Big + medium(500) gives an elegant editorial title; a small
+     faux-heavy title reads as a bolded first line, not a heading. */
+  font-weight: 500;
   font-style: normal;
-  font-size: 1.35rem;
+  font-size: clamp(1.9rem, 5.2vw, 2.6rem);
   color: var(--text);
   padding: 0 8px;
-  margin-bottom: 28px;
-  line-height: 1.3;
-  letter-spacing: -0.025em;
+  margin-bottom: 32px;
+  line-height: 1.1;
+  letter-spacing: -0.012em;
   text-align: center;
+  text-wrap: balance;
   display: block;
   flex-shrink: 0;
   white-space: pre-wrap;
   overflow-wrap: break-word;
   cursor: text;
   caret-color: #999;
-  min-height: 1.35em;
+  min-height: 1.1em;
 }
 #title-input:focus { caret-color: #777; }
 #title-input:empty::before {
@@ -553,7 +557,7 @@ body.focus-mode #text-container {
   font-style: normal;
   pointer-events: none;
 }
-#title-input.font-arial { font-family: Arial, sans-serif; letter-spacing: -0.01em; }
+#title-input.font-arial { font-family: Arial, sans-serif; font-weight: 600; letter-spacing: -0.02em; }
 
 #format-toolbar {
   position: fixed;
@@ -2861,7 +2865,7 @@ body.focus-mode #text-container {
   #title-input {
     width: 100%;
     max-width: none;
-    font-size: 1.25rem;
+    font-size: clamp(1.7rem, 7vw, 2.1rem);
   }
   #text {
     width: 100%;
