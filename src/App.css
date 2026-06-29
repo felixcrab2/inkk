@@ -1599,13 +1599,13 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   text-align: center;
   width: 100%;
   max-width: 520px;
-  padding-bottom: 38px;
+  padding-bottom: 18px;
 }
 
 #profile-avatar-wrap {
   position: relative;
   flex-shrink: 0;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 #avatar-upload-btn {
@@ -1674,7 +1674,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 #profile-displayname {
   font-size: 0.86rem;
   color: var(--muted);
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
 #profile-joined {
@@ -1682,7 +1682,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   color: var(--subtle);
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  margin-top: 14px;
+  margin-top: 6px;
 }
 
 /* ─── Stats — editorial figures ────────────────────────────────────────── */
@@ -1692,8 +1692,8 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   flex-wrap: wrap;
   width: 100%;
   max-width: 520px;
-  margin-bottom: 52px;
-  padding: 26px 0;
+  margin-bottom: 28px;
+  padding: 14px 0;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
 }

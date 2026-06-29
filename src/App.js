@@ -332,7 +332,7 @@ function dropCapSrc(letter, images) {
   return list?.length ? `/drop_caps/${l}/${list[0]}.png` : null;
 }
 
-async function compressAvatar(file, size = 240) {
+async function compressAvatar(file, size = 400) {
   return new Promise(resolve => {
     const reader = new FileReader();
     reader.onload = e => {
@@ -341,9 +341,11 @@ async function compressAvatar(file, size = 240) {
         const canvas = document.createElement("canvas");
         canvas.width = size; canvas.height = size;
         const ctx = canvas.getContext("2d");
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
         const s = Math.min(img.width, img.height);
         ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size);
-        resolve(canvas.toDataURL("image/jpeg", 0.88));
+        resolve(canvas.toDataURL("image/jpeg", 0.92));
       };
       img.src = e.target.result;
     };
@@ -1767,7 +1769,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
     <div id="profile-container">
       <header id="profile-header">
         <div id="profile-avatar-wrap">
-          <DropCapAvatar letter={avatarLetter} avatarData={profile?.avatar_data} dropCapImages={dropCapImages} size={78} />
+          <DropCapAvatar letter={avatarLetter} avatarData={profile?.avatar_data} dropCapImages={dropCapImages} size={96} />
           <button id="avatar-upload-btn" onClick={() => fileInputRef.current?.click()} title="Change photo">
             {uploading ? "…" : "✎"}
           </button>
