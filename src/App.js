@@ -1069,44 +1069,152 @@ function scoreFromRecord(rec) {
 
 // ─── AuthModal ────────────────────────────────────────────────────────────────
 
+const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+const PW_MIN = 8;
+
+function passwordChecks(pw) {
+  return {
+    length: pw.length >= PW_MIN,
+    letter: /[a-zA-Z]/.test(pw),
+    number: /[0-9]/.test(pw),
+  };
+}
+
 function AuthModal({ onClose }) {
-  const [mode, setMode]         = useState("signin"); // signin | signup | reset
-  const [email, setEmail]       = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError]       = useState("");
-  const [message, setMessage]   = useState("");
-  const [loading, setLoading]   = useState(false);
+  const [mode, setMode]             = useState("signin"); // signin | signup | reset
+  const [email, setEmail]           = useState("");
+  const [username, setUsername]     = useState("");
+  const [password, setPassword]     = useState("");
+  const [showPw, setShowPw]         = useState(false);
+  const [accepted, setAccepted]     = useState(false);
+  const [showTerms, setShowTerms]   = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [error, setError]           = useState("");
+  const [message, setMessage]       = useState("");
+  const [loading, setLoading]       = useState(false);
+  const [unameStatus, setUnameStatus] = useState(""); // "" | checking | available | taken | invalid
+  const [resend, setResend]         = useState("");   // "" | sending | sent
+  const sentEmailRef                = useRef("");
+
+  const switchMode = (m) => {
+    setMode(m); setError(""); setMessage(""); setResend("");
+    if (m === "reset") setPassword("");
+  };
+
+  // Live username availability check (signup only, debounced).
+  useEffect(() => {
+    if (mode !== "signup") return;
+    const u = username.trim();
+    if (!u)                    { setUnameStatus(""); return; }
+    if (!USERNAME_RE.test(u))  { setUnameStatus("invalid"); return; }
+    setUnameStatus("checking");
+    let alive = true;
+    const t = setTimeout(async () => {
+      const existing = await fetchProfileByUsername(u);
+      if (alive) setUnameStatus(existing ? "taken" : "available");
+    }, 400);
+    return () => { alive = false; clearTimeout(t); };
+  }, [username, mode]);
+
+  const pw       = passwordChecks(password);
+  const pwOk     = pw.length && pw.letter && pw.number;
+  const unameOk  = USERNAME_RE.test(username.trim()) && unameStatus !== "taken";
+  const signupReady = !!email && unameOk && pwOk && accepted;
 
   const submit = async (e) => {
-    e.preventDefault(); setError(""); setLoading(true);
+    e.preventDefault();
+    setError(""); setMessage("");
+
     if (mode === "signin") {
+      setLoading(true);
       const { error } = await supabase.auth.signInWithPassword({ email, password });
+      setLoading(false);
       if (error) setError(error.message);
-    } else if (mode === "signup") {
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) setError(error.message);
-      else if (data.user?.identities?.length === 0) setError("An account with this email already exists. Try signing in.");
-      else if (!data.session) setMessage("Check your email to confirm your account.");
-    } else if (mode === "reset") {
+      return;
+    }
+
+    if (mode === "reset") {
+      setLoading(true);
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: window.location.origin + "/?recovery=1",
       });
+      setLoading(false);
       if (error) setError(error.message);
       else setMessage("Check your email for a link to reset your password.");
+      return;
     }
+
+    // signup
+    const u = username.trim();
+    if (!USERNAME_RE.test(u)) { setError("Username must be 3–20 characters — letters, numbers, or underscores."); return; }
+    if (!pwOk)                { setError(`Password needs at least ${PW_MIN} characters, a letter, and a number.`); return; }
+    if (!accepted)            { setError("Please accept the Terms & Privacy Policy to continue."); return; }
+
+    setLoading(true);
+    // Final availability check right before we commit.
+    const existing = await fetchProfileByUsername(u);
+    if (existing) { setUnameStatus("taken"); setError("That username is taken — try another."); setLoading(false); return; }
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: window.location.origin,
+        data: { username: u, display_name: u, tos_accepted: true, tos_version: TOS_VERSION },
+      },
+    });
     setLoading(false);
+    if (error) { setError(error.message); return; }
+    if (data.user?.identities?.length === 0) {
+      setError("An account with this email already exists. Try signing in.");
+      return;
+    }
+    sentEmailRef.current = email;
+    // No session means email confirmation is required; a session means we're in
+    // and onAuthStateChange will create the profile from the metadata above.
+    if (!data.session) setMessage(`We sent a confirmation link to ${email}. Open it to finish creating your account.`);
+  };
+
+  const resendConfirmation = async () => {
+    if (!sentEmailRef.current || resend === "sending") return;
+    setResend("sending"); setError("");
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: sentEmailRef.current,
+      options: { emailRedirectTo: window.location.origin },
+    });
+    if (error) { setResend(""); setError(error.message); }
+    else setResend("sent");
   };
 
   const googleSignIn = async () => {
     await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
   };
 
+  const unameHint = {
+    checking:  { text: "checking…",        cls: "muted" },
+    available: { text: "available",         cls: "ok" },
+    taken:     { text: "already taken",     cls: "bad" },
+    invalid:   { text: "3–20 chars", cls: "muted" },
+  }[unameStatus];
+
   return (
+    <>
     <div id="auth-overlay" onClick={onClose}>
       <div id="auth-modal" onClick={e => e.stopPropagation()}>
         <button id="auth-close" onClick={onClose}>×</button>
         {message ? (
-          <p id="auth-message">{message}</p>
+          <div id="auth-message-wrap">
+            <p id="auth-message">{message}</p>
+            {sentEmailRef.current && mode === "signup" && (
+              <div className="auth-resend">
+                {resend === "sent"
+                  ? <span className="auth-resend-done">Sent again — check your inbox and spam folder.</span>
+                  : <>Didn't get it? <button type="button" onClick={resendConfirmation} disabled={resend === "sending"}>{resend === "sending" ? "sending…" : "resend email"}</button></>}
+                <button type="button" className="auth-back" onClick={() => { setMessage(""); setResend(""); }}>← use a different email</button>
+              </div>
+            )}
+          </div>
         ) : mode === "reset" ? (
           <>
             <div id="auth-tabs">
@@ -1120,24 +1228,80 @@ function AuthModal({ onClose }) {
                 {loading ? "…" : "Send reset link"}
               </button>
             </form>
-            <button className="auth-back" onClick={() => { setMode("signin"); setError(""); }}>← back to sign in</button>
+            <button className="auth-back" onClick={() => switchMode("signin")}>← back to sign in</button>
           </>
         ) : (
           <>
             <div id="auth-tabs">
-              <button className={mode === "signin" ? "active" : ""} onClick={() => { setMode("signin"); setError(""); }}>sign in</button>
-              <button className={mode === "signup" ? "active" : ""} onClick={() => { setMode("signup"); setError(""); }}>create account</button>
+              <button className={mode === "signin" ? "active" : ""} onClick={() => switchMode("signin")}>sign in</button>
+              <button className={mode === "signup" ? "active" : ""} onClick={() => switchMode("signup")}>create account</button>
             </div>
             <form onSubmit={submit}>
-              <input type="email" placeholder="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus />
-              <input type="password" placeholder="password" value={password} onChange={e => setPassword(e.target.value)} required />
+              <input type="email" placeholder="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus autoComplete="email" />
+
+              {mode === "signup" && (
+                <>
+                  <div className="auth-field">
+                    <input
+                      type="text"
+                      placeholder="username"
+                      value={username}
+                      onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+                      maxLength={20}
+                      required
+                      autoComplete="off"
+                      autoCapitalize="off"
+                      spellCheck={false}
+                    />
+                    {unameHint && <span className={`auth-uname-hint ${unameHint.cls}`}>{unameHint.text}</span>}
+                  </div>
+                </>
+              )}
+
+              <div className="auth-field">
+                <input
+                  type={showPw ? "text" : "password"}
+                  placeholder="password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                />
+                {password && (
+                  <button type="button" className="auth-pw-toggle" onClick={() => setShowPw(v => !v)} aria-label={showPw ? "Hide password" : "Show password"}>
+                    {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                )}
+              </div>
+
+              {mode === "signup" && password && !pwOk && (
+                <ul className="auth-pw-reqs">
+                  <li className={pw.length ? "met" : ""}>{pw.length ? "✓" : "○"} at least {PW_MIN} characters</li>
+                  <li className={pw.letter ? "met" : ""}>{pw.letter ? "✓" : "○"} a letter</li>
+                  <li className={pw.number ? "met" : ""}>{pw.number ? "✓" : "○"} a number</li>
+                </ul>
+              )}
+
+              {mode === "signup" && (
+                <label id="tos-consent" className="auth-tos">
+                  <input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} />
+                  <span id="tos-consent-text">
+                    I agree to the{" "}
+                    <button type="button" className="tos-link" onClick={() => setShowTerms(true)}>Terms</button>
+                    {" "}and{" "}
+                    <button type="button" className="tos-link" onClick={() => setShowPrivacy(true)}>Privacy Policy</button>
+                    , including contributing my anonymised writing-process data to Inkk's research dataset. I can opt out anytime from my Profile.
+                  </span>
+                </label>
+              )}
+
               {error && <p className="auth-error">{error}</p>}
-              <button id="auth-submit" type="submit" disabled={loading}>
+              <button id="auth-submit" type="submit" disabled={loading || (mode === "signup" && !signupReady)}>
                 {loading ? "…" : mode === "signin" ? "sign in" : "create account"}
               </button>
             </form>
             {mode === "signin" && (
-              <button className="auth-forgot" onClick={() => { setMode("reset"); setError(""); setPassword(""); }}>
+              <button className="auth-forgot" onClick={() => switchMode("reset")}>
                 Forgot password?
               </button>
             )}
@@ -1147,6 +1311,9 @@ function AuthModal({ onClose }) {
         )}
       </div>
     </div>
+    {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
+    {showTerms   && <TermsModal   onClose={() => setShowTerms(false)} />}
+    </>
   );
 }
 
@@ -3107,12 +3274,28 @@ export default function App() {
           return (c && !d.verifyCode) ? { ...d, verifyCode: c.code, contentHash: d.contentHash || c.hash } : d;
         }));
       }
-      const prof = await fetchProfile(signedInUser.id);
+      let prof = await fetchProfile(signedInUser.id);
+      // Brand-new account created through our signup form carries the chosen
+      // username + T&C acceptance in user_metadata — provision the profile from
+      // it so signup is one step. UsernameModal is only the fallback (e.g. Google
+      // sign-in, or a username that got claimed before email confirmation).
+      if (!prof) {
+        const meta = signedInUser.user_metadata || {};
+        const metaUsername = (meta.username || "").trim();
+        if (metaUsername) {
+          const errMsg = await upsertProfile(
+            signedInUser.id, metaUsername, (meta.display_name || metaUsername).trim(),
+            { tosAccepted: !!meta.tos_accepted, tosVersion: meta.tos_version || TOS_VERSION },
+          );
+          if (!errMsg) prof = await fetchProfile(signedInUser.id);
+        }
+      }
       if (prof) {
         setProfile(prof);
         const opt = !!prof.research_opt_in;
         optInRef.current = opt;
         setResearchOptIn(opt);
+        if (opt) { try { syncFlushNow(); } catch {} }
       } else {
         setUsernameModalOpen(true);
         // New user — UsernameModal will set opt-in=true via T&C acceptance.

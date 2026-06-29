@@ -2657,9 +2657,12 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(250, 249, 247, 0.9);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  /* Near-opaque warm paper instead of backdrop-filter: blur(). A live blur over
+     the continuously-animating editor (cursor blink, save pulse, feed shimmer)
+     forces the filter to recompute every frame, which smears and flickers the
+     modal. A solid layer is rock-steady and reads the same. */
+  background: rgba(249, 248, 245, 0.985);
+  isolation: isolate;
 }
 
 #auth-modal {
@@ -2808,6 +2811,69 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   margin: 0 0 18px;
   text-align: center;
 }
+
+/* ─── Auth signup extras ──────────────────────────────────────────────── */
+/* Wraps an input so a hint/toggle can sit on its baseline without nudging
+   layout (which would feel like the "flicker" the bottom border is fighting). */
+.auth-field { position: relative; display: flex; flex-direction: column; }
+/* Reserve room on the right so typed text never slides under the eye toggle
+   or the availability hint. */
+.auth-field input { padding-right: 84px; }
+
+.auth-pw-toggle {
+  position: absolute;
+  right: 0; top: 6px;
+  background: none; border: none; padding: 2px;
+  color: #c4c2bd; cursor: pointer; line-height: 0;
+  transition: color 0.15s;
+}
+.auth-pw-toggle:hover { color: var(--text); }
+
+.auth-uname-hint {
+  position: absolute;
+  right: 0; top: 9px;
+  font-size: 0.72rem; letter-spacing: 0.01em;
+  pointer-events: none;
+}
+.auth-uname-hint.ok    { color: #5a8a5a; }
+.auth-uname-hint.bad   { color: #b94040; }
+.auth-uname-hint.muted { color: #c4c2bd; }
+
+.auth-pw-reqs {
+  list-style: none;
+  margin: -6px 0 14px; padding: 0;
+  display: flex; flex-wrap: wrap; gap: 4px 16px;
+}
+.auth-pw-reqs li {
+  font-size: 0.74rem; color: #bdbab4;
+  letter-spacing: 0.01em;
+  transition: color 0.15s;
+}
+.auth-pw-reqs li.met { color: #5a8a5a; }
+
+.auth-tos {
+  display: flex; align-items: flex-start; gap: 9px;
+  margin: 2px 0 16px;
+  cursor: pointer;
+}
+.auth-tos input { margin-top: 2px; accent-color: var(--text); flex-shrink: 0; }
+.auth-tos #tos-consent-text {
+  font-size: 0.75rem; line-height: 1.5; color: var(--muted);
+}
+
+#auth-message-wrap { text-align: center; }
+.auth-resend {
+  font-size: 0.78rem; color: var(--muted);
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  margin-top: 4px;
+}
+.auth-resend > button:not(.auth-back) {
+  background: none; border: none; padding: 0;
+  font: inherit; color: var(--text);
+  text-decoration: underline; cursor: pointer;
+}
+.auth-resend > button:disabled { color: var(--muted); cursor: default; text-decoration: none; }
+.auth-resend-done { color: #5a8a5a; }
 
 /* ─── Human Signal modal ──────────────────────────────────────────────────── */
 #hs-modal-title {
