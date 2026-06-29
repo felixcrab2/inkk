@@ -1392,7 +1392,7 @@ function FeedActions({ pub, sc, likeCount, commentCount, onRead, onLike }) {
   );
 }
 
-function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, onLike }) {
+function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, onLike, noAvatar }) {
   const excerpt      = feedExcerpt(pub.content, featured ? 300 : 168);
   const likeCount    = getRelCount(pub.like_count);
   const commentCount = getRelCount(pub.comment_count);
@@ -1422,9 +1422,11 @@ function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, 
         <h2 className="feed-lead-title">{pub.title || "Untitled"}</h2>
         {excerpt && <p className="feed-lead-excerpt">{excerpt}</p>}
         <div className="feed-lead-byline">
-          <span className="feed-mark">
-            <DropCapAvatar letter={initial} avatarData={pub.avatar_data} dropCapImages={dropCapImages} size={44} />
-          </span>
+          {!noAvatar && (
+            <span className="feed-mark">
+              <DropCapAvatar letter={initial} avatarData={pub.avatar_data} dropCapImages={dropCapImages} size={44} />
+            </span>
+          )}
           <div className="feed-lead-byline-text">
             {author}
             <span className="feed-lead-sub">{dateline}</span>
@@ -1437,9 +1439,11 @@ function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, 
 
   return (
     <article className="feed-entry" style={{ "--card-index": index }} onClick={() => onRead(pub)}>
-      <span className="feed-mark feed-mark-sm">
-        <DropCapAvatar letter={initial} avatarData={pub.avatar_data} dropCapImages={dropCapImages} size={34} />
-      </span>
+      {!noAvatar && (
+        <span className="feed-mark feed-mark-sm">
+          <DropCapAvatar letter={initial} avatarData={pub.avatar_data} dropCapImages={dropCapImages} size={34} />
+        </span>
+      )}
       <div className="feed-entry-body">
         <h2 className="feed-entry-title">{pub.title || "Untitled"}</h2>
         {excerpt && <p className="feed-entry-excerpt">{excerpt}</p>}
@@ -2167,7 +2171,7 @@ function UserProfileView({ profile, onRead, dropCapImages, user, onRequestAuth }
         {loading && <p className="feed-empty">loading…</p>}
         {!loading && pubs.length === 0 && <p className="feed-empty">nothing published yet.</p>}
         {pubs.map((pub, i) => (
-          <FeedCard key={pub.id} pub={pub} index={i} onRead={onRead} onAuthorClick={() => {}} onLike={handleLike} />
+          <FeedCard key={pub.id} pub={pub} index={i} onRead={onRead} onAuthorClick={() => {}} onLike={handleLike} noAvatar />
         ))}
       </div>
     </div>
