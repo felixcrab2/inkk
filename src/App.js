@@ -212,15 +212,34 @@ function stripHtml(html) {
     .replace(/\n{3,}/g, "\n\n").trim();
 }
 
+// Defence-in-depth: strip script-bearing markup before HTML is placed into a
+// live editable node. Parses in an inert <template> (no execution), removes
+// <script>/<iframe>/etc, on* handlers and javascript: URLs, and keeps all
+// formatting and data:image content intact.
+function sanitizeContentHtml(html) {
+  if (!html) return "";
+  const tpl = document.createElement("template");
+  tpl.innerHTML = html;
+  tpl.content.querySelectorAll("script,style,iframe,object,embed,link,meta,base,form,svg").forEach(n => n.remove());
+  tpl.content.querySelectorAll("*").forEach(el => {
+    for (const attr of [...el.attributes]) {
+      const name = attr.name.toLowerCase();
+      if (name.startsWith("on")) el.removeAttribute(attr.name);
+      else if ((name === "href" || name === "src" || name === "xlink:href") && /^\s*javascript:/i.test(attr.value)) el.removeAttribute(attr.name);
+    }
+  });
+  return tpl.innerHTML;
+}
+
 function setEditorHtml(el, content) {
   if (!content) { el.innerHTML = ""; return; }
-  if (/<(div|br|img|p)\b/i.test(content)) { el.innerHTML = content; }
+  if (/<(div|br|img|p)\b/i.test(content)) { el.innerHTML = sanitizeContentHtml(content); }
   else { el.innerText = content; }
 }
 
 function setTitleHtml(el, content) {
   if (!content) { el.innerHTML = ""; return; }
-  if (/<\w+/.test(content) || /&\w+;/.test(content)) { el.innerHTML = content; }
+  if (/<\w+/.test(content) || /&\w+;/.test(content)) { el.innerHTML = sanitizeContentHtml(content); }
   else { el.innerText = content; }
 }
 
@@ -600,9 +619,14 @@ function extractImages(html, max = 8) {
 // the user. On success returns { status: 'ok' | 'flagged', scores }.
 async function moderateText(text, images) {
   try {
+    const headers = { "Content-Type": "application/json" };
+    if (supabase) {
+      const { data: s } = await supabase.auth.getSession();
+      if (s?.session?.access_token) headers.Authorization = `Bearer ${s.session.access_token}`;
+    }
     const res = await fetch("/api/moderate", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ text: stripHtml(text), images: images || [] }),
     });
     if (!res.ok) return null;
@@ -959,9 +983,15 @@ function pathToView(path) {
   return "editor";
 }
 
+// Strip characters that are significant in a PostgREST filter string, so a search
+// term can't break out of the ilike pattern and inject extra filter conditions.
+function sanitizeSearch(query) {
+  return (query || "").replace(/[,()*:%\\]/g, " ").replace(/\s+/g, " ").trim();
+}
+
 async function searchProfiles(query) {
-  if (!supabase || !query.trim()) return [];
-  const q = query.trim();
+  const q = sanitizeSearch(query);
+  if (!supabase || !q) return [];
   let { data, error } = await supabase
     .from("profiles")
     .select("id, username, display_name, avatar_data, bio")
@@ -979,8 +1009,8 @@ async function searchProfiles(query) {
 }
 
 async function searchPublications(query) {
-  if (!supabase || !query.trim()) return [];
-  const q = query.trim();
+  const q = sanitizeSearch(query);
+  if (!supabase || !q) return [];
   const { data, error } = await supabase
     .from("publications")
     .select(PUB_SELECT_WITH_COUNTS)
