@@ -197,8 +197,10 @@ function caretRangeAt(x, y) {
 async function compressImage(file, maxDim = 2000) {
   return new Promise(resolve => {
     const reader = new FileReader();
+    reader.onerror = () => resolve(null);
     reader.onload = e => {
       const img = new window.Image();
+      img.onerror = () => resolve(null);   // undecodable format (e.g. HEIC)
       img.onload = () => {
         const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
         const w = Math.round(img.width * scale);
@@ -2670,6 +2672,18 @@ export default function App() {
     fetch("/drop_caps/manifest.json").then(r => r.json()).then(setDropCapImages).catch(() => {});
   }, []);
 
+  // Safety net: never let a file dropped outside the editor navigate the app
+  // away (the browser's default for a file drop is to open it).
+  useEffect(() => {
+    const prevent = (e) => { if (Array.from(e.dataTransfer?.types || []).includes("Files")) e.preventDefault(); };
+    window.addEventListener("dragover", prevent);
+    window.addEventListener("drop", prevent);
+    return () => {
+      window.removeEventListener("dragover", prevent);
+      window.removeEventListener("drop", prevent);
+    };
+  }, []);
+
   // Online/offline — drives the "offline — saved locally" indicator.
   useEffect(() => {
     const on  = () => setOnline(true);
@@ -3426,19 +3440,25 @@ export default function App() {
     e.preventDefault();   // stop the browser from opening the dropped file
     const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith("image/"));
     if (!files.length) return;
-    const range = caretRangeAt(e.clientX, e.clientY);
+    const editor = editorRef.current;
+    if (!editor) return;
+    // Insert at the drop point if it lands inside the body; otherwise append.
+    let range = caretRangeAt(e.clientX, e.clientY);
+    if (!range || !editor.contains(range.startContainer)) range = null;
     let lastImg = null;
+    let failed = false;
     for (const file of files) {
       const src = await compressImage(file);
+      if (!src) { failed = true; continue; }   // undecodable (e.g. HEIC) — skip
       const img = document.createElement("img");
       img.src = src;
       if (range) { range.insertNode(img); range.collapse(false); }
-      else { editorRef.current?.appendChild(img); }
+      else editor.appendChild(img);
       lastImg = img;
     }
-    onInput();
-    if (lastImg) selectImageWhenReady(lastImg);
-  }, [onInput, selectImageWhenReady]);
+    if (lastImg) { onInput(); selectImageWhenReady(lastImg); }
+    if (failed && !lastImg) addToast("That image format isn’t supported. Try a JPEG or PNG.");
+  }, [onInput, selectImageWhenReady, addToast]);
 
   const handleEditorPaste = useCallback(async (e) => {
     const items = Array.from(e.clipboardData?.items || []);
@@ -3448,6 +3468,7 @@ export default function App() {
       const file = imageItem.getAsFile();
       if (!file) return;
       const src = await compressImage(file);
+      if (!src) { addToast("That image format isn’t supported. Try a JPEG or PNG."); return; }
       const img = document.createElement("img");
       img.src = src;
       const sel = window.getSelection();
@@ -3467,7 +3488,7 @@ export default function App() {
     e.preventDefault();
     const text = e.clipboardData?.getData("text/plain") || "";
     if (text) document.execCommand("insertText", false, text);
-  }, [onInput, selectImageWhenReady]);
+  }, [onInput, selectImageWhenReady, addToast]);
 
   // ─ PDF export ───────────────────────────────────────────────────────────────
   //
@@ -4066,6 +4087,9 @@ export default function App() {
         ref={containerRef}
         className={words > 0 ? "writing-started" : ""}
         style={{ display: isEditor ? "" : "none" }}
+        onDrop={handleEditorDrop}
+        onDragEnter={e => { if (Array.from(e.dataTransfer?.types || []).includes("Files")) e.preventDefault(); }}
+        onDragOver={e => { if (Array.from(e.dataTransfer?.types || []).includes("Files")) e.preventDefault(); }}
       >
         <div
           id="title-input"
@@ -4095,9 +4119,6 @@ export default function App() {
             autoCorrect="off"
             autoCapitalize="off"
             onInput={onInput}
-            onDrop={handleEditorDrop}
-            onDragEnter={e => { if (Array.from(e.dataTransfer?.types || []).includes("Files")) e.preventDefault(); }}
-            onDragOver={e => { if (Array.from(e.dataTransfer?.types || []).includes("Files")) e.preventDefault(); }}
             onPaste={handleEditorPaste}
             onClick={e => { if (e.target.tagName === "IMG") selectEditorImage(e.target); else clearImageSel(); }}
             onKeyDown={() => { if (imgElRef.current) clearImageSel(); }}
