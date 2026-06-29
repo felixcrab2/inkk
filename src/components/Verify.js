@@ -65,10 +65,15 @@ function Certificate({ cert, onOpenPiece }) {
         <dt>Code</dt><dd className="verify-cert-code">{cert.code}</dd>
       </dl>
 
-      {cert.publication_id && (
+      {cert.publication_id ? (
         <button className="verify-read-btn" onClick={() => onOpenPiece(cert.publication_id)}>
           Read the piece →
         </button>
+      ) : (
+        <p className="verify-cert-private">
+          This certificate isn’t linked to a piece on the public feed — it certifies the text
+          privately. Check it matches your copy below.
+        </p>
       )}
 
       <details className="verify-match">
