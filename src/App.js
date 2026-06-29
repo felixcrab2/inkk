@@ -961,6 +961,23 @@ async function fetchProfileByUsername(username) {
   return data || null;
 }
 
+// Build a valid, unused username from a free-form base (a Google display name,
+// an email local-part, or a handle that was claimed between signup and
+// confirmation). Sanitises to the allowed charset, pads to the 3-char minimum,
+// and suffixes digits until the handle is free. Used so accounts that arrive
+// without a chosen username (e.g. Google sign-in) are never blocked — the handle
+// is editable afterwards from the Profile tab.
+async function generateUniqueUsername(base) {
+  let root = (base || "").toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 16);
+  if (root.length < 3) root = `${root}writer`.slice(0, 16);
+  for (let i = 0; i < 10; i++) {
+    const suffix = i === 0 ? "" : String(Math.floor(1000 + Math.random() * 9000));
+    const candidate = `${root}${suffix}`.slice(0, 20);
+    if (!(await fetchProfileByUsername(candidate))) return candidate;
+  }
+  return `${root}${Date.now().toString().slice(-6)}`.slice(0, 20);
+}
+
 function viewToPath(view, pub, userProfile, code) {
   if (view === "feed")        return "/feed";
   if (view === "search")      return "/people";
@@ -1194,6 +1211,42 @@ function passwordChecks(pw) {
   };
 }
 
+// ─── Google Identity Services (ID-token sign-in) ──────────────────────────────
+// When REACT_APP_GOOGLE_CLIENT_ID is set, "continue with Google" uses Google's
+// own button to obtain an ID token in-page, which we hand to
+// supabase.auth.signInWithIdToken. The whole consent flow runs on our own
+// domain (no redirect to <ref>.supabase.co), so Google's screen shows the Inkk
+// app, not the Supabase project URL. Without the env var we fall back to the
+// redirect flow (signInWithOAuth) so nothing breaks before it's configured.
+const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
+
+let gsiScriptPromise = null;
+function loadGoogleIdentity() {
+  if (gsiScriptPromise) return gsiScriptPromise;
+  gsiScriptPromise = new Promise((resolve, reject) => {
+    if (window.google?.accounts?.id) { resolve(); return; }
+    const s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client";
+    s.async = true; s.defer = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("Could not load Google sign-in."));
+    document.head.appendChild(s);
+  });
+  return gsiScriptPromise;
+}
+
+// Supabase validates the nonce by SHA-256-hashing the value passed to
+// signInWithIdToken and matching it to the token's nonce claim — so Google gets
+// the hashed nonce and Supabase gets the raw one.
+async function makeGoogleNonce() {
+  const raw = window.crypto?.randomUUID
+    ? window.crypto.randomUUID()
+    : `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+  const digest = await window.crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+  const hashed = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
+  return { raw, hashed };
+}
+
 function AuthModal({ onClose, initialMode = "signin" }) {
   const [mode, setMode]             = useState(initialMode); // signin | signup | reset
   const [email, setEmail]           = useState("");
@@ -1209,7 +1262,9 @@ function AuthModal({ onClose, initialMode = "signin" }) {
   const [unameStatus, setUnameStatus] = useState(""); // "" | checking | available | taken | invalid
   const [resend, setResend]         = useState("");   // "" | sending | sent
   const [needsConfirm, setNeedsConfirm] = useState(false); // show "resend confirmation" UI
+  const [gsiReady, setGsiReady]     = useState(false);     // Google Identity script loaded
   const sentEmailRef                = useRef("");
+  const googleBtnRef                = useRef(null);        // host for Google's rendered button
 
   const switchMode = (m) => {
     setMode(m); setError(""); setMessage(""); setResend(""); setNeedsConfirm(false);
@@ -1230,6 +1285,46 @@ function AuthModal({ onClose, initialMode = "signin" }) {
     }, 400);
     return () => { alive = false; clearTimeout(t); };
   }, [username, mode]);
+
+  // Load Google Identity Services once, if a client ID is configured.
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) return;
+    let active = true;
+    loadGoogleIdentity().then(() => { if (active) setGsiReady(true); }).catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  // Render Google's button once the script is ready and the Terms are accepted.
+  // The credential callback trades the Google ID token for a Supabase session via
+  // signInWithIdToken — no redirect ever leaves our own domain.
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID || !gsiReady || mode === "reset" || !accepted) return;
+    const el = googleBtnRef.current;
+    const gid = window.google?.accounts?.id;
+    if (!el || !gid) return;
+    let active = true;
+    makeGoogleNonce().then(({ raw, hashed }) => {
+      if (!active) return;
+      gid.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        nonce: hashed,
+        callback: async (resp) => {
+          // Record Terms acceptance for the profile auto-provisioner.
+          try { localStorage.setItem("inkk_pending_tos", TOS_VERSION); } catch {}
+          const { error } = await supabase.auth.signInWithIdToken({
+            provider: "google", token: resp.credential, nonce: raw,
+          });
+          if (error) setError(error.message);
+        },
+      });
+      el.innerHTML = "";
+      gid.renderButton(el, {
+        type: "standard", theme: "outline", size: "large",
+        text: "continue_with", shape: "rectangular", width: 320,
+      });
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [gsiReady, accepted, mode]);
 
   const pw       = passwordChecks(password);
   const pwOk     = pw.length && pw.letter && pw.number;
@@ -1317,6 +1412,10 @@ function AuthModal({ onClose, initialMode = "signin" }) {
   };
 
   const googleSignIn = async () => {
+    // Google has no username/Terms step of its own. The agreement is ticked here
+    // (the button is disabled until then); stash it across the OAuth redirect so
+    // the profile provisioned on return records the Terms acceptance.
+    try { localStorage.setItem("inkk_pending_tos", TOS_VERSION); } catch {}
     await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
   };
 
@@ -1437,7 +1536,28 @@ function AuthModal({ onClose, initialMode = "signin" }) {
               </button>
             )}
             <div id="auth-divider"><span>or</span></div>
-            <button id="google-btn" onClick={googleSignIn}>continue with Google</button>
+            {/* Google has no username/Terms step of its own, so the agreement is
+                collected here and carried across the OAuth redirect. In create-
+                account mode the in-form checkbox above already covers it. */}
+            {mode === "signin" && (
+              <label id="tos-consent" className="auth-tos">
+                <input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} />
+                <span id="tos-consent-text">
+                  I agree to the{" "}
+                  <button type="button" className="tos-link" onClick={() => setShowTerms(true)}>Terms</button>
+                  {" "}and{" "}
+                  <button type="button" className="tos-link" onClick={() => setShowPrivacy(true)}>Privacy Policy</button>
+                  , including contributing my anonymised writing-process data to Inkk's research dataset. I can opt out anytime from my Profile.
+                </span>
+              </label>
+            )}
+            {GOOGLE_CLIENT_ID ? (
+              accepted
+                ? <div ref={googleBtnRef} style={{ display: "flex", justifyContent: "center" }} />
+                : <button id="google-btn" disabled>continue with Google</button>
+            ) : (
+              <button id="google-btn" onClick={googleSignIn} disabled={!accepted}>continue with Google</button>
+            )}
           </>
         )}
       </div>
@@ -1487,79 +1607,6 @@ function UpdatePasswordModal({ onClose, onDone }) {
         </form>
       </div>
     </div>
-  );
-}
-
-// ─── UsernameModal ────────────────────────────────────────────────────────────
-
-function UsernameModal({ user, onDone }) {
-  const [username, setUsername]       = useState("");
-  const [displayName, setDisplayName] = useState(user.user_metadata?.full_name || "");
-  const [accepted, setAccepted]       = useState(false);
-  const [showPrivacy, setShowPrivacy] = useState(false);
-  const [showTerms, setShowTerms]     = useState(false);
-  const [error, setError]             = useState("");
-  const [loading, setLoading]         = useState(false);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    const u = username.trim();
-    if (u.length < 3) { setError("At least 3 characters."); return; }
-    if (!accepted)   { setError("Please review and accept the Terms & Privacy Policy to continue."); return; }
-    setLoading(true); setError("");
-    const errMsg = await upsertProfile(user.id, u, displayName.trim(), { tosAccepted: true, tosVersion: TOS_VERSION });
-    if (errMsg) {
-      setError(errMsg.includes("unique") || errMsg.includes("duplicate") ? "Username taken." : errMsg);
-      setLoading(false);
-    } else {
-      onDone({ id: user.id, username: u, display_name: displayName.trim(), research_opt_in: true, tos_accepted_at: new Date().toISOString() });
-    }
-  };
-
-  return (
-    <>
-      <div id="auth-overlay">
-        <div id="auth-modal" onClick={e => e.stopPropagation()}>
-          <div id="auth-tabs">
-            <button className="active" style={{ cursor: "default" }}>welcome to inkk</button>
-          </div>
-          <form onSubmit={submit}>
-            <input
-              type="text"
-              placeholder="username"
-              value={username}
-              onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
-              required
-              autoFocus
-              maxLength={20}
-            />
-            <input
-              type="text"
-              placeholder="display name (optional)"
-              value={displayName}
-              onChange={e => setDisplayName(e.target.value)}
-              maxLength={50}
-            />
-            <label id="tos-consent">
-              <input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} />
-              <span id="tos-consent-text">
-                I agree to the{" "}
-                <button type="button" className="tos-link" onClick={() => setShowTerms(true)}>Terms</button>
-                {" "}and{" "}
-                <button type="button" className="tos-link" onClick={() => setShowPrivacy(true)}>Privacy Policy</button>
-                , including contributing my anonymised writing-process data to Inkk's research dataset. I can opt out anytime from my Profile.
-              </span>
-            </label>
-            {error && <p className="auth-error">{error}</p>}
-            <button id="auth-submit" type="submit" disabled={loading || username.length < 3 || !accepted}>
-              {loading ? "saving…" : "continue"}
-            </button>
-          </form>
-        </div>
-      </div>
-      {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
-      {showTerms   && <TermsModal   onClose={() => setShowTerms(false)} />}
-    </>
   );
 }
 
@@ -3104,7 +3151,6 @@ export default function App() {
   const [publishMenuOpen, setPublishMenuOpen] = useState(false);
   const [profile, setProfile]         = useState(null);
   const [dropCapImages, setDropCapImages] = useState({});
-  const [usernameModalOpen, setUsernameModalOpen] = useState(false);
   const [updatePasswordOpen, setUpdatePasswordOpen] = useState(false);
   const [viewingUser, setViewingUser] = useState(null);
   const [researchOptIn, setResearchOptIn] = useState(false);
@@ -3539,20 +3585,35 @@ export default function App() {
         }));
       }
       let prof = await fetchProfile(signedInUser.id);
-      // Brand-new account created through our signup form carries the chosen
-      // username + T&C acceptance in user_metadata — provision the profile from
-      // it so signup is one step. UsernameModal is only the fallback (e.g. Google
-      // sign-in, or a username that got claimed before email confirmation).
+      // Every account gets a profile provisioned automatically at sign-in, so no
+      // one is ever blocked by a sign-in-time modal. Email signups carry their
+      // chosen username + Terms acceptance in user_metadata. Google (and any
+      // other provider) has no username, so we derive a unique handle from the
+      // Google name / email and record the Terms acceptance ticked in the auth
+      // modal, which we stashed across the OAuth redirect. Username + display
+      // name stay editable anytime from the Profile tab.
       if (!prof) {
         const meta = signedInUser.user_metadata || {};
         const metaUsername = (meta.username || "").trim();
-        if (metaUsername) {
-          const errMsg = await upsertProfile(
-            signedInUser.id, metaUsername, (meta.display_name || metaUsername).trim(),
-            { tosAccepted: !!meta.tos_accepted, tosVersion: meta.tos_version || TOS_VERSION },
-          );
-          if (!errMsg) prof = await fetchProfile(signedInUser.id);
+        // The Terms checkbox ticked before "continue with Google" is carried
+        // across the OAuth redirect here; consume it (clear so it can't leak to
+        // a later, unrelated signup on this browser).
+        let pendingTos = null;
+        try { pendingTos = localStorage.getItem("inkk_pending_tos"); localStorage.removeItem("inkk_pending_tos"); } catch {}
+        let username = metaUsername || await generateUniqueUsername(
+          meta.full_name || meta.name || (signedInUser.email || "").split("@")[0],
+        );
+        const displayName = (meta.display_name || meta.full_name || meta.name || username).trim();
+        const tosAccepted = !!meta.tos_accepted || !!pendingTos;
+        const tosVersion  = meta.tos_version || pendingTos || TOS_VERSION;
+        let errMsg = await upsertProfile(signedInUser.id, username, displayName, { tosAccepted, tosVersion });
+        // The chosen handle was claimed between signup and confirmation — derive
+        // a free variant rather than stranding the user without a profile.
+        if (errMsg && /unique|duplicate/i.test(errMsg)) {
+          username = await generateUniqueUsername(username);
+          errMsg = await upsertProfile(signedInUser.id, username, displayName, { tosAccepted, tosVersion });
         }
+        if (!errMsg) prof = await fetchProfile(signedInUser.id);
       }
       if (prof) {
         setProfile(prof);
@@ -3561,8 +3622,9 @@ export default function App() {
         setResearchOptIn(opt);
         if (opt) { try { syncFlushNow(); } catch {} }
       } else {
-        setUsernameModalOpen(true);
-        // New user — UsernameModal will set opt-in=true via T&C acceptance.
+        // Provisioning failed (offline / transient DB error) — never trap the
+        // user behind a modal. They keep writing; the profile is created on the
+        // next sign-in, or when they set a username from the Profile tab.
         optInRef.current = false;
         setResearchOptIn(false);
       }
@@ -3583,7 +3645,7 @@ export default function App() {
       if (event === "SIGNED_OUT") {
         syncedUserRef.current = null;
         setUser(null); userRef.current = null;
-        setPublishedDocIds(new Set()); setProfile(null); setUsernameModalOpen(false);
+        setPublishedDocIds(new Set()); setProfile(null);
         setResearchOptIn(false); optInRef.current = false;
         recorderRef.current?.recordUserChange(null);
         resetLocalWorkspace(); // clear A's drafts/streak so B doesn't inherit them
@@ -4198,14 +4260,13 @@ export default function App() {
         if (publishMenuOpen) { setPublishMenuOpen(false); setConfirmUnpublishOpen(false); return; }
         if (publishModalDoc) { setPublishModalDoc(null); return; }
         if (downloadModalOpen) { setDownloadModalOpen(false); return; }
-        if (usernameModalOpen) return;
         setPanelOpen(false); setHsModalOpen(false); setHsScoreOpen(false);
         if (view !== "editor") { window.history.back(); return; }
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [openDownloadModal, view, focusMode, certMenuOpen, toggleFocusMode, exitFocusMode, publishMenuOpen, publishModalDoc, downloadModalOpen, usernameModalOpen, authOpen, onInput, onTitleInput]);
+  }, [openDownloadModal, view, focusMode, certMenuOpen, toggleFocusMode, exitFocusMode, publishMenuOpen, publishModalDoc, downloadModalOpen, authOpen, onInput, onTitleInput]);
 
   // ─ mount ────────────────────────────────────────────────────────────────────
 
@@ -4872,17 +4933,6 @@ export default function App() {
         const scoreObj = { score: doc.humanScore, tier: doc.scoreTier, ...doc.scoreFeatures };
         return <HumanSignalPanel score={scoreObj} onClose={() => setHsScoreOpen(false)} />;
       })()}
-      {usernameModalOpen && user && (
-        <UsernameModal user={user} onDone={prof => {
-          setProfile(prof);
-          setUsernameModalOpen(false);
-          if (prof.research_opt_in) {
-            optInRef.current = true;
-            setResearchOptIn(true);
-            syncFlushNow();
-          }
-        }} />
-      )}
       {updatePasswordOpen && (
         <UpdatePasswordModal
           onClose={() => setUpdatePasswordOpen(false)}
