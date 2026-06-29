@@ -71,7 +71,9 @@ const TITLE_TRACK = -0.02;
 
 const LINE_H_PT      = T_BODY * 1.55;
 const LINE_H         = LINE_H_PT * PX;
-const PARA_GAP       = 4 * PX;
+// A clear blank-line-ish break between paragraphs (applies in both plain and
+// indented modes, so an indented paragraph also gets a visible break).
+const PARA_GAP       = Math.round(LINE_H * 0.6);
 const PARA_INDENT_PT = 16;
 const PARA_INDENT    = PARA_INDENT_PT * PX;
 
@@ -536,9 +538,8 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
   const {
     pageW            = PAGE_W_PT,
     pageH            = PAGE_H_PT,
-    justify          = true,
-    titleGap         = "normal",   // 'tight' | 'normal' | 'loose'
-    paragraphIndent  = true,
+    justify          = false,
+    paragraphIndent  = false,
     paperTexture     = true,
   } = options;
 
@@ -549,13 +550,8 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
   const mX   = Math.round(pageW * 0.15);
   const mTop = Math.round(pageH * 0.15);
   const mBot = Math.round(pageH * 0.125);
-  const titleGapMult =
-    titleGap === "tight" ? 0.6 :
-    titleGap === "loose" ? 1.7 :
-    1.0;
-  // User asked for default = 1 line more than before. Original was 18pt; bump
-  // to 30pt at default (≈ 1.5× a body line).
-  const TITLE_BODY_GAP = 30 * PX * titleGapMult;
+  // Fixed gap between the title block and the body (≈ 1.5× a body line).
+  const TITLE_BODY_GAP = 30 * PX;
 
   // Measurement canvas (for wrap and layout calculations).
   const measure = document.createElement("canvas");
