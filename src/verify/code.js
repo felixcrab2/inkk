@@ -85,9 +85,11 @@ export function normalizePlainText(htmlOrText) {
     .replace(/<\/(p|div|h[1-6]|li|blockquote|tr)>/gi, " ");
   let text;
   if (/<[a-z][\s\S]*>/i.test(s) && typeof document !== "undefined") {
-    const el = document.createElement("div");
-    el.innerHTML = s;
-    text = el.textContent || el.innerText || "";
+    // Inert <template> parse: extracting text from pasted HTML must not run
+    // scripts or fire <img onerror>.
+    const tpl = document.createElement("template");
+    tpl.innerHTML = s;
+    text = tpl.content.textContent || "";
   } else {
     // Already plain text (or no DOM available) — strip any stray tags crudely.
     text = s.replace(/<[^>]*>/g, " ");
