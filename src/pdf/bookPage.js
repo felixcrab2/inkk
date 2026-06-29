@@ -2,7 +2,7 @@
 //
 // Parses the editor's HTML (paragraphs, line breaks and images), lays the
 // content out on a high-DPI canvas with classical book typography
-// (justified text, drop cap, paragraph indents, hard line breaks preserved),
+// (justified text, paragraph indents, hard line breaks preserved),
 // and embeds each page as a JPEG inside a custom-sized PDF.
 //
 // All ink (text and images) is drawn under `multiply` blend mode, then a
@@ -28,12 +28,12 @@ export const PAGE_PRESETS = {
   portrait:     { w: 480, h: 600 },                          // 4:5 (Instagram portrait)
 };
 
-// Warm ink, slightly transparent under multiply for "absorbed letterpress".
-const INK_BODY    = "#241a12";
-const INK_TITLE   = "#1f1610";
-const INK_FOOTER  = "#3e3326";
-const INK_HEADER  = "#a8967e";
-const INK_ALPHA   = 0.93;
+// Solid black ink at full opacity for crisp, fully-black text on the page.
+const INK_BODY    = "#000000";
+const INK_TITLE   = "#000000";
+const INK_FOOTER  = "#000000";
+const INK_HEADER  = "#000000";   // running head (author) — black, like the body
+const INK_ALPHA   = 1.0;
 
 // Paper tone: heavy desaturation + slight brightness for near-white paper.
 // Lower saturation pulls the yellow out; the brightness lift keeps it a touch
@@ -60,9 +60,8 @@ const FOOTER_FROM_BOTTOM = 34;
 // Title is kept only slightly larger than the body so the rendered page
 // matches the editor, where the title sits just above the prose size.
 const T_TITLE   = 12.0;
-const T_HEADER  = 8.5;
+const T_HEADER  = 6.0;   // running head (author): a lot smaller than the body
 const T_BODY    = 11.25;
-const T_DROPCAP = 42;
 const T_FOOTER  = 10.5;
 
 // Letter-spacing (em) for the uppercase running head — the wide tracking is
@@ -73,14 +72,11 @@ const HEADER_TRACK = 0.16;
 // editor's uppercase title (CSS letter-spacing: -0.02em).
 const TITLE_TRACK = -0.02;
 
-// Drop cap spans this many body lines.
-// At T_DROPCAP=42pt, cap-height ≈ 0.72 × 42 = 30.2pt = 1.73 body lines,
-// so 2 reserved lines clears the cap without an empty third line.
-const DROPCAP_LINES = 2;
-
 const LINE_H_PT      = T_BODY * 1.55;
 const LINE_H         = LINE_H_PT * PX;
-const PARA_GAP       = 4 * PX;
+// A clear blank-line-ish break between paragraphs (applies in both plain and
+// indented modes, so an indented paragraph also gets a visible break).
+const PARA_GAP       = Math.round(LINE_H * 0.6);
 const PARA_INDENT_PT = 16;
 const PARA_INDENT    = PARA_INDENT_PT * PX;
 
@@ -152,7 +148,7 @@ function drawTrackedCentered(ctx, text, cx, baseline, sizePt, trackEm) {
 //   { type: "image", src }
 // A run is { text, b, i }. Segments inside a text block are joined by hard
 // line-breaks; blocks are joined by paragraph breaks.
-function parseHtmlToBlocks(html) {
+export function parseHtmlToBlocks(html) {
   const container = document.createElement("div");
   container.innerHTML = html || "";
 
@@ -189,6 +185,11 @@ function parseHtmlToBlocks(html) {
       b: ctx.b || tag === "b" || tag === "strong" || fw === "bold" || +fw >= 600,
       i: ctx.i || tag === "i" || tag === "em" || fs === "italic" || fs === "oblique",
     };
+    // A block element both starts and ends a paragraph. The leading break is
+    // what keeps a block (e.g. a <div> paragraph) from merging into preceding
+    // bare text — without it the first two paragraphs run together. Empty
+    // breaks collapse harmlessly during the block-building pass below.
+    if (block) tokens.push({ type: "break" });
     for (const child of node.childNodes) walk(child, next);
     if (block) tokens.push({ type: "break" });
   }
@@ -548,10 +549,8 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
   const {
     pageW            = PAGE_W_PT,
     pageH            = PAGE_H_PT,
-    dropCap: dropCapOpt   = true,
-    justify          = true,
-    titleGap         = "normal",   // 'tight' | 'normal' | 'loose'
-    paragraphIndent  = true,
+    justify          = false,
+    paragraphIndent  = false,
     paperTexture     = true,
   } = options;
 
@@ -562,13 +561,8 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
   const mX   = Math.round(pageW * 0.15);
   const mTop = Math.round(pageH * 0.15);
   const mBot = Math.round(pageH * 0.125);
-  const titleGapMult =
-    titleGap === "tight" ? 0.6 :
-    titleGap === "loose" ? 1.7 :
-    1.0;
-  // User asked for default = 1 line more than before. Original was 18pt; bump
-  // to 30pt at default (≈ 1.5× a body line).
-  const TITLE_BODY_GAP = 30 * PX * titleGapMult;
+  // Fixed gap between the title block and the body (≈ 1.5× a body line).
+  const TITLE_BODY_GAP = 30 * PX;
 
   // Measurement canvas (for wrap and layout calculations).
   const measure = document.createElement("canvas");
@@ -602,24 +596,6 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
   // Strip leading empty text blocks.
   while (blocks.length && blocks[0].type === "text" && !blocks[0].segments.length) blocks.shift();
 
-  // Drop cap based on the first character of the first text block.
-  let firstChar = "";
-  let useDropCap = false;
-  if (dropCapOpt && blocks.length && blocks[0].type === "text" && blocks[0].segments.length) {
-    const seg = blocks[0].segments[0];
-    const firstRun = seg[0];
-    const c = firstRun ? (firstRun.text.match(/^\s*([A-Za-z])/) || [])[1] : null;
-    if (c) {
-      firstChar = c.toUpperCase();
-      useDropCap = true;
-      firstRun.text = firstRun.text.replace(/^\s*[A-Za-z]/, "");
-      if (!firstRun.text) seg.shift();
-    }
-  }
-
-  const dropCapW   = useDropCap ? T_DROPCAP * PX * 0.72 : 0;
-  const dropCapIndent = useDropCap ? dropCapW + 10 * PX : 0;
-
   // Preload images so we can size them during pagination.
   await Promise.all(blocks.filter(b => b.type === "image").map(async (b) => {
     b.img = await loadImg(b.src);
@@ -634,44 +610,25 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
     }
     // text block
     if (bi > 0) items.push({ type: "gap" });
-    let dropCapLinesLeft = (bi === 0 && useDropCap) ? DROPCAP_LINES : 0;
     const isFirstParaForIndent = bi > 0;
     block.segments.forEach((seg, si) => {
       // For segment 0 of a paragraph (not first paragraph) → first-line indent.
       const wantsParaIndent = paragraphIndent && si === 0 && isFirstParaForIndent;
       const wrapOpts = {};
-      if (dropCapLinesLeft > 0) {
-        wrapOpts.narrowCount = dropCapLinesLeft;
-        wrapOpts.narrowWidth = fullWidth - dropCapIndent;
-      } else if (wantsParaIndent) {
+      if (wantsParaIndent) {
         wrapOpts.narrowCount = 1;
         wrapOpts.narrowWidth = fullWidth - PARA_INDENT;
       }
       const lines = wrapRuns(mctx, seg || [], fullWidth, wrapOpts);
       lines.forEach((ln, li) => {
-        const item = {
+        items.push({
           type: "line",
           tokens: ln.tokens,
           width: ln.width,
           endOfSegment: !!ln.endOfSegment,
-        };
-        if (li < (wrapOpts.narrowCount || 0)) {
-          // Apply indent visually.
-          if (dropCapLinesLeft > 0) {
-            item.indent = dropCapIndent;
-            dropCapLinesLeft = Math.max(0, dropCapLinesLeft - 1);
-          } else if (wantsParaIndent && li === 0) {
-            item.indent = PARA_INDENT;
-          }
-        } else if (dropCapLinesLeft > 0 && li >= (wrapOpts.narrowCount || 0)) {
-          // Should not happen with the above wrapOpts, but be defensive.
-          dropCapLinesLeft = 0;
-        }
-        items.push(item);
+          indent: (wantsParaIndent && li === 0) ? PARA_INDENT : 0,
+        });
       });
-      // If segment wrapped into fewer lines than dropCapLinesLeft, we still
-      // need to consume those lines. Subtract by lines.length on top of what
-      // was applied above? Already handled in the loop.
     });
   });
 
@@ -718,16 +675,6 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
             y += T_TITLE * PX * TITLE_LINE_MULT;
           }
           y += TITLE_BODY_GAP;
-        }
-
-        // ── Drop cap (page 1 only) ──────────────────────────────────────
-        if (isFirst && useDropCap) {
-          ctx.font = font(T_DROPCAP);
-          ctx.fillStyle = INK_TITLE;
-          ctx.textAlign = "left";
-          const capAscent   = T_DROPCAP * PX * 0.72;
-          const capBaseline = y + capAscent;
-          ctx.fillText(firstChar, mX * PX, capBaseline);
         }
 
         // ── Body ────────────────────────────────────────────────────────

@@ -135,6 +135,12 @@ function applySmartTypography() {
     }
   }
 
+  // Em dash: -- → —
+  if (before.endsWith("--")) {
+    node.nodeValue = before.slice(0, -2) + "—" + after;
+    setCaret(node, offset - 1);
+    return;
+  }
   // Ellipsis: ... → …
   if (before.endsWith("...")) {
     node.nodeValue = before.slice(0, -3) + "…" + after;
@@ -197,8 +203,10 @@ function caretRangeAt(x, y) {
 async function compressImage(file, maxDim = 2600) {
   return new Promise(resolve => {
     const reader = new FileReader();
+    reader.onerror = () => resolve(null);
     reader.onload = e => {
       const img = new window.Image();
+      img.onerror = () => resolve(null);   // undecodable format (e.g. HEIC)
       img.onload = () => {
         const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
         const w = Math.round(img.width * scale);
@@ -225,6 +233,89 @@ function docTitle(content) {
 function wordCount(content) {
   const t = stripHtml(content || "").trim();
   return t ? t.split(/\s+/).length : 0;
+}
+
+// ── Title case ────────────────────────────────────────────────────────────────
+// Capitalize a title the conventional way: the first and last word always go up,
+// and the first word after a colon (subtitle); short "minor" words (articles,
+// coordinating conjunctions, short prepositions) stay down in between. Acronyms
+// and intentional mixed-case (NASA, iPhone) are preserved.
+const TITLE_MINOR_WORDS = new Set([
+  "a", "an", "and", "as", "at", "but", "by", "en", "for", "if", "in", "nor",
+  "of", "on", "or", "per", "so", "the", "to", "v", "vs", "via", "yet",
+]);
+
+function capitalizeTitleWord(word) {
+  // Capitalize each hyphen-separated part: "self-portrait" -> "Self-Portrait".
+  return word.split("-").map(part => {
+    if (!part) return part;
+    // Preserve acronyms (NASA) and intentional inner caps (iPhone, McCoy).
+    if (/[A-Z]/.test(part.slice(1)) || (part.length > 1 && part === part.toUpperCase())) return part;
+    return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+  }).join("-");
+}
+
+function titleCase(input) {
+  const str = (input || "").replace(/\s+/g, " ").trim();
+  if (!str) return str;
+  const words = str.split(" ");
+  const last = words.length - 1;
+  let capNext = true;   // first word always capitalized
+  return words.map((word, i) => {
+    const forceCap = capNext || i === last;
+    capNext = /:$/.test(word);   // word after a colon starts a subtitle
+    const bare = word.toLowerCase().replace(/[^a-z]/g, "");
+    if (!forceCap && TITLE_MINOR_WORDS.has(bare)) return word.toLowerCase();
+    return capitalizeTitleWord(word);
+  }).join(" ");
+}
+
+// Title-case the words the user has already finished (those followed by
+// whitespace), leaving the word currently being typed alone — except the first
+// word, which is always capitalized. Last-word/minor-word fixes happen in the
+// full titleCase() pass on blur/Enter. Case-only, so caret offsets stay valid.
+function liveTitleCase(text) {
+  if (!text) return text;
+  const trailingWS = /\s$/.test(text);
+  const parts = text.split(/(\s+)/);   // words at even indices, whitespace at odd
+  let lastWordIdx = -1;
+  for (let i = 0; i < parts.length; i++) if (i % 2 === 0 && parts[i] !== "") lastWordIdx = i;
+  let firstSeen = false;
+  let capNext = true;
+  return parts.map((tok, i) => {
+    if (i % 2 === 1 || tok === "") return tok;
+    const isFirst = !firstSeen; firstSeen = true;
+    const inProgress = i === lastWordIdx && !trailingWS;
+    const forceCap = capNext;
+    capNext = /:$/.test(tok);
+    if (inProgress && !isFirst) return tok;   // don't touch the word being typed
+    const bare = tok.toLowerCase().replace(/[^a-z]/g, "");
+    if (!forceCap && TITLE_MINOR_WORDS.has(bare)) return tok.toLowerCase();
+    return capitalizeTitleWord(tok);
+  }).join("");
+}
+
+// Caret offset (character count from start) within a single-line editable.
+function titleCaretOffset(el) {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
+  const pre = range.cloneRange();
+  pre.selectNodeContents(el);
+  pre.setEnd(range.endContainer, range.endOffset);
+  return pre.toString().length;
+}
+
+function setTitleCaret(el, offset) {
+  const node = el.firstChild;
+  if (!node) return;
+  const len = (node.textContent || "").length;
+  const range = document.createRange();
+  range.setStart(node, Math.min(offset, len));
+  range.collapse(true);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
 }
 
 function isMobile() {
@@ -372,7 +463,7 @@ function mergeDocs(local, cloud) {
 // ─── publications ─────────────────────────────────────────────────────────────
 
 const PUB_SELECT = "id, title, content, published_at, author_name, author_username, user_id, writing_time_seconds, revision_count, human_score, score_tier, score_features, keystrokes, deletions, pastes, verify_code, content_hash";
-const PUB_SELECT_WITH_COUNTS = PUB_SELECT + ", moderation_status, like_count:likes(count), comment_count:comments(count)";
+const PUB_SELECT_WITH_COUNTS = PUB_SELECT + ", moderation_status, render_justify, render_indent, like_count:likes(count), comment_count:comments(count)";
 
 function getRelCount(rel) {
   if (!rel) return 0;
@@ -493,9 +584,14 @@ function withModeration(payload, mod) {
   };
 }
 
-// Drop moderation keys — used to retry writes on databases not yet migrated.
+// Drop the newer optional columns (moderation + render flags) — used to retry
+// writes on databases not yet migrated.
 function stripModeration(p) {
-  const { moderation_status, moderation_scores, moderation_checked_at, ...rest } = p;
+  const {
+    moderation_status, moderation_scores, moderation_checked_at,
+    render_justify, render_indent,
+    ...rest
+  } = p;
   return rest;
 }
 
@@ -672,7 +768,7 @@ async function ensureCertificate(doc, user, { title, authorName, authorUsername 
 // Publish (or re-publish) a document to the feed. Publishing certifies the
 // piece too — reusing the document's existing code when the text is unchanged.
 // Returns { error, code, verified }.
-async function doPublish(doc, user, title, authorName, authorUsername) {
+async function doPublish(doc, user, title, authorName, authorUsername, renderOpts = {}) {
   if (!supabase || !user) return { error: "Not signed in." };
 
   const cert = await ensureCertificate(doc, user, { title, authorName, authorUsername });
@@ -693,6 +789,8 @@ async function doPublish(doc, user, title, authorName, authorUsername) {
     human_score:    doc.humanScore     ?? null,
     score_tier:     doc.scoreTier      ?? null,
     score_features: doc.scoreFeatures  ?? null,
+    render_justify: !!renderOpts.justify,
+    render_indent:  !!renderOpts.indent,
   };
   // Auto-triage the publication's text (title + body) before writing it.
   // Fail-open: an outage leaves moderation_status at its 'pending' default.
@@ -1170,6 +1268,8 @@ function UsernameModal({ user, onDone }) {
 function PublishModal({ doc, user, profile, onConfirm, onClose }) {
   const author = profile?.username || user.user_metadata?.full_name || user.email.split("@")[0];
   const [title, setTitle]     = useState(stripHtml(doc.title || ""));
+  const [justify, setJustify] = useState(false);
+  const [indent, setIndent]   = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
 
@@ -1178,7 +1278,7 @@ function PublishModal({ doc, user, profile, onConfirm, onClose }) {
     const t = title.trim();
     if (!t) return;
     setLoading(true); setError("");
-    const errMsg = await onConfirm(t, author);
+    const errMsg = await onConfirm(t, author, { justify, indent });
     if (errMsg) setError(errMsg);
     setLoading(false);
   };
@@ -1192,6 +1292,9 @@ function PublishModal({ doc, user, profile, onConfirm, onClose }) {
         </div>
         <form onSubmit={submit}>
           <input type="text" placeholder="article title" value={title} onChange={e => setTitle(e.target.value)} required autoFocus />
+          <div className="dl-section-label">Style</div>
+          <label className="dl-check"><input type="checkbox" checked={justify} onChange={e => setJustify(e.target.checked)} /><span>Justify text</span></label>
+          <label className="dl-check"><input type="checkbox" checked={indent}  onChange={e => setIndent(e.target.checked)} /><span>Paragraph indent</span></label>
           {error && <p className="auth-error">{error}</p>}
           <button id="auth-submit" type="submit" disabled={loading || !title.trim()}>
             {loading ? "publishing…" : "publish"}
@@ -1206,22 +1309,14 @@ function PublishModal({ doc, user, profile, onConfirm, onClose }) {
 
 function DownloadModal({ onConfirm, onClose }) {
   const [format,          setFormat]          = useState("pdf");
-  const [dropCap,         setDropCap]         = useState(true);
-  const [justify,         setJustify]         = useState(true);
-  const [paragraphIndent, setParagraphIndent] = useState(true);
-  const [titleGap,        setTitleGap]        = useState("normal");
-  const [paperTexture,    setPaperTexture]    = useState(true);
+  const [justify,         setJustify]         = useState(false);
+  const [paragraphIndent, setParagraphIndent] = useState(false);
   const [busy,            setBusy]            = useState(false);
-
-  const isPng = format !== "pdf";
 
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
-    await onConfirm({
-      format,
-      style: { dropCap, justify, paragraphIndent, titleGap, paperTexture: isPng ? paperTexture : true },
-    });
+    await onConfirm({ format, style: { justify, paragraphIndent } });
     setBusy(false);
     onClose();
   };
@@ -1247,22 +1342,8 @@ function DownloadModal({ onConfirm, onClose }) {
           </div>
 
           <div className="dl-section-label">Style</div>
-          <label className="dl-check"><input type="checkbox" checked={dropCap}         onChange={e => setDropCap(e.target.checked)} /><span>Drop cap</span></label>
           <label className="dl-check"><input type="checkbox" checked={justify}         onChange={e => setJustify(e.target.checked)} /><span>Justify text</span></label>
           <label className="dl-check"><input type="checkbox" checked={paragraphIndent} onChange={e => setParagraphIndent(e.target.checked)} /><span>Paragraph indent</span></label>
-          {isPng && (
-            <label className="dl-check"><input type="checkbox" checked={paperTexture} onChange={e => setPaperTexture(e.target.checked)} /><span>Paper texture</span></label>
-          )}
-
-          <div className="dl-section-label">Title spacing</div>
-          <div className="dl-radio-row">
-            {[{ v: "tight", l: "Tight" }, { v: "normal", l: "Normal" }, { v: "loose", l: "Loose" }].map(o => (
-              <label key={o.v} className={`dl-radio${titleGap === o.v ? " active" : ""}`}>
-                <input type="radio" name="titleGap" value={o.v} checked={titleGap === o.v} onChange={() => setTitleGap(o.v)} />
-                <span>{o.l}</span>
-              </label>
-            ))}
-          </div>
 
           <button id="auth-submit" type="submit" disabled={busy}>
             {busy ? "preparing…" : `Download ${format === "pdf" ? "PDF" : "PNG"}`}
@@ -2114,7 +2195,7 @@ function ReadingView({ pub, user, dropCapImages, focus, onRequestAuth, onAuthorC
       title: pub.title || "",
       byline: pub.author_name || "",
       html: pub.content || "",
-      options: { dropCap: true, justify: true, paragraphIndent: true, paperTexture: true },
+      options: { justify: !!pub.render_justify, paragraphIndent: !!pub.render_indent, paperTexture: true },
       async onPage(canvas) {
         const url = canvas.toDataURL("image/jpeg", 0.95);
         setPages(prev => [...prev, url]);
@@ -2612,6 +2693,7 @@ export default function App() {
     window.location.pathname.startsWith("/v/") ? window.location.pathname.slice(3) : "");
   const [publishModalDoc, setPublishModalDoc] = useState(null);
   const [font, setFont]               = useState(() => localStorage.getItem("inkk_font") || "garamond");
+  const [titleCapsOn, setTitleCapsOn] = useState(() => localStorage.getItem("inkk_title_caps") !== "0");
   const [showLanding, setShowLanding] = useState(() => !localStorage.getItem("inkk_visited"));
   const [hsModalOpen, setHsModalOpen] = useState(false);
   const [hsScoreOpen, setHsScoreOpen]   = useState(false);
@@ -2668,8 +2750,21 @@ export default function App() {
   useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
   useEffect(() => { optInRef.current = researchOptIn; }, [researchOptIn]);
   useEffect(() => { localStorage.setItem("inkk_font", font); }, [font]);
+  useEffect(() => { localStorage.setItem("inkk_title_caps", titleCapsOn ? "1" : "0"); }, [titleCapsOn]);
   useEffect(() => {
     fetch("/drop_caps/manifest.json").then(r => r.json()).then(setDropCapImages).catch(() => {});
+  }, []);
+
+  // Safety net: never let a file dropped outside the editor navigate the app
+  // away (the browser's default for a file drop is to open it).
+  useEffect(() => {
+    const prevent = (e) => { if (Array.from(e.dataTransfer?.types || []).includes("Files")) e.preventDefault(); };
+    window.addEventListener("dragover", prevent);
+    window.addEventListener("drop", prevent);
+    return () => {
+      window.removeEventListener("dragover", prevent);
+      window.removeEventListener("drop", prevent);
+    };
   }, []);
 
   // Online/offline — drives the "offline — saved locally" indicator.
@@ -3146,10 +3241,10 @@ export default function App() {
     setPublishModalDoc({ ...doc, content });
   }, [activeId]);
 
-  const confirmPublish = useCallback(async (title, authorName) => {
+  const confirmPublish = useCallback(async (title, authorName, renderOpts) => {
     if (!publishModalDoc) return "No document selected.";
     const wasAlreadyPublished = publishedDocIds.has(publishModalDoc.id);
-    const { error, code, verified, contentHash } = await doPublish(publishModalDoc, userRef.current, title, authorName, profile?.username);
+    const { error, code, verified, contentHash } = await doPublish(publishModalDoc, userRef.current, title, authorName, profile?.username, renderOpts);
     if (!error) {
       const docId = publishModalDoc.id;
       setPublishedDocIds(prev => new Set([...prev, docId]));
@@ -3400,9 +3495,19 @@ export default function App() {
     };
   }, [imgSelActive, clearImageSel]);
 
-  const onTitleInput = useCallback(() => {
+  const onTitleInput = useCallback((e) => {
     const el = titleEditorRef.current;
     if (!el) return;
+    // Live title-case finished words as you type (skip during IME composition).
+    if (titleCapsOn && !(e && e.nativeEvent && e.nativeEvent.isComposing)) {
+      const text = el.textContent || "";
+      const cased = liveTitleCase(text);
+      if (cased !== text) {
+        const off = titleCaretOffset(el);
+        el.textContent = cased;
+        if (off != null) setTitleCaret(el, off);
+      }
+    }
     titleRef.current = el.innerHTML;
     setSaveStatus("saving");
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -3419,26 +3524,47 @@ export default function App() {
       });
       setSaveStatus("saved");
     }, 500);
-  }, [activeId]);
+  }, [activeId, titleCapsOn]);
 
+  // Apply title-case to the title when the user finishes it (blur / Enter),
+  // unless they've turned auto-capitalization off.
+  const finalizeTitle = useCallback(() => {
+    const el = titleEditorRef.current;
+    if (!el) return;
+    if (titleCapsOn) {
+      const current = el.textContent || "";
+      const cased = titleCase(current);
+      if (cased && cased !== current) el.textContent = cased;
+    }
+    titleRef.current = el.innerHTML ?? "";
+    onTitleInput();
+  }, [titleCapsOn, onTitleInput]);
 
   const handleEditorDrop = useCallback(async (e) => {
+    // Only intercept file drops; let text/other drops behave normally.
+    if (!Array.from(e.dataTransfer?.types || []).includes("Files")) return;
+    e.preventDefault();   // stop the browser from opening the dropped file
     const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith("image/"));
     if (!files.length) return;
-    e.preventDefault();
-    const range = caretRangeAt(e.clientX, e.clientY);
+    const editor = editorRef.current;
+    if (!editor) return;
+    // Insert at the drop point if it lands inside the body; otherwise append.
+    let range = caretRangeAt(e.clientX, e.clientY);
+    if (!range || !editor.contains(range.startContainer)) range = null;
     let lastImg = null;
+    let failed = false;
     for (const file of files) {
       const src = await compressImage(file);
+      if (!src) { failed = true; continue; }   // undecodable (e.g. HEIC) — skip
       const img = document.createElement("img");
       img.src = src;
       if (range) { range.insertNode(img); range.collapse(false); }
-      else { editorRef.current?.appendChild(img); }
+      else editor.appendChild(img);
       lastImg = img;
     }
-    onInput();
-    if (lastImg) selectImageWhenReady(lastImg);
-  }, [onInput, selectImageWhenReady]);
+    if (lastImg) { onInput(); selectImageWhenReady(lastImg); }
+    if (failed && !lastImg) addToast("That image format isn’t supported. Try a JPEG or PNG.");
+  }, [onInput, selectImageWhenReady, addToast]);
 
   const handleEditorPaste = useCallback(async (e) => {
     const items = Array.from(e.clipboardData?.items || []);
@@ -3448,6 +3574,7 @@ export default function App() {
       const file = imageItem.getAsFile();
       if (!file) return;
       const src = await compressImage(file);
+      if (!src) { addToast("That image format isn’t supported. Try a JPEG or PNG."); return; }
       const img = document.createElement("img");
       img.src = src;
       const sel = window.getSelection();
@@ -3467,7 +3594,7 @@ export default function App() {
     e.preventDefault();
     const text = e.clipboardData?.getData("text/plain") || "";
     if (text) document.execCommand("insertText", false, text);
-  }, [onInput, selectImageWhenReady]);
+  }, [onInput, selectImageWhenReady, addToast]);
 
   // ─ PDF export ───────────────────────────────────────────────────────────────
   //
@@ -3485,8 +3612,8 @@ export default function App() {
       format === "png-portrait" ? "portrait" :
       "book"
     ];
-    // PNG outputs default to inkk background; user can override.
-    const paperTexture = style.paperTexture ?? (format === "pdf");
+    // PDF keeps the paper look; PNG exports on the clean inkk background.
+    const paperTexture = (format === "pdf");
     // Verification certificate for this piece, if it's certified. Written into
     // the PDF's (invisible) document metadata only — the code is surfaced in
     // the app (Profile, reading view, Verify tab), not stamped on the page.
@@ -3509,10 +3636,8 @@ export default function App() {
     const renderOptions = {
       pageW: preset.w,
       pageH: preset.h,
-      dropCap:         style.dropCap         ?? true,
-      justify:         style.justify         ?? true,
-      titleGap:        style.titleGap        ?? "normal",
-      paragraphIndent: style.paragraphIndent ?? true,
+      justify:         style.justify         ?? false,
+      paragraphIndent: style.paragraphIndent ?? false,
       paperTexture,
     };
 
@@ -3724,7 +3849,7 @@ export default function App() {
       title: stripHtml(titleRef.current) || "Untitled",
       byline: profileRef.current?.display_name || profileRef.current?.username || "",
       html: contentRef.current || "",
-      options: { dropCap: true, justify: true, paragraphIndent: true, paperTexture: true },
+      options: { justify: false, paragraphIndent: false, paperTexture: true },
       async onPage(canvas) {
         const url = canvas.toDataURL("image/jpeg", 0.95);
         setPreviewPages(prev => [...prev, url]);
@@ -3894,6 +4019,17 @@ export default function App() {
                 </div>
               )}
             </div>
+          )}
+          {isEditor && (
+            <button
+              className={`icon-btn title-caps-btn ${menuClass}${titleCapsOn ? " active" : ""}`}
+              onClick={() => setTitleCapsOn(v => !v)}
+              title={titleCapsOn
+                ? "Title capitalization is on — titles auto-capitalize. Click to turn off."
+                : "Title capitalization is off — titles stay exactly as typed. Click to turn on."}
+            >
+              <span className="title-caps-glyph">Aa</span>
+            </button>
           )}
           {isEditor && hasContent && (
             <button
@@ -4067,6 +4203,9 @@ export default function App() {
         ref={containerRef}
         className={words > 0 ? "writing-started" : ""}
         style={{ display: isEditor ? "" : "none" }}
+        onDrop={handleEditorDrop}
+        onDragEnter={e => { if (Array.from(e.dataTransfer?.types || []).includes("Files")) e.preventDefault(); }}
+        onDragOver={e => { if (Array.from(e.dataTransfer?.types || []).includes("Files")) e.preventDefault(); }}
       >
         <div
           id="title-input"
@@ -4077,8 +4216,8 @@ export default function App() {
           data-placeholder="Title"
           className={font === "arial" ? "font-arial" : ""}
           onInput={onTitleInput}
-          onBlur={() => { titleRef.current = titleEditorRef.current?.innerHTML ?? ""; }}
-          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); titleRef.current = titleEditorRef.current?.innerHTML ?? ""; editorRef.current?.focus(); } }}
+          onBlur={finalizeTitle}
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); finalizeTitle(); editorRef.current?.focus(); } }}
           onPaste={e => {
             e.preventDefault();
             const text = (e.clipboardData?.getData("text/plain") || "").replace(/\s*\n\s*/g, " ");
@@ -4096,8 +4235,6 @@ export default function App() {
             autoCorrect="off"
             autoCapitalize="off"
             onInput={onInput}
-            onDrop={handleEditorDrop}
-            onDragOver={e => { if (Array.from(e.dataTransfer?.items || []).some(i => i.type.startsWith("image/"))) e.preventDefault(); }}
             onPaste={handleEditorPaste}
             onClick={e => { if (e.target.tagName === "IMG") selectEditorImage(e.target); else clearImageSel(); }}
             onKeyDown={() => { if (imgElRef.current) clearImageSel(); }}

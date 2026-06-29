@@ -3599,3 +3599,14 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
 .img-tb-btn:hover { background: var(--surface); color: var(--text); }
 .img-tb-btn.active { color: var(--text); background: var(--surface); }
 .img-tb-btn:last-child:hover { color: #9a6a62; }
+
+/* ─── Title auto-capitalization toggle ────────────────────────────────────── */
+.title-caps-btn { opacity: 0.45; transition: opacity 0.18s, color 0.18s; }
+.title-caps-btn:hover { opacity: 1; }
+.title-caps-btn.active { opacity: 1; color: var(--text); }
+.title-caps-glyph {
+  font-family: var(--font-serif);
+  font-size: 0.98rem;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
