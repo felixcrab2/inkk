@@ -139,4 +139,22 @@ describe("extractFeatures", () => {
     const f = extractFeatures(e, { words: 6 });
     expect(f.iki.cv).toBeLessThan(0.05);
   });
+
+  test("velocity ignores long idle gaps (left the tab open)", () => {
+    // Two ~15s bursts of steady ~5 chars/sec typing, separated by a 1-hour
+    // idle gap. Wall-clock span is ~1h; active writing span is only ~30s.
+    let t = 1_000_000, caret = 0;
+    const e = [];
+    const burst = (n) => {
+      for (let i = 0; i < n; i++) { t += 200; caret++; e.push(ev({ kind: "input", len_delta: 1, caret_pos: caret, t })); }
+    };
+    burst(75);                  // ~15s of typing
+    t += 60 * 60 * 1000;        // step away for an hour
+    burst(75);                  // ~15s more
+    const f = extractFeatures(e, { words: 30 });
+    // ~5 chars/sec = ~60 wpm; the idle hour must not crush this toward zero.
+    expect(f.avg_wpm).toBeGreaterThan(40);
+    // The whole session should not be sliced into dozens of near-empty windows.
+    expect(f.velocity_series.length).toBeLessThanOrEqual(24);
+  });
 });

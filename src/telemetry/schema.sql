@@ -184,12 +184,16 @@ drop policy if exists "comments_delete_own"  on public.comments;
 create policy "comments_delete_own"  on public.comments for delete using (auth.uid() = user_id);
 
 -- ── 10. Verification certificates ──────────────────────────────────────────
--- An immutable ledger: one row per published version. It stores only metadata
+-- An immutable ledger: one row per certified version. It stores only metadata
 -- and a content hash — never a copy of the text and never the keystroke
 -- process — so the full audit trail of every version stays tiny. Editing a
--- piece and re-publishing issues a NEW code; old codes keep verifying the
+-- piece and re-certifying issues a NEW code; old codes keep verifying the
 -- older text via their stored hash. (The keystroke stream lives in
 -- writing_events, gated by opt-in; the certificate never duplicates it.)
+--
+-- A certificate is independent of publishing: a document can be certified to
+-- get a code WITHOUT a public feed post. Whether a code currently maps to a
+-- live publication is derived (verify_by_code joins publications below).
 
 -- "Current" pointer on the publication for quick display / lookup.
 alter table public.publications
@@ -197,6 +201,12 @@ alter table public.publications
   add column if not exists content_hash text;
 create unique index if not exists publications_verify_code_idx
   on public.publications(verify_code) where verify_code is not null;
+
+-- Same pointer on the document, so a piece can carry a code before (or without)
+-- ever being published.
+alter table public.documents
+  add column if not exists verify_code  text,
+  add column if not exists content_hash text;
 
 create table if not exists public.verifications (
   code            text primary key,                 -- INKK-XXXX-XXXX-XXXX
@@ -235,6 +245,9 @@ create policy "ver_delete_own" on public.verifications
 
 -- Public verify-by-code: returns one certificate by exact code, for anyone
 -- (readers checking an exported PDF are usually logged out). Exact match only.
+-- publication_id is DERIVED by joining publications on the (current) verify_code,
+-- so a code maps to a live piece only while it's the published version — private
+-- and superseded codes resolve with a null publication_id.
 create or replace function public.verify_by_code(p_code text)
 returns table (
   code text, publication_id uuid, title text, author_name text,
@@ -245,9 +258,10 @@ language sql
 security definer
 set search_path = public
 as $$
-  select v.code, v.publication_id, v.title, v.author_name, v.author_username,
+  select v.code, p.id as publication_id, v.title, v.author_name, v.author_username,
          v.content_hash, v.word_count, v.human_score, v.score_tier, v.verified, v.issued_at
   from public.verifications v
+  left join public.publications p on p.verify_code = v.code
   where v.code = upper(btrim(p_code))
   limit 1;
 $$;

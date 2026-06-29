@@ -56,7 +56,7 @@ const FOOTER_FROM_BOTTOM = 34;
 // Typography (pt).
 // Title is kept only slightly larger than the body so the rendered page
 // matches the editor, where the title sits just above the prose size.
-const T_TITLE   = 12.5;
+const T_TITLE   = 12.0;
 const T_HEADER  = 8.5;
 const T_BODY    = 11.25;
 const T_DROPCAP = 42;
@@ -65,6 +65,10 @@ const T_FOOTER  = 10.5;
 // Letter-spacing (em) for the uppercase running head — the wide tracking is
 // what makes small caps read as deliberate rather than faded.
 const HEADER_TRACK = 0.16;
+
+// Letter-spacing (em) for the page-1 title. Kept very tight to match the
+// editor's uppercase title (CSS letter-spacing: -0.02em).
+const TITLE_TRACK = -0.02;
 
 // Drop cap spans this many body lines.
 // At T_DROPCAP=42pt, cap-height ≈ 0.72 × 42 = 30.2pt = 1.73 body lines,
@@ -558,8 +562,9 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
   const otherPageHeight = bodyBottom - bodyTop;
 
   // ── Title (wrapped) ──────────────────────────────────────────────────────
-  // Rendered all-caps to match the editor's uppercase title treatment.
-  const titleStr  = (title  || "").trim().toUpperCase();
+  // Rendered as typed (natural case) to match the editor title. The running
+  // head still small-caps it (book convention) where it is drawn.
+  const titleStr  = (title  || "").trim();
   const bylineStr = (byline || "").trim();
   let titleLines = [];
   let titleBlockH = 0;
@@ -689,9 +694,8 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
         if (isFirst && titleStr) {
           ctx.font = font(T_TITLE, false, true);
           ctx.fillStyle = INK_TITLE;
-          ctx.textAlign = "center";
           for (const ln of titleLines) {
-            ctx.fillText(ln, cw / 2, y + T_TITLE * PX);
+            drawTrackedCentered(ctx, ln, cw / 2, y + T_TITLE * PX, T_TITLE, TITLE_TRACK);
             y += T_TITLE * PX * TITLE_LINE_MULT;
           }
           y += TITLE_BODY_GAP;

@@ -40,6 +40,7 @@ function createDoc() {
     writingTimeSecs: 0, revisionCount: 0,
     keystrokes: 0, deletions: 0, pastes: 0,
     humanScore: null, scoreTier: null, scoreFeatures: null,
+    verifyCode: null, contentHash: null,
   };
 }
 
@@ -47,6 +48,7 @@ const DOC_DEFAULTS = {
   title: "", writingTimeSecs: 0, revisionCount: 0,
   keystrokes: 0, deletions: 0, pastes: 0,
   humanScore: null, scoreTier: null, scoreFeatures: null,
+  verifyCode: null, contentHash: null,
 };
 
 function normaliseDoc(d) {
@@ -309,7 +311,7 @@ async function fetchCloudDocs() {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("documents")
-    .select("id, content, updated_at, total_writing_secs, revision_count, keystrokes, deletions, pastes, human_score, score_tier, score_features");
+    .select("id, content, updated_at, total_writing_secs, revision_count, keystrokes, deletions, pastes, human_score, score_tier, score_features, verify_code, content_hash");
   if (error || !data) return [];
   return data.map(r => ({
     id: r.id,
@@ -323,6 +325,8 @@ async function fetchCloudDocs() {
     humanScore: r.human_score,
     scoreTier: r.score_tier,
     scoreFeatures: r.score_features || null,
+    verifyCode: r.verify_code ?? null,
+    contentHash: r.content_hash ?? null,
   }));
 }
 
@@ -340,6 +344,8 @@ async function pushDocToCloud(doc, userId) {
     human_score:        doc.humanScore     ?? null,
     score_tier:         doc.scoreTier      ?? null,
     score_features:     doc.scoreFeatures  ?? null,
+    verify_code:        doc.verifyCode     ?? null,
+    content_hash:       doc.contentHash    ?? null,
   });
 }
 
@@ -367,6 +373,20 @@ function getRelCount(rel) {
   if (!rel) return 0;
   if (Array.isArray(rel)) return rel[0]?.count ?? 0;
   return rel?.count ?? 0;
+}
+
+// ─── Browser fullscreen ──────────────────────────────────────────────────────
+// Genuine fullscreen (hides the browser's tab strip / address bar). Must be
+// called from a user gesture; silently no-ops where unsupported (e.g. iOS Safari).
+function enterBrowserFullscreen() {
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (req) { try { Promise.resolve(req.call(el)).catch(() => {}); } catch {} }
+}
+function exitBrowserFullscreen() {
+  if (!(document.fullscreenElement || document.webkitFullscreenElement)) return;
+  const exit = document.exitFullscreen || document.webkitExitFullscreen;
+  if (exit) { try { Promise.resolve(exit.call(document)).catch(() => {}); } catch {} }
 }
 
 // ─── Likes ─────────────────────────────────────────────────────────────────
@@ -595,27 +615,52 @@ async function fetchMyPublications(userId) {
   return data;
 }
 
-// Publish (or re-publish) a document, and issue/refresh its human-signal
-// certificate. Returns { error, code, verified } — the code is the current
-// verification handle for the published piece.
-async function doPublish(doc, user, title, authorName, authorUsername) {
-  if (!supabase || !user) return { error: "Not signed in." };
-  const { data: existing, error: fetchErr } = await supabase
-    .from("publications").select("id, content_hash, verify_code").eq("doc_id", doc.id).maybeSingle();
-  if (fetchErr) return { error: fetchErr.message };
-
-  // Bind the certificate to the text. If the text is unchanged from the last
-  // publish, keep the same code (no-op re-publishes don't rotate it); if it
-  // changed, mint a fresh code so the old one keeps verifying the older text.
-  // A certificate is only meaningful with a content hash — without one (e.g.
-  // Web Crypto unavailable in an insecure context) we publish without touching
-  // the verify fields rather than write an unbacked code.
+// Ensure the document's current text has a certificate, minting one if needed.
+// This is the verification primitive — it does NOT publish. Returns
+// { code, verified, contentHash, isNew } (code null when hashing is unavailable).
+//
+// The code is bound to the text: if the doc already carries a code for this
+// exact hash we reuse it; otherwise we mint a fresh one and append an immutable
+// row to the ledger, so old codes keep verifying the older text.
+async function ensureCertificate(doc, user, { title, authorName, authorUsername }) {
   const contentHash = await hashContent(doc.content);
   const verified    = isVerifiedTier(doc.scoreTier);
-  const unchanged   = !!(existing?.verify_code && existing.content_hash && contentHash
-                      && existing.content_hash === contentHash);
-  const code        = contentHash ? (unchanged ? existing.verify_code : makeVerifyCode())
-                                  : (existing?.verify_code || null);
+  if (!contentHash) {
+    // No Web Crypto (e.g. insecure context) — can't bind a certificate.
+    return { code: doc.verifyCode || null, verified, contentHash: doc.contentHash || null, isNew: false };
+  }
+  if (doc.verifyCode && doc.contentHash && doc.contentHash === contentHash) {
+    return { code: doc.verifyCode, verified, contentHash, isNew: false };
+  }
+  const code = makeVerifyCode();
+  const { error } = await supabase.from("verifications").insert({
+    code,
+    doc_id: doc.id,
+    user_id: user.id,
+    title: title ?? null,
+    author_name: authorName ?? null,
+    author_username: authorUsername || null,
+    content_hash: contentHash,
+    word_count: wordCount(doc.content),
+    human_score: doc.humanScore ?? null,
+    score_tier:  doc.scoreTier  ?? null,
+    verified,
+  });
+  if (error) return { code: doc.verifyCode || null, verified, contentHash: doc.contentHash || null, isNew: false, error: error.message };
+  return { code, verified, contentHash, isNew: true };
+}
+
+// Publish (or re-publish) a document to the feed. Publishing certifies the
+// piece too — reusing the document's existing code when the text is unchanged.
+// Returns { error, code, verified }.
+async function doPublish(doc, user, title, authorName, authorUsername) {
+  if (!supabase || !user) return { error: "Not signed in." };
+
+  const cert = await ensureCertificate(doc, user, { title, authorName, authorUsername });
+
+  const { data: existing, error: fetchErr } = await supabase
+    .from("publications").select("id").eq("doc_id", doc.id).maybeSingle();
+  if (fetchErr) return { error: fetchErr.message };
 
   const payload = {
     title, content: doc.content, author_name: authorName,
@@ -638,53 +683,26 @@ async function doPublish(doc, user, title, authorName, authorUsername) {
     payload.moderation_scores     = mod.scores;
     payload.moderation_checked_at = new Date().toISOString();
   }
-  // Only write the verify fields when we actually have a hash to back them.
-  if (contentHash) {
-    payload.verify_code  = code;
-    payload.content_hash = contentHash;
+  if (cert.code) {
+    payload.verify_code  = cert.code;
+    payload.content_hash = cert.contentHash;
   }
 
-  let error, publicationId = existing?.id || null;
+  let error;
   if (existing) {
     ({ error } = await supabase.from("publications").update(payload).eq("id", existing.id));
     if (error && /column/i.test(error.message || "")) {
       ({ error } = await supabase.from("publications").update(stripModeration(payload)).eq("id", existing.id));
     }
   } else {
-    let { data, error: insErr } = await supabase
-      .from("publications").insert({ ...payload, doc_id: doc.id, user_id: user.id })
-      .select("id").maybeSingle();
-    if (insErr && /column/i.test(insErr.message || "")) {
-      ({ data, error: insErr } = await supabase
-        .from("publications").insert({ ...stripModeration(payload), doc_id: doc.id, user_id: user.id })
-        .select("id").maybeSingle());
+    ({ error } = await supabase.from("publications").insert({ ...payload, doc_id: doc.id, user_id: user.id }));
+    if (error && /column/i.test(error.message || "")) {
+      ({ error } = await supabase.from("publications").insert({ ...stripModeration(payload), doc_id: doc.id, user_id: user.id }));
     }
-    error = insErr;
-    publicationId = data?.id || null;
   }
   if (error) return { error: error.message };
 
-  // Append an immutable certificate to the ledger (skip when the code was
-  // reused — that exact certificate already exists). Best-effort: a failure
-  // here shouldn't block the publish itself.
-  if (!unchanged && contentHash) {
-    await supabase.from("verifications").insert({
-      code,
-      publication_id: publicationId,
-      doc_id: doc.id,
-      user_id: user.id,
-      title,
-      author_name: authorName,
-      author_username: authorUsername || null,
-      content_hash: contentHash,
-      word_count: wordCount(doc.content),
-      human_score: doc.humanScore ?? null,
-      score_tier:  doc.scoreTier  ?? null,
-      verified,
-    });
-  }
-
-  return { error: null, code, verified };
+  return { error: null, code: cert.code, verified: cert.verified, contentHash: cert.contentHash };
 }
 
 async function doUnpublish(docId) {
@@ -1714,6 +1732,16 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
                     <div className="pac-main">
                       <span className="pac-title">{title || "Untitled"}</span>
                       <span className="pac-meta">{wc} words · {formatDate(new Date(d.updatedAt).toISOString())}</span>
+                      {d.verifyCode && (
+                        <div className="pac-code" onClick={e => e.stopPropagation()}>
+                          <span className="pac-code-mark" aria-hidden="true">◇</span>
+                          <button className="pac-code-val" title="Copy verification code" onClick={() => copyCode(d.verifyCode)}>
+                            {d.verifyCode}
+                            <span className="pac-code-copied">{copiedCode === d.verifyCode ? "copied" : "copy"}</span>
+                          </button>
+                          <button className="pac-code-link" onClick={() => onOpenVerify?.(d.verifyCode)}>Verify →</button>
+                        </div>
+                      )}
                     </div>
                     {!confirming ? (
                       <div className="pac-actions" onClick={e => e.stopPropagation()}>
@@ -2495,7 +2523,8 @@ export default function App() {
   const [readingPub, setReadingPub]   = useState(null);
   const [readingFocus, setReadingFocus] = useState(null);
   const [publishedDocIds, setPublishedDocIds] = useState(new Set());
-  const [pubCerts, setPubCerts]       = useState({});   // docId → { code, verified }
+  const [certMenuOpen, setCertMenuOpen] = useState(false);
+  const [certifying, setCertifying]   = useState(false);
   const [verifyCode, setVerifyCode]   = useState(() =>
     window.location.pathname.startsWith("/v/") ? window.location.pathname.slice(3) : "");
   const [publishModalDoc, setPublishModalDoc] = useState(null);
@@ -2574,6 +2603,34 @@ export default function App() {
     else document.body.classList.remove("focus-mode");
   }, [focusMode]);
 
+  // Focus mode also drives genuine browser fullscreen. Both helpers must run
+  // straight off the user gesture (click / keypress), so toggle here rather
+  // than inside an effect.
+  const toggleFocusMode = useCallback(() => {
+    setFocusMode(prev => {
+      if (prev) exitBrowserFullscreen(); else enterBrowserFullscreen();
+      return !prev;
+    });
+  }, []);
+  const exitFocusMode = useCallback(() => {
+    exitBrowserFullscreen();
+    setFocusMode(false);
+  }, []);
+
+  // Keep focus mode in sync when the user leaves native fullscreen via Esc / F11.
+  useEffect(() => {
+    const onFsChange = () => {
+      const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      if (!isFs) setFocusMode(false);
+    };
+    document.addEventListener("fullscreenchange", onFsChange);
+    document.addEventListener("webkitfullscreenchange", onFsChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFsChange);
+      document.removeEventListener("webkitfullscreenchange", onFsChange);
+    };
+  }, []);
+
   useEffect(() => {
     if (!showLanding && !isMobileRef.current) editorRef.current?.focus();
   }, [showLanding]);
@@ -2634,6 +2691,29 @@ export default function App() {
           mid_revisions: features.mid_revisions,
           typo_corrections: features.typo_corrections,
           pause_count_500: features.pause_count_500,
+          // Full nine-dimension sub-signal vector (value + confidence, 0..1) for
+          // the radar "fingerprint". Stripped of the heavier `raw` payloads.
+          dims: Object.entries(score.subs || {}).map(([key, s]) => ({
+            key,
+            value: Math.round((s.value || 0) * 1000) / 1000,
+            conf:  Math.round((s.conf  || 0) * 1000) / 1000,
+          })),
+          // Pause distribution buckets for the rhythm chart.
+          pause_micro: Math.max(0, (features.pause_count_500 || 0) - (features.pause_count_2000 || 0)),
+          pause_think: Math.max(0, (features.pause_count_2000 || 0) - (features.pause_count_10000 || 0)),
+          pause_long:  features.pause_count_10000 || 0,
+          // Cadence + provenance figures.
+          iki_median:      Math.round(features.iki?.median || 0),
+          iki_n:           features.iki?.n || 0,
+          dwell_mean:      Math.round(features.dwell?.mean || 0),
+          dwell_n:         features.dwell?.n || 0,
+          deleted_chars:   features.deleted_chars   || 0,
+          pasted_chars:    features.pasted_chars    || 0,
+          typing_events:   features.typing_events   || 0,
+          deletion_events: features.deletion_events || 0,
+          burst_total_ms:  features.burst_total_ms  || 0,
+          total_time_ms:   features.total_time_ms   || 0,
+          nav_events:      features.nav_events      || 0,
           velocity_series:   score.velocity_series  || [],
           avg_wpm:           score.avg_wpm          || 0,
           peak_wpm:          score.peak_wpm         || 0,
@@ -2819,10 +2899,18 @@ export default function App() {
       if (docToLoad) loadDocIntoEditor(docToLoad, { preserveLocalTitle: true });
       const myPubs = await fetchMyPublications(signedInUser.id);
       setPublishedDocIds(new Set(myPubs.map(p => p.doc_id).filter(Boolean)));
-      setPubCerts(Object.fromEntries(
+      // Backfill verify codes from publications onto any doc that doesn't carry
+      // one yet (published on another device, or before doc-level certs).
+      const codeByDoc = new Map(
         myPubs.filter(p => p.doc_id && p.verify_code)
-          .map(p => [p.doc_id, { code: p.verify_code, verified: isVerifiedTier(p.score_tier) }])
-      ));
+          .map(p => [p.doc_id, { code: p.verify_code, hash: p.content_hash || null }])
+      );
+      if (codeByDoc.size) {
+        setDocs(prev => prev.map(d => {
+          const c = codeByDoc.get(d.id);
+          return (c && !d.verifyCode) ? { ...d, verifyCode: c.code, contentHash: d.contentHash || c.hash } : d;
+        }));
+      }
       const prof = await fetchProfile(signedInUser.id);
       if (prof) {
         setProfile(prof);
@@ -2966,16 +3054,53 @@ export default function App() {
   const confirmPublish = useCallback(async (title, authorName) => {
     if (!publishModalDoc) return "No document selected.";
     const wasAlreadyPublished = publishedDocIds.has(publishModalDoc.id);
-    const { error, code, verified } = await doPublish(publishModalDoc, userRef.current, title, authorName, profile?.username);
+    const { error, code, verified, contentHash } = await doPublish(publishModalDoc, userRef.current, title, authorName, profile?.username);
     if (!error) {
       const docId = publishModalDoc.id;
       setPublishedDocIds(prev => new Set([...prev, docId]));
-      if (code) setPubCerts(prev => ({ ...prev, [docId]: { code, verified } }));
+      // Persist the code onto the document so the editor shows it and it survives reload.
+      if (code) {
+        setDocs(prev => {
+          const next = prev.map(d => d.id === docId ? { ...d, verifyCode: code, contentHash: contentHash ?? d.contentHash } : d);
+          const updated = next.find(d => d.id === docId);
+          if (updated) pushDocToCloud(updated, userRef.current.id);
+          return next;
+        });
+      }
       setPublishModalDoc(null);
       addToast(verified ? "Published · human-verified." : (wasAlreadyPublished ? "Updated." : "Published to feed."));
     }
     return error;
   }, [publishModalDoc, publishedDocIds, profile, addToast]);
+
+  // Certify the active document — mint/show a verification code WITHOUT
+  // publishing it to the feed.
+  const certifyActiveDoc = useCallback(async () => {
+    if (!userRef.current) { setAuthOpen(true); return; }
+    const docId = activeIdRef.current;
+    const base = docsRef.current.find(d => d.id === docId);
+    if (!base) return;
+    const liveDoc = {
+      ...base,
+      content: contentRef.current || base.content,
+      title: stripHtml(titleRef.current || "") || base.title,
+    };
+    if (!stripHtml(liveDoc.content || "").trim()) return;
+    setCertifying(true);
+    const authorName = profile?.display_name || profile?.username || userRef.current.email?.split("@")[0] || "Anonymous";
+    const cert = await ensureCertificate(liveDoc, userRef.current, { title: stripHtml(titleRef.current || ""), authorName, authorUsername: profile?.username });
+    setCertifying(false);
+    if (!cert.code) { addToast(cert.error ? "Could not certify." : "Certification needs a secure connection."); return; }
+    setDocs(prev => {
+      const next = prev.map(d => d.id === docId ? { ...d, verifyCode: cert.code, contentHash: cert.contentHash } : d);
+      const updated = next.find(d => d.id === docId);
+      if (updated) pushDocToCloud(updated, userRef.current.id);
+      saveState(next, docId);
+      return next;
+    });
+    setCertMenuOpen(true);
+    if (cert.isNew) addToast(cert.verified ? "Certified · human-verified." : "Certified.");
+  }, [profile, addToast]);
 
   const openUserProfile = useCallback(async (userIdOrProfile) => {
     const prof = typeof userIdOrProfile === "string"
@@ -3188,23 +3313,24 @@ export default function App() {
     ];
     // PNG outputs default to inkk background; user can override.
     const paperTexture = style.paperTexture ?? (format === "pdf");
-    // Verification certificate for this piece, if it's published. Written into
-    // the PDF's (invisible) document metadata; the code is surfaced in the app
-    // (Profile, reading view, Verify tab), not stamped on the page.
-    let cert = pubCerts[activeId];
-    // Fallback: if the cert isn't in local state yet (published in another
-    // session, or state not hydrated before download), look it up directly so
-    // the PDF still reliably carries the verification code in its metadata.
-    if (!cert?.code && supabase && userRef.current) {
+    // Verification certificate for this piece, if it's certified. Written into
+    // the PDF's (invisible) document metadata only — the code is surfaced in
+    // the app (Profile, reading view, Verify tab), not stamped on the page.
+    const activeDoc = docsRef.current.find(d => d.id === activeIdRef.current);
+    let certCode = activeDoc?.verifyCode || null;
+    let certTier = activeDoc?.scoreTier || null;
+    // Fallback: if the code isn't hydrated into local state yet (certified in
+    // another session), look it up so the PDF still reliably carries it.
+    if (!certCode && supabase && userRef.current) {
       const { data } = await supabase
-        .from("publications")
+        .from("documents")
         .select("verify_code, score_tier")
-        .eq("doc_id", activeId)
+        .eq("id", activeIdRef.current)
         .maybeSingle();
-      if (data?.verify_code) cert = { code: data.verify_code, verified: isVerifiedTier(data.score_tier) };
+      if (data?.verify_code) { certCode = data.verify_code; certTier = data.score_tier; }
     }
-    const verify = cert?.code
-      ? { code: cert.code, verified: !!cert.verified, host: window.location.host }
+    const verify = certCode
+      ? { code: certCode, verified: isVerifiedTier(certTier), host: window.location.host }
       : null;
     const renderOptions = {
       pageW: preset.w,
@@ -3273,7 +3399,7 @@ export default function App() {
       addToast("Download failed.");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [addToast, profile?.display_name, profile?.username, pubCerts, activeId]);
+  }, [addToast, profile?.display_name, profile?.username]);
 
   const openDownloadModal = useCallback(() => {
     if (!stripHtml(contentRef.current || "").trim()) return;
@@ -3285,11 +3411,25 @@ export default function App() {
   useEffect(() => {
     const handler = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); if (view === "editor") openDownloadModal(); }
-      if ((e.metaKey || e.ctrlKey) && e.key === ".") { e.preventDefault(); if (view === "editor") setFocusMode(v => !v); }
-      // No italics anywhere: block the browser's default Cmd+I / Ctrl+I in the editor.
-      if ((e.metaKey || e.ctrlKey) && (e.key === "i" || e.key === "I")) { e.preventDefault(); }
+      if ((e.metaKey || e.ctrlKey) && e.key === ".") { e.preventDefault(); if (view === "editor") toggleFocusMode(); }
+      // Cmd/Ctrl+I toggles italic in the title or body editor.
+      if ((e.metaKey || e.ctrlKey) && (e.key === "i" || e.key === "I")) {
+        e.preventDefault();
+        const active = document.activeElement;
+        if (active === editorRef.current || active === titleEditorRef.current) {
+          document.execCommand("italic");
+          if (active === titleEditorRef.current) onTitleInput(); else onInput();
+          try {
+            setFormatActive({
+              bold:   document.queryCommandState("bold"),
+              italic: document.queryCommandState("italic"),
+            });
+          } catch {}
+        }
+      }
       if (e.key === "Escape") {
-        if (focusMode) { setFocusMode(false); return; }
+        if (focusMode) { exitFocusMode(); return; }
+        if (certMenuOpen) { setCertMenuOpen(false); return; }
         if (publishMenuOpen) { setPublishMenuOpen(false); setConfirmUnpublishOpen(false); return; }
         if (publishModalDoc) { setPublishModalDoc(null); return; }
         if (downloadModalOpen) { setDownloadModalOpen(false); return; }
@@ -3300,7 +3440,7 @@ export default function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [openDownloadModal, view, focusMode, publishMenuOpen, publishModalDoc, downloadModalOpen, usernameModalOpen]);
+  }, [openDownloadModal, view, focusMode, certMenuOpen, toggleFocusMode, exitFocusMode, publishMenuOpen, publishModalDoc, downloadModalOpen, usernameModalOpen, onInput, onTitleInput]);
 
   // ─ mount ────────────────────────────────────────────────────────────────────
 
@@ -3428,6 +3568,9 @@ export default function App() {
   const sortedDocs   = [...docs].sort((a, b) => b.updatedAt - a.updatedAt);
   const hasContent   = words > 0;
   const isPublished  = publishedDocIds.has(activeId);
+  const activeDoc      = docs.find(d => d.id === activeId);
+  const activeCert     = activeDoc?.verifyCode || null;
+  const activeCertOk   = isVerifiedTier(activeDoc?.scoreTier);
 
   const openReading = useCallback((pub, opts = {}) => {
     setReadingFocus(opts.focus || null);
@@ -3488,6 +3631,45 @@ export default function App() {
         </div>
         <div id="top-bar-right">
           {isEditor && supabase && hasContent && (
+            <div id="cert-menu-wrap">
+              <button
+                id="cert-btn"
+                className={`${menuClass}${activeCert ? " is-certified" : ""}`}
+                title={activeCert ? "Verification code" : "Get a verification code — no need to publish"}
+                disabled={certifying}
+                onClick={() => {
+                  if (activeCert) setCertMenuOpen(v => !v);
+                  else certifyActiveDoc();
+                }}
+              >
+                <span className="cert-diamond" aria-hidden="true">◇</span>
+                <span className="btn-label">{certifying ? "Certifying…" : activeCert ? "Certified" : "Certify"}</span>
+              </button>
+              {activeCert && certMenuOpen && (
+                <div id="cert-menu">
+                  <span className="cert-menu-label">{activeCertOk ? "Human-verified" : "Verification code"}</span>
+                  <button
+                    className="cert-menu-code"
+                    title="Copy code"
+                    onClick={() => navigator.clipboard?.writeText(activeCert).then(() => addToast("Code copied."))}
+                  >{activeCert}</button>
+                  <p className="cert-menu-note">
+                    Proof this piece was written by hand. Share the code anywhere — anyone can check it.
+                    {!isPublished && " It stays private to you until you publish."}
+                  </p>
+                  <button
+                    className="cert-menu-link"
+                    onClick={() => { setCertMenuOpen(false); openVerify(activeCert); }}
+                  >Open verification →</button>
+                  <button
+                    className="cert-menu-link cert-menu-recertify"
+                    onClick={() => { setCertMenuOpen(false); certifyActiveDoc(); }}
+                  >Re-certify current text</button>
+                </div>
+              )}
+            </div>
+          )}
+          {isEditor && supabase && hasContent && (
             <div id="publish-menu-wrap">
               <button
                 id="publish-btn"
@@ -3508,22 +3690,6 @@ export default function App() {
                 <div id="publish-menu">
                   {!confirmUnpublishOpen ? (
                     <>
-                      {pubCerts[activeId]?.code && (
-                        <div className="publish-menu-cert">
-                          <span className="pmc-label">
-                            {pubCerts[activeId].verified ? "Human-verified" : "Verification code"}
-                          </span>
-                          <button
-                            className="pmc-code"
-                            title="Copy code"
-                            onClick={() => navigator.clipboard?.writeText(pubCerts[activeId].code).then(() => addToast("Code copied."))}
-                          >{pubCerts[activeId].code}</button>
-                          <button
-                            className="pmc-verify-link"
-                            onClick={() => { setPublishMenuOpen(false); openVerify(pubCerts[activeId].code); }}
-                          >Open verification →</button>
-                        </div>
-                      )}
                       <button className="publish-menu-item" onClick={() => {
                         setPublishMenuOpen(false);
                         const doc = docs.find(d => d.id === activeId);
@@ -3574,8 +3740,8 @@ export default function App() {
           {isEditor && (
             <button
               className={`icon-btn focus-btn ${menuClass}`}
-              onClick={() => setFocusMode(v => !v)}
-              title={focusMode ? "Exit focus mode  ⌘." : "Focus mode  ⌘."}
+              onClick={toggleFocusMode}
+              title={focusMode ? "Exit fullscreen  ⌘." : "Fullscreen  ⌘."}
             >
               {focusMode ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
             </button>
@@ -3771,6 +3937,12 @@ export default function App() {
           onMouseDown={e => { e.preventDefault(); applyFormat("bold"); }}
           title="Bold  ⌘B"
         ><b>B</b></button>
+        <button
+          type="button"
+          className={`format-btn${formatActive.italic ? " active" : ""}`}
+          onMouseDown={e => { e.preventDefault(); applyFormat("italic"); }}
+          title="Italic  ⌘I"
+        ><i>I</i></button>
       </div>
 
       {/* ── editor preview overlay ── */}
@@ -3936,13 +4108,14 @@ export default function App() {
 
       {/* ── focus mode exit ── */}
       {focusMode && (
-        <button id="focus-exit" onClick={() => setFocusMode(false)} title="Exit focus mode  ⌘.">
+        <button id="focus-exit" onClick={exitFocusMode} title="Exit fullscreen  ⌘.">
           <Minimize2 size={14} />
         </button>
       )}
 
       {/* ── publish menu backdrop ── */}
       {publishMenuOpen && <div id="publish-menu-backdrop" onClick={() => { setPublishMenuOpen(false); setConfirmUnpublishOpen(false); }} />}
+      {certMenuOpen && <div id="publish-menu-backdrop" onClick={() => setCertMenuOpen(false)} />}
 
       {/* ── toasts ── */}
       <Toasts toasts={toasts} />
