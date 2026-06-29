@@ -1594,9 +1594,10 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 /* ─── Identity masthead ────────────────────────────────────────────────── */
 #profile-header {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  text-align: center;
+  text-align: left;
+  gap: 18px;
   width: 100%;
   max-width: 520px;
   padding-bottom: 18px;
@@ -1605,19 +1606,18 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 #profile-avatar-wrap {
   position: relative;
   flex-shrink: 0;
-  margin-bottom: 12px;
 }
 
 #avatar-upload-btn {
   position: absolute;
   bottom: 0;
   right: 0;
-  width: 23px;
-  height: 23px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: var(--bg);
   border: 1px solid var(--border);
-  font-size: 0.66rem;
+  font-size: 0.6rem;
   color: var(--subtle);
   cursor: pointer;
   display: flex;
@@ -1632,12 +1632,12 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   position: absolute;
   top: 0;
   right: 0;
-  width: 21px;
-  height: 21px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: var(--bg);
   border: 1px solid var(--border);
-  font-size: 0.82rem;
+  font-size: 0.74rem;
   color: #9a6a62;
   cursor: pointer;
   display: flex;
@@ -1657,7 +1657,9 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 #profile-identity {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
+  flex: 1;
+  min-width: 0;
 }
 
 #profile-username {
@@ -2162,9 +2164,10 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .profile-edit-form {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 10px;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   max-width: 280px;
 }
 .profile-edit-input {
