@@ -345,14 +345,11 @@ body.focus-mode #hs-editor-status {
 body.focus-mode #text-container {
   top: 0 !important;
   bottom: 0 !important;
-  padding-top: 36vh;
+  padding-top: 18vh;
   -webkit-mask-image: none !important;
   mask-image: none !important;
 }
-/* In fullscreen, sit the title/body well down the screen (about a third down)
-   with only a small ~4vh settle once writing begins, so it stays low and barely
-   moves rather than jumping up toward the top. */
-body.focus-mode #text-container.writing-started { padding-top: 32vh; }
+body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 
 /* ─── Document panel ──────────────────────────────────────────────────────── */
 #panel-backdrop {
