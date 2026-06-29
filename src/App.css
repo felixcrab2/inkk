@@ -2414,6 +2414,7 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
 .reading-page-img {
   width: 100%;
   display: block;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08), 0 0 0 0.5px rgba(0, 0, 0, 0.10);
 }
 
 .reading-pages-loading {
