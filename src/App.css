@@ -408,7 +408,6 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
   font-family: var(--font-serif);
   font-size: 0.95rem;
   letter-spacing: -0.02em;
-  text-transform: uppercase;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
@@ -540,10 +539,9 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
   border: none;
   outline: none;
   font-family: var(--font-serif);
-  /* Small all-caps Cormorant at its natural (tight) spacing, matching how the
-     caps read when typed directly. The measure is narrower than the body so a
-     long title wraps to a second line sooner and never runs wider than the
-     prose below it. */
+  /* Cormorant title shown as typed (natural case) at tight spacing. The measure
+     is narrower than the body so a long title wraps to a second line sooner and
+     never runs wider than the prose below it. */
   font-weight: 600;
   font-style: normal;
   font-size: clamp(1.02rem, 1.6vw, 1.2rem);
@@ -552,7 +550,6 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
   margin-bottom: 22px;
   line-height: 1.32;
   letter-spacing: -0.02em;
-  text-transform: uppercase;
   text-align: center;
   text-wrap: balance;
   display: block;
@@ -860,7 +857,6 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
   font-weight: 600;
   line-height: 1.18;
   letter-spacing: -0.02em;
-  text-transform: uppercase;
   color: var(--text);
   margin: 0 0 12px;
   transition: color 0.2s ease;
@@ -940,7 +936,6 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
   font-weight: 600;
   line-height: 1.3;
   letter-spacing: -0.02em;
-  text-transform: uppercase;
   color: var(--text);
   margin: 0 0 7px;
   transition: color 0.2s ease;
@@ -1717,7 +1712,6 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
   font-style: normal;
   color: var(--text);
   letter-spacing: -0.02em;
-  text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

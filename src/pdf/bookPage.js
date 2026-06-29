@@ -562,8 +562,9 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
   const otherPageHeight = bodyBottom - bodyTop;
 
   // ── Title (wrapped) ──────────────────────────────────────────────────────
-  // Rendered all-caps to match the editor's uppercase title treatment.
-  const titleStr  = (title  || "").trim().toUpperCase();
+  // Rendered as typed (natural case) to match the editor title. The running
+  // head still small-caps it (book convention) where it is drawn.
+  const titleStr  = (title  || "").trim();
   const bylineStr = (byline || "").trim();
   let titleLines = [];
   let titleBlockH = 0;
