@@ -71,6 +71,18 @@ function saveState(docs, activeId) {
   try { localStorage.setItem("inkk_v1", JSON.stringify({ docs, activeId })); } catch {}
 }
 
+// Which signed-in user the on-device docs belong to (null = anonymous). Used to
+// stop one account's drafts from being merged into another on a shared device.
+function loadOwner() {
+  try { return localStorage.getItem("inkk_owner") || null; } catch { return null; }
+}
+function saveOwner(id) {
+  try {
+    if (id) localStorage.setItem("inkk_owner", id);
+    else localStorage.removeItem("inkk_owner");
+  } catch {}
+}
+
 function initState() {
   const saved = loadState();
   if (!saved?.docs?.length) {
@@ -1213,9 +1225,18 @@ function AuthModal({ onClose, initialMode = "signin" }) {
     invalid:   { text: "3–20 chars", cls: "muted" },
   }[unameStatus];
 
+  // Only dismiss when the press *starts and ends* on the backdrop itself.
+  // Without this, drag-selecting text in an input and releasing over the
+  // backdrop fires a click on the overlay and closes the modal mid-type.
+  const overlayDownRef = useRef(false);
+
   return (
     <>
-    <div id="auth-overlay" onClick={onClose}>
+    <div
+      id="auth-overlay"
+      onMouseDown={e => { overlayDownRef.current = e.target === e.currentTarget; }}
+      onClick={e => { if (overlayDownRef.current && e.target === e.currentTarget) onClose(); }}
+    >
       <div id="auth-modal" onClick={e => e.stopPropagation()}>
         <button id="auth-close" onClick={onClose}>×</button>
         {message ? (
@@ -3249,6 +3270,28 @@ export default function App() {
     el.focus();
   }, []);
 
+  // Wipe device-local writing state back to a single empty draft. Called on sign
+  // out so the next account on this device starts clean (their own work is safe
+  // in the cloud and re-fetched on next sign in).
+  const resetLocalWorkspace = useCallback(() => {
+    const fresh = createDoc();
+    docsRef.current = [fresh];
+    activeIdRef.current = fresh.id;
+    setDocs([fresh]);
+    setActiveId(fresh.id);
+    saveState([fresh], fresh.id);
+    saveOwner(null);
+    titleRef.current = "";
+    contentRef.current = "";
+    writingBaseRef.current = 0;
+    writingFlushRef.current = 0;
+    writingSessionStartRef.current = null;
+    setWords(0);
+    try { localStorage.removeItem("inkk_streak"); } catch {}
+    setStreak(0);
+    loadDocIntoEditor(fresh);
+  }, [loadDocIntoEditor]);
+
   // ─ auth + cloud sync ────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -3262,9 +3305,21 @@ export default function App() {
       // Use live in-memory docs/activeId — localStorage may be stale or empty for
       // a brand-new session where initState created a doc but saveState hasn't fired yet.
       const localDocs = docsRef.current.map(normaliseDoc);
-      const hasLocalContent = localDocs.some(d => stripHtml(d.content).trim()) || !!stripHtml(titleRef.current).trim();
+      // If the on-device docs belong to a *different* signed-in user, never merge
+      // them into this account — that would leak drafts (and the streak) across
+      // accounts on a shared device. Anonymous local work (no owner) still merges,
+      // preserving the write-then-sign-up flow.
+      const storedOwner = loadOwner();
+      const localBelongsToOther = !!storedOwner && storedOwner !== signedInUser.id;
+      if (localBelongsToOther) {
+        try { localStorage.removeItem("inkk_streak"); } catch {}
+        setStreak(0);
+      }
+      const mergeableLocal = localBelongsToOther ? [] : localDocs;
+      const hasLocalContent = mergeableLocal.some(d => stripHtml(d.content).trim())
+        || (!localBelongsToOther && !!stripHtml(titleRef.current).trim());
       let merged = (hasLocalContent || !cloudDocs.length)
-        ? mergeDocs(localDocs, cloudDocs) : cloudDocs;
+        ? mergeDocs(mergeableLocal, cloudDocs) : cloudDocs;
       if (!merged.length) merged = [createDoc()];
       merged = merged.map(normaliseDoc);
       const cloudIds = new Set(cloudDocs.map(d => d.id));
@@ -3274,6 +3329,8 @@ export default function App() {
       const currentActiveId = activeIdRef.current;
       const newActiveId = merged.find(d => d.id === currentActiveId) ? currentActiveId : merged[0].id;
       setDocs(merged); saveState(merged, newActiveId); setActiveId(newActiveId);
+      saveOwner(signedInUser.id); // these docs now belong to this account
+      docsRef.current = merged; activeIdRef.current = newActiveId;
       const docToLoad = merged.find(d => d.id === newActiveId);
       if (docToLoad) loadDocIntoEditor(docToLoad, { preserveLocalTitle: true });
       const myPubs = await fetchMyPublications(signedInUser.id);
@@ -3334,9 +3391,11 @@ export default function App() {
       }
       if (event === "SIGNED_OUT") {
         syncedUserRef.current = null;
-        setUser(null); setPublishedDocIds(new Set()); setProfile(null); setUsernameModalOpen(false);
+        setUser(null); userRef.current = null;
+        setPublishedDocIds(new Set()); setProfile(null); setUsernameModalOpen(false);
         setResearchOptIn(false); optInRef.current = false;
         recorderRef.current?.recordUserChange(null);
+        resetLocalWorkspace(); // clear A's drafts/streak so B doesn't inherit them
       }
     });
 
@@ -3355,7 +3414,7 @@ export default function App() {
       }
     } catch {}
     return () => subscription.unsubscribe();
-  }, [loadDocIntoEditor]);
+  }, [loadDocIntoEditor, resetLocalWorkspace]);
 
   // ─ switch document ──────────────────────────────────────────────────────────
 
