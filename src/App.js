@@ -15,6 +15,7 @@ import {
   Share2, Check, Download, Maximize2, Minimize2,
   Copy, CheckCheck, Plus, Trash2, Type, Search,
   Heart, MessageCircle, Eye, EyeOff,
+  AlignLeft, AlignCenter, AlignRight,
 } from "lucide-react";
 import { createRecorder } from "./telemetry/recorder";
 import { extractFeatures } from "./telemetry/features";
@@ -193,7 +194,7 @@ function caretRangeAt(x, y) {
   return r;
 }
 
-async function compressImage(file, maxDim = 1600) {
+async function compressImage(file, maxDim = 2000) {
   return new Promise(resolve => {
     const reader = new FileReader();
     reader.onload = e => {
@@ -204,8 +205,11 @@ async function compressImage(file, maxDim = 1600) {
         const h = Math.round(img.height * scale);
         const canvas = document.createElement("canvas");
         canvas.width = w; canvas.height = h;
-        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL("image/jpeg", 0.88));
+        const ctx = canvas.getContext("2d");
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";   // crisper downscaling
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
       };
       img.src = e.target.result;
     };
@@ -2555,6 +2559,35 @@ function AdminView({ profile, onOpenPiece }) {
   );
 }
 
+// ─── Image toolbar ───────────────────────────────────────────────────────────
+// Floating controls shown when an embedded image is selected in the editor:
+// width presets, alignment, and remove. Edits are written as inline width % +
+// data-align on the <img>, which the book renderer reads when publishing.
+function ImageToolbar({ rect, width, align, onWidth, onAlign, onRemove, panelRef }) {
+  const top  = Math.max(8, rect.top - 46);
+  const left = rect.left + rect.width / 2;
+  const Btn = ({ active, children, ...p }) => (
+    <button className={`img-tb-btn${active ? " active" : ""}`} onMouseDown={e => e.preventDefault()} {...p}>{children}</button>
+  );
+  return (
+    <div ref={panelRef} className="img-toolbar" style={{ top, left }} onMouseDown={e => e.preventDefault()}>
+      <div className="img-tb-group">
+        <Btn active={width <= 45}            onClick={() => onWidth(40)}>S</Btn>
+        <Btn active={width > 45 && width < 100} onClick={() => onWidth(70)}>M</Btn>
+        <Btn active={width >= 100}           onClick={() => onWidth(100)}>Full</Btn>
+      </div>
+      <span className="img-tb-sep" />
+      <div className="img-tb-group">
+        <Btn active={align === "left"}   onClick={() => onAlign("left")}   aria-label="Align left"><AlignLeft size={14} strokeWidth={1.75} /></Btn>
+        <Btn active={align === "center"} onClick={() => onAlign("center")} aria-label="Align center"><AlignCenter size={14} strokeWidth={1.75} /></Btn>
+        <Btn active={align === "right"}  onClick={() => onAlign("right")}  aria-label="Align right"><AlignRight size={14} strokeWidth={1.75} /></Btn>
+      </div>
+      <span className="img-tb-sep" />
+      <Btn onClick={onRemove} aria-label="Remove image"><Trash2 size={14} strokeWidth={1.75} /></Btn>
+    </div>
+  );
+}
+
 export default function App() {
   const { docs: initDocs, activeId: initActiveId } = initState();
 
@@ -2605,6 +2638,9 @@ export default function App() {
   const titleEditorRef = useRef(null);
   const containerRef   = useRef(null);
   const formatBarRef   = useRef(null);
+  const imgElRef       = useRef(null);   // currently-selected editor image
+  const imgPanelRef    = useRef(null);   // the floating image toolbar
+  const [imgTool, setImgTool] = useState(null); // editor image selection: { rect, width, align }
   const contentRef     = useRef("");
   const titleRef       = useRef("");
   const isMobileRef  = useRef(false);
@@ -3289,6 +3325,81 @@ export default function App() {
     }, 500);
   }, [activeId, scheduleMenuReturn, scrollToCursor, addToast]);
 
+  // ── Editor image selection (resize / align / remove) ───────────────────────
+  const clearImageSel = useCallback(() => {
+    if (imgElRef.current) imgElRef.current.classList.remove("img-selected");
+    imgElRef.current = null;
+    setImgTool(null);
+  }, []);
+
+  const selectEditorImage = useCallback((el) => {
+    if (!el) return;
+    if (imgElRef.current && imgElRef.current !== el) imgElRef.current.classList.remove("img-selected");
+    imgElRef.current = el;
+    el.classList.add("img-selected");
+    const width = el.style.width ? Math.round(parseFloat(el.style.width)) : 100;
+    const align = el.dataset.align || "center";
+    setImgTool({ rect: el.getBoundingClientRect(), width, align });
+  }, []);
+
+  // Select a freshly inserted image once it has real dimensions (so the toolbar
+  // lands in the right place).
+  const selectImageWhenReady = useCallback((img) => {
+    if (img.complete && img.naturalWidth) selectEditorImage(img);
+    else img.addEventListener("load", () => selectEditorImage(img), { once: true });
+  }, [selectEditorImage]);
+
+  const setImageWidth = useCallback((pct) => {
+    const el = imgElRef.current;
+    if (!el) return;
+    el.style.width = pct >= 100 ? "" : pct + "%";
+    onInput();
+    setImgTool(t => (t ? { ...t, width: pct, rect: el.getBoundingClientRect() } : t));
+  }, [onInput]);
+
+  const setImageAlign = useCallback((align) => {
+    const el = imgElRef.current;
+    if (!el) return;
+    el.dataset.align = align;
+    el.style.marginLeft  = align === "left"  ? "0" : "auto";
+    el.style.marginRight = align === "right" ? "0" : "auto";
+    onInput();
+    setImgTool(t => (t ? { ...t, align, rect: el.getBoundingClientRect() } : t));
+  }, [onInput]);
+
+  const removeSelectedImage = useCallback(() => {
+    const el = imgElRef.current;
+    if (!el) return;
+    el.remove();
+    clearImageSel();
+    onInput();
+  }, [onInput, clearImageSel]);
+
+  // Keep the toolbar pinned to the image while scrolling/resizing, and dismiss
+  // the selection on an outside click or when the image is removed.
+  const imgSelActive = imgTool !== null;
+  useEffect(() => {
+    if (!imgSelActive) return;
+    const reposition = () => {
+      const el = imgElRef.current;
+      if (!el || !el.isConnected) { clearImageSel(); return; }
+      setImgTool(t => (t ? { ...t, rect: el.getBoundingClientRect() } : t));
+    };
+    const onDocMouseDown = (e) => {
+      if (imgPanelRef.current?.contains(e.target)) return;
+      if (imgElRef.current === e.target) return;
+      clearImageSel();
+    };
+    window.addEventListener("scroll", reposition, true);
+    window.addEventListener("resize", reposition);
+    document.addEventListener("mousedown", onDocMouseDown, true);
+    return () => {
+      window.removeEventListener("scroll", reposition, true);
+      window.removeEventListener("resize", reposition);
+      document.removeEventListener("mousedown", onDocMouseDown, true);
+    };
+  }, [imgSelActive, clearImageSel]);
+
   const onTitleInput = useCallback(() => {
     const el = titleEditorRef.current;
     if (!el) return;
@@ -3316,15 +3427,18 @@ export default function App() {
     if (!files.length) return;
     e.preventDefault();
     const range = caretRangeAt(e.clientX, e.clientY);
+    let lastImg = null;
     for (const file of files) {
       const src = await compressImage(file);
       const img = document.createElement("img");
       img.src = src;
       if (range) { range.insertNode(img); range.collapse(false); }
       else { editorRef.current?.appendChild(img); }
+      lastImg = img;
     }
     onInput();
-  }, [onInput]);
+    if (lastImg) selectImageWhenReady(lastImg);
+  }, [onInput, selectImageWhenReady]);
 
   const handleEditorPaste = useCallback(async (e) => {
     const items = Array.from(e.clipboardData?.items || []);
@@ -3346,13 +3460,14 @@ export default function App() {
         editorRef.current?.appendChild(img);
       }
       onInput();
+      selectImageWhenReady(img);
       return;
     }
     // Strip formatting on paste — insert as plain text only
     e.preventDefault();
     const text = e.clipboardData?.getData("text/plain") || "";
     if (text) document.execCommand("insertText", false, text);
-  }, [onInput]);
+  }, [onInput, selectImageWhenReady]);
 
   // ─ PDF export ───────────────────────────────────────────────────────────────
   //
@@ -3984,9 +4099,23 @@ export default function App() {
             onDrop={handleEditorDrop}
             onDragOver={e => { if (Array.from(e.dataTransfer?.items || []).some(i => i.type.startsWith("image/"))) e.preventDefault(); }}
             onPaste={handleEditorPaste}
+            onClick={e => { if (e.target.tagName === "IMG") selectEditorImage(e.target); else clearImageSel(); }}
+            onKeyDown={() => { if (imgElRef.current) clearImageSel(); }}
           />
         </div>
       </div>
+
+      {imgTool && (
+        <ImageToolbar
+          rect={imgTool.rect}
+          width={imgTool.width}
+          align={imgTool.align}
+          onWidth={setImageWidth}
+          onAlign={setImageAlign}
+          onRemove={removeSelectedImage}
+          panelRef={imgPanelRef}
+        />
+      )}
 
       {/* ── floating format toolbar (appears on selection in title/body) ── */}
       <div id="format-toolbar" ref={formatBarRef} className="format-bar-hidden">

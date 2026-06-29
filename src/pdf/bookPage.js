@@ -83,7 +83,6 @@ const PARA_INDENT    = PARA_INDENT_PT * PX;
 
 const IMG_VPAD_PT  = 12;
 const IMG_VPAD     = IMG_VPAD_PT * PX;
-const IMG_WIDTH_FRAC = 1.0;   // images fill the text measure (0–1)
 
 // Title wrap leading multiplier.
 const TITLE_LINE_MULT = 1.3;
@@ -165,7 +164,18 @@ function parseHtmlToBlocks(html) {
     const tag = node.tagName.toLowerCase();
     if (tag === "img") {
       const src = node.getAttribute("src");
-      if (src) tokens.push({ type: "image", src });
+      if (src) {
+        // Honor the editor's per-image width (inline "width:NN%") and alignment
+        // (data-align). Default: full measure, centered.
+        let frac = 1;
+        const wStyle = node.style && node.style.width;
+        if (wStyle && wStyle.endsWith("%")) {
+          const p = parseFloat(wStyle);
+          if (p > 0 && p <= 100) frac = p / 100;
+        }
+        const align = (node.dataset && node.dataset.align) || "center";
+        tokens.push({ type: "image", src, frac, align });
+      }
       return;
     }
     if (tag === "br") { tokens.push({ type: "break" }); return; }
@@ -217,7 +227,7 @@ function parseHtmlToBlocks(html) {
     } else if (tok.type === "image") {
       breaks = 0;
       flushPara();
-      blocks.push({ type: "image", src: tok.src });
+      blocks.push({ type: "image", src: tok.src, frac: tok.frac, align: tok.align });
     }
   }
   flushPara();
@@ -402,12 +412,15 @@ function drawTokenLine(ctx, tokens, lineWidth, x, y, endOfSegment, justify = tru
 // Compute the height in canvas px an image will take given the available text
 // width. Capped to a fraction of the page height so a tall photo doesn't push
 // everything else out.
-function imageDims(image, fullWidth, maxHeightOnPage) {
+function imageDims(image, fullWidth, maxHeightOnPage, frac = 1) {
   if (!image || !image.naturalWidth) return { w: 0, h: 0 };
-  const w = fullWidth * IMG_WIDTH_FRAC;
+  const f = Math.min(1, Math.max(0.1, frac || 1));
+  let w = fullWidth * f;
   let h = w * (image.naturalHeight / image.naturalWidth);
   if (h > maxHeightOnPage) {
+    // Height-capped (very tall image): scale width down too to keep aspect.
     h = maxHeightOnPage;
+    w = h * (image.naturalWidth / image.naturalHeight);
   }
   return { w, h };
 }
@@ -431,8 +444,8 @@ function paginate(items, firstPageHeight, otherPageHeight, fullWidth) {
       if (it.type === "line")     cost = LINE_H;
       else if (it.type === "gap") cost = PARA_GAP;
       else if (it.type === "image") {
-        // Resize to fit remaining space if image is huge.
-        const { w, h } = imageDims(it.img, fullWidth, otherPageHeight - 2 * IMG_VPAD);
+        // Resize to the image's chosen width fraction, fitting remaining space.
+        const { w, h } = imageDims(it.img, fullWidth, otherPageHeight - 2 * IMG_VPAD, it.frac);
         it._w = w; it._h = h;
         cost = h + 2 * IMG_VPAD;
       }
@@ -610,7 +623,7 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
   const items = [];
   blocks.forEach((block, bi) => {
     if (block.type === "image") {
-      if (block.img) items.push({ type: "image", img: block.img });
+      if (block.img) items.push({ type: "image", img: block.img, frac: block.frac, align: block.align });
       return;
     }
     // text block
@@ -722,7 +735,11 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
           if (it.type === "gap")   { y += PARA_GAP; continue; }
           if (it.type === "image") {
             const w = it._w, h = it._h;
-            const x = (cw - w) / 2;
+            // Position within the text measure by the chosen alignment.
+            let x;
+            if (it.align === "left")       x = leftX;
+            else if (it.align === "right") x = leftX + fullWidth - w;
+            else                           x = leftX + (fullWidth - w) / 2;
             // Slight desaturation/contrast as a film/print look; multiply
             // blend (active on the surrounding save) bakes it into paper.
             ctx.save();
