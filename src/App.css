@@ -778,6 +778,7 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
 .writer-card:hover { opacity: 0.6; }
 .writer-card-info { flex: 1; min-width: 0; }
 .writer-card-name {
+  font-family: var(--font-serif);
   display: block;
   font-size: 0.88rem;
   font-weight: 500;
@@ -885,6 +886,7 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
   overflow: hidden;
 }
 .feed-lead-byline {
+  font-family: var(--font-serif);
   display: flex;
   align-items: center;
   gap: 13px;
@@ -897,7 +899,7 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
 }
 .feed-lead-author {
   background: none; border: none; padding: 0;
-  font-family: var(--font-ui);
+  font-family: var(--font-serif);
   font-size: 0.8rem;
   font-weight: 500;
   letter-spacing: 0.01em;
@@ -975,6 +977,7 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
 }
 
 .feed-entry-author {
+  font-family: var(--font-serif);
   background: none; border: none; padding: 0;
   font: inherit;
   color: var(--muted);
@@ -1102,6 +1105,7 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
 }
 
 .pub-author-btn {
+  font-family: var(--font-serif);
   font-size: 0.8rem;
   font-weight: 500;
   color: var(--text);
@@ -2269,6 +2273,7 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
 .user-card:hover { opacity: 0.6; }
 .user-card-info { flex: 1; min-width: 0; }
 .user-card-username {
+  font-family: var(--font-serif);
   display: block;
   font-size: 0.88rem;
   font-weight: 500;
@@ -2277,6 +2282,7 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
   letter-spacing: 0;
 }
 .user-card-name {
+  font-family: var(--font-serif);
   display: block;
   font-size: 0.72rem;
   color: var(--subtle);
@@ -2317,6 +2323,7 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
 }
 
 #user-profile-username {
+  font-family: var(--font-serif);
   font-size: 1.15rem;
   font-weight: 600;
   color: var(--text);
@@ -2324,6 +2331,7 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
 }
 
 #user-profile-name {
+  font-family: var(--font-serif);
   font-size: 0.83rem;
   color: var(--muted);
   margin-top: 2px;
@@ -2436,6 +2444,7 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
   flex-wrap: wrap;
 }
 .reading-author-btn {
+  font-family: var(--font-serif);
   background: none;
   border: none;
   padding: 0;
@@ -2604,6 +2613,7 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
   font-size: 0.78rem;
 }
 .comment-author {
+  font-family: var(--font-serif);
   color: var(--text);
   letter-spacing: 0.01em;
 }
