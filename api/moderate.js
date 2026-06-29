@@ -11,7 +11,9 @@
 
 const OPENAI_URL = "https://api.openai.com/v1/moderations";
 const MODEL = "omni-moderation-latest";
-const MAX_CHARS = 32000; // generous cap to bound latency on very long pieces
+const MAX_CHARS = 32000;       // generous cap to bound latency on very long pieces
+const MAX_IMAGES = 8;          // cap images per request
+const MAX_IMG_CHARS = 4000000; // ~3MB data URL; keeps us under Vercel's body limit
 
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
@@ -34,10 +36,27 @@ module.exports = async function handler(req, res) {
   const raw = (body && typeof body.text === "string") ? body.text : "";
   const text = raw.slice(0, MAX_CHARS).trim();
 
-  if (!text) {
+  // omni-moderation also scores images (sexual/violence/self-harm). Accept an
+  // optional list of image URLs (data: or http) alongside the text.
+  const imagesIn = Array.isArray(body && body.images) ? body.images : [];
+  const images = imagesIn
+    .filter(u => typeof u === "string" && (u.startsWith("data:image") || u.startsWith("http")))
+    .filter(u => u.length <= MAX_IMG_CHARS)
+    .slice(0, MAX_IMAGES);
+
+  if (!text && images.length === 0) {
     res.status(200).json({ ok: true, flagged: false, categories: {}, scores: {} });
     return;
   }
+
+  // Multimodal input (one combined verdict) when images are present; otherwise
+  // a plain string. An array of {type} items returns a single merged result.
+  const input = images.length
+    ? [
+        ...(text ? [{ type: "text", text }] : []),
+        ...images.map(url => ({ type: "image_url", image_url: { url } })),
+      ]
+    : text;
 
   try {
     const r = await fetch(OPENAI_URL, {
@@ -46,7 +65,7 @@ module.exports = async function handler(req, res) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({ model: MODEL, input: text }),
+      body: JSON.stringify({ model: MODEL, input }),
     });
 
     if (!r.ok) {

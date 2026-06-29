@@ -35,7 +35,7 @@ We do not sell your data. We share data with third parties only as needed to run
 
 KEEPING THE FEED SAFE (CONTENT MODERATION)
 
-To keep published work and comments free of illegal and abusive content, the text you publish to the feed and the comments you post are checked by an automated moderation service operated by OpenAI. Only that text is sent — never your keystroke data, your drafts, or your account details. OpenAI processes it to return a safety classification and, per its API terms, does not use it to train its models. Content may also be reported by other users. Anything flagged is reviewed by a moderator, who may hide content that breaks our Terms of Service.
+To keep the feed free of illegal and abusive content, the text and images you publish to the feed, the comments you post, and your profile picture are checked by an automated moderation service operated by OpenAI. We send only that content — never your keystroke data, your drafts, or your account details. OpenAI processes it to return a safety classification and, per its API terms, does not use it to train its models. Content may also be reported by other users. Anything flagged is reviewed by a moderator, who may hide content that breaks our Terms of Service.
 
 YOUR RIGHTS
 
