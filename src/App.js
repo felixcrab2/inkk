@@ -1225,19 +1225,12 @@ function AuthModal({ onClose, initialMode = "signin" }) {
     invalid:   { text: "3–20 chars", cls: "muted" },
   }[unameStatus];
 
-  // Only dismiss when the press *starts and ends* on the backdrop itself.
-  // Without this, drag-selecting text in an input and releasing over the
-  // backdrop fires a click on the overlay and closes the modal mid-type.
-  const overlayDownRef = useRef(false);
-
+  // The modal only closes via the × button — never on a backdrop click,
+  // text-selection drag, or key press.
   return (
     <>
-    <div
-      id="auth-overlay"
-      onMouseDown={e => { overlayDownRef.current = e.target === e.currentTarget; }}
-      onClick={e => { if (overlayDownRef.current && e.target === e.currentTarget) onClose(); }}
-    >
-      <div id="auth-modal" onClick={e => e.stopPropagation()}>
+    <div id="auth-overlay">
+      <div id="auth-modal">
         <button id="auth-close" onClick={onClose}>×</button>
         {message ? (
           <div id="auth-message-wrap">
@@ -3998,19 +3991,20 @@ export default function App() {
         }
       }
       if (e.key === "Escape") {
+        if (authOpen) return;       // auth modal closes only via its × button
         if (focusMode) { exitFocusMode(); return; }
         if (certMenuOpen) { setCertMenuOpen(false); return; }
         if (publishMenuOpen) { setPublishMenuOpen(false); setConfirmUnpublishOpen(false); return; }
         if (publishModalDoc) { setPublishModalDoc(null); return; }
         if (downloadModalOpen) { setDownloadModalOpen(false); return; }
         if (usernameModalOpen) return;
-        setPanelOpen(false); setAuthOpen(false); setHsModalOpen(false); setHsScoreOpen(false);
+        setPanelOpen(false); setHsModalOpen(false); setHsScoreOpen(false);
         if (view !== "editor") { window.history.back(); return; }
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [openDownloadModal, view, focusMode, certMenuOpen, toggleFocusMode, exitFocusMode, publishMenuOpen, publishModalDoc, downloadModalOpen, usernameModalOpen, onInput, onTitleInput]);
+  }, [openDownloadModal, view, focusMode, certMenuOpen, toggleFocusMode, exitFocusMode, publishMenuOpen, publishModalDoc, downloadModalOpen, usernameModalOpen, authOpen, onInput, onTitleInput]);
 
   // ─ mount ────────────────────────────────────────────────────────────────────
 
