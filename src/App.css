@@ -2422,7 +2422,7 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
 .reading-page-img {
   width: 100%;
   display: block;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04), 0 0 0 0.5px rgba(0, 0, 0, 0.10);
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.10);
 }
 
 .reading-pages-loading {
