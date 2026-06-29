@@ -6,6 +6,7 @@ import "@fontsource/cormorant-garamond/400.css";
 import "@fontsource/cormorant-garamond/500.css";
 import "@fontsource/cormorant-garamond/600.css";
 import "@fontsource/cormorant-garamond/700.css";
+import "@fontsource-variable/hanken-grotesk";
 import { jsPDF } from "jspdf";
 import { supabase } from "./supabase";
 import { renderBookPdfPages, PAGE_PRESETS } from "./pdf/bookPage";
@@ -367,7 +368,7 @@ function mergeDocs(local, cloud) {
 // ─── publications ─────────────────────────────────────────────────────────────
 
 const PUB_SELECT = "id, title, content, published_at, author_name, author_username, user_id, writing_time_seconds, revision_count, human_score, score_tier, score_features, keystrokes, deletions, pastes, verify_code, content_hash";
-const PUB_SELECT_WITH_COUNTS = PUB_SELECT + ", like_count:likes(count), comment_count:comments(count)";
+const PUB_SELECT_WITH_COUNTS = PUB_SELECT + ", moderation_status, like_count:likes(count), comment_count:comments(count)";
 
 function getRelCount(rel) {
   if (!rel) return 0;
@@ -416,7 +417,13 @@ async function addComment(pubId, userId, body) {
   const trimmed = (body || "").trim();
   if (!trimmed) return "Empty comment.";
   if (trimmed.length > 2000) return "Comment is too long (max 2000 chars).";
-  const { error } = await supabase.from("comments").insert({ user_id: userId, publication_id: pubId, body: trimmed });
+  const mod = await moderateText(trimmed);
+  const row = withModeration({ user_id: userId, publication_id: pubId, body: trimmed }, mod);
+  let { error } = await supabase.from("comments").insert(row);
+  // Backward-compat: retry plain if the moderation columns aren't migrated yet.
+  if (error && /column/i.test(error.message || "") && mod) {
+    ({ error } = await supabase.from("comments").insert(stripModeration(row)));
+  }
   return error?.message || null;
 }
 
@@ -434,6 +441,84 @@ async function fetchMyContribution(userId) {
 async function deleteCommentRow(commentId) {
   if (!supabase || !commentId) return "Not signed in.";
   const { error } = await supabase.from("comments").delete().eq("id", commentId);
+  return error?.message || null;
+}
+
+// ─── Content moderation ──────────────────────────────────────────────────────
+// Ask the server-side /api/moderate endpoint (OpenAI) to classify text.
+// stripHtml() (defined above) gives the classifier prose, not markup.
+// Fail-open: returns null on any failure so a moderation outage never blocks
+// the user. On success returns { status: 'ok' | 'flagged', scores }.
+async function moderateText(text) {
+  try {
+    const res = await fetch("/api/moderate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: stripHtml(text) }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data || data.ok === false) return null;
+    return { status: data.flagged ? "flagged" : "ok", scores: data.scores || null };
+  } catch { return null; }
+}
+
+// Merge a moderation verdict into a content-row payload. When unchecked
+// (mod === null) the row keeps its column default ('pending').
+function withModeration(payload, mod) {
+  if (!mod) return payload;
+  return {
+    ...payload,
+    moderation_status: mod.status,
+    moderation_scores: mod.scores,
+    moderation_checked_at: new Date().toISOString(),
+  };
+}
+
+// Drop moderation keys — used to retry writes on databases not yet migrated.
+function stripModeration(p) {
+  const { moderation_status, moderation_scores, moderation_checked_at, ...rest } = p;
+  return rest;
+}
+
+// Highest-scoring moderation category, as a human label (for the admin queue).
+function topCategory(scores) {
+  if (!scores) return null;
+  let best = null, bestV = 0;
+  for (const [k, v] of Object.entries(scores)) {
+    if (typeof v === "number" && v > bestV) { bestV = v; best = k; }
+  }
+  return best ? best.replace(/[/_]/g, " ") : null;
+}
+
+// ─── Reports ─────────────────────────────────────────────────────────────────
+const REPORT_REASONS = [
+  ["spam",       "Spam or scam"],
+  ["harassment", "Harassment or bullying"],
+  ["hate",       "Hate or discrimination"],
+  ["sexual",     "Sexual or explicit"],
+  ["violence",   "Violence or threats"],
+  ["self_harm",  "Self-harm"],
+  ["illegal",    "Illegal content"],
+  ["other",      "Something else"],
+];
+
+async function reportContent({ targetType, targetId, targetUserId, reason, note, userId }) {
+  if (!supabase) return "Reporting unavailable.";
+  if (!userId) return "Not signed in.";
+  const { error } = await supabase.from("reports").upsert(
+    {
+      reporter_id:    userId,
+      target_type:    targetType,
+      target_id:      targetId,
+      target_user_id: targetUserId || null,
+      reason,
+      note: (note || "").trim() || null,
+    },
+    // Re-reporting the same target is a no-op (keeps the first report). DO
+    // NOTHING avoids needing an update-own RLS policy on reports.
+    { onConflict: "reporter_id,target_type,target_id", ignoreDuplicates: true },
+  );
   return error?.message || null;
 }
 
@@ -488,7 +573,7 @@ async function fetchFollowingFeed(userId) {
         .order("published_at", { ascending: false })
         .limit(50),
     );
-    return data || [];
+    return (data || []).filter(p => p.moderation_status !== "removed");
   } catch { return []; }
 }
 
@@ -513,7 +598,7 @@ async function fetchFeed() {
       .limit(50),
   );
   if (error || !data) return [];
-  return data;
+  return data.filter(p => p.moderation_status !== "removed");
 }
 
 async function fetchMyPublications(userId) {
@@ -591,6 +676,14 @@ async function doPublish(doc, user, title, authorName, authorUsername) {
     score_tier:     doc.scoreTier      ?? null,
     score_features: doc.scoreFeatures  ?? null,
   };
+  // Auto-triage the publication's text (title + body) before writing it.
+  // Fail-open: an outage leaves moderation_status at its 'pending' default.
+  const mod = await moderateText((title ? title + "\n\n" : "") + (doc.content || ""));
+  if (mod) {
+    payload.moderation_status     = mod.status;
+    payload.moderation_scores     = mod.scores;
+    payload.moderation_checked_at = new Date().toISOString();
+  }
   if (cert.code) {
     payload.verify_code  = cert.code;
     payload.content_hash = cert.contentHash;
@@ -599,8 +692,14 @@ async function doPublish(doc, user, title, authorName, authorUsername) {
   let error;
   if (existing) {
     ({ error } = await supabase.from("publications").update(payload).eq("id", existing.id));
+    if (error && /column/i.test(error.message || "")) {
+      ({ error } = await supabase.from("publications").update(stripModeration(payload)).eq("id", existing.id));
+    }
   } else {
     ({ error } = await supabase.from("publications").insert({ ...payload, doc_id: doc.id, user_id: user.id }));
+    if (error && /column/i.test(error.message || "")) {
+      ({ error } = await supabase.from("publications").insert({ ...stripModeration(payload), doc_id: doc.id, user_id: user.id }));
+    }
   }
   if (error) return { error: error.message };
 
@@ -617,7 +716,7 @@ async function doUnpublish(docId) {
 async function fetchProfile(userId) {
   if (!supabase || !userId) return null;
   const { data } = await supabase
-    .from("profiles").select("id, username, display_name, avatar_data, research_opt_in, tos_accepted_at").eq("id", userId).maybeSingle();
+    .from("profiles").select("id, username, display_name, avatar_data, research_opt_in, tos_accepted_at, is_admin").eq("id", userId).maybeSingle();
   return data || null;
 }
 
@@ -661,6 +760,7 @@ function viewToPath(view, pub, userProfile, code) {
   if (view === "feed")        return "/feed";
   if (view === "search")      return "/people";
   if (view === "profile")     return "/profile";
+  if (view === "admin")       return "/admin";
   if (view === "verify")      return code ? `/v/${code}` : "/verify";
   if (view === "reading" && pub)          return `/read/${pub.id}`;
   if (view === "userProfile" && userProfile) return `/u/${userProfile.username}`;
@@ -674,6 +774,7 @@ function pathToView(path) {
   if (path === "/feed")   return "feed";
   if (path === "/people") return "search";
   if (path === "/profile") return "profile";
+  if (path === "/admin")   return "admin";
   return "editor";
 }
 
@@ -700,7 +801,7 @@ async function fetchUserPublications(userId) {
       .order("published_at", { ascending: false }),
   );
   if (error || !data) return [];
-  return data;
+  return data.filter(p => p.moderation_status !== "removed");
 }
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
@@ -2090,6 +2191,17 @@ function ReadingView({ pub, user, dropCapImages, focus, onRequestAuth, onAuthorC
     setConfirmDelId(null);
   }, []);
 
+  // A removed piece stays hidden even via direct link, except for its author.
+  if (pub.moderation_status === "removed" && !(user && pub.user_id === user.id)) {
+    return (
+      <div id="reading-container">
+        <div id="reading-meta" style={{ textAlign: "center", paddingTop: "20vh" }}>
+          <p className="feed-empty">This piece has been removed.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div id="reading-progress" style={{ width: `${progress * 100}%` }} />
@@ -2156,6 +2268,16 @@ function ReadingView({ pub, user, dropCapImages, focus, onRequestAuth, onAuthorC
               </button>
             </div>
 
+            <div className="reading-report-row">
+              <ReportControl
+                targetType="publication"
+                targetId={pub.id}
+                targetUserId={pub.user_id}
+                user={user}
+                onRequestAuth={onRequestAuth}
+              />
+            </div>
+
             <div className="reading-comments" ref={commentsRef}>
               <h3 className="reading-comments-title">{comments.length} {comments.length === 1 ? "comment" : "comments"}</h3>
 
@@ -2213,6 +2335,16 @@ function ReadingView({ pub, user, dropCapImages, focus, onRequestAuth, onAuthorC
                               <button className="comment-delete comment-delete-yes" onClick={() => removeComment(c.id)}>yes, delete</button>
                             </span>
                           )}
+                          {!isMine && (
+                            <ReportControl
+                              targetType="comment"
+                              targetId={c.id}
+                              targetUserId={c.user_id}
+                              user={user}
+                              onRequestAuth={onRequestAuth}
+                              className="comment-report"
+                            />
+                          )}
                         </div>
                         <p className="comment-body">{c.body}</p>
                       </div>
@@ -2229,6 +2361,185 @@ function ReadingView({ pub, user, dropCapImages, focus, onRequestAuth, onAuthorC
 }
 
 // ─── App ──────────────────────────────────────────────────────────────────────
+
+// ─── Report control ──────────────────────────────────────────────────────────
+// Quiet "report" affordance reused on publications and comments. Opens a small
+// reason picker and files (or updates) one report per user per target.
+function ReportControl({ targetType, targetId, targetUserId, user, onRequestAuth, className = "" }) {
+  const [open, setOpen]     = useState(false);
+  const [reason, setReason] = useState("");
+  const [note, setNote]     = useState("");
+  const [busy, setBusy]     = useState(false);
+  const [done, setDone]     = useState(false);
+  const [err, setErr]       = useState("");
+
+  // You can't report your own content.
+  if (user && targetUserId && user.id === targetUserId) return null;
+
+  if (done) return <span className={`report-done ${className}`}>Reported — thank you.</span>;
+
+  if (!open) {
+    return (
+      <button
+        className={`report-btn ${className}`}
+        onClick={() => { if (!user) { onRequestAuth?.(); return; } setOpen(true); }}
+      >
+        Report
+      </button>
+    );
+  }
+
+  const submit = async () => {
+    if (!reason || busy) return;
+    setBusy(true); setErr("");
+    const e = await reportContent({ targetType, targetId, targetUserId, reason, note, userId: user.id });
+    setBusy(false);
+    if (e) { setErr(e); return; }
+    setOpen(false); setDone(true);
+  };
+
+  return (
+    <div className="report-panel" onClick={e => e.stopPropagation()}>
+      <div className="report-panel-head">
+        <span className="report-panel-title">Report this {targetType === "comment" ? "comment" : "piece"}</span>
+        <button className="report-cancel" onClick={() => { setOpen(false); setErr(""); }}>cancel</button>
+      </div>
+      <div className="report-reasons">
+        {REPORT_REASONS.map(([val, label]) => (
+          <label key={val} className="report-reason">
+            <input
+              type="radio" name={`reason-${targetType}-${targetId}`} value={val}
+              checked={reason === val} onChange={() => setReason(val)}
+            />
+            <span>{label}</span>
+          </label>
+        ))}
+      </div>
+      <textarea
+        className="report-note"
+        placeholder="Add a note (optional)"
+        value={note} onChange={e => setNote(e.target.value)}
+        maxLength={1000} rows={2}
+      />
+      {err && <p className="report-err">{err}</p>}
+      <div className="report-actions">
+        <button className="report-submit" onClick={submit} disabled={!reason || busy}>
+          {busy ? "sending…" : "Submit report"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Admin moderation queue ───────────────────────────────────────────────────
+// Open reports + auto-flagged content, with remove / dismiss / keep. Gated on
+// profile.is_admin (RLS enforces it server-side too).
+function AdminView({ profile, onOpenPiece }) {
+  const [reports, setReports] = useState([]);
+  const [flagged, setFlagged] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId]   = useState(null);
+
+  const load = useCallback(async () => {
+    if (!supabase) return;
+    setLoading(true);
+    const [reps, fpubs, fcoms] = await Promise.all([
+      supabase.from("reports").select("*").eq("status", "open").order("created_at", { ascending: false }),
+      supabase.from("publications").select("id, title, content, user_id, moderation_scores")
+        .eq("moderation_status", "flagged").order("published_at", { ascending: false }).limit(50),
+      supabase.from("comments").select("id, body, user_id, moderation_scores")
+        .eq("moderation_status", "flagged").order("created_at", { ascending: false }).limit(50),
+    ]);
+    setReports(reps.data || []);
+    setFlagged([
+      ...(fpubs.data || []).map(p => ({ ...p, _kind: "publication" })),
+      ...(fcoms.data || []).map(c => ({ ...c, _kind: "comment" })),
+    ]);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const tableFor = (kind) => (kind === "comment" ? "comments" : "publications");
+  const setStatus = async (kind, id, status) => {
+    setBusyId(id);
+    await supabase.from(tableFor(kind)).update({ moderation_status: status }).eq("id", id);
+    setBusyId(null); load();
+  };
+  const resolveReport = async (rep, action) => {
+    setBusyId(rep.id);
+    if (action === "remove" && rep.target_id) {
+      await supabase.from(tableFor(rep.target_type)).update({ moderation_status: "removed" }).eq("id", rep.target_id);
+    }
+    await supabase.from("reports").update({
+      status: action === "remove" ? "actioned" : "dismissed",
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: profile?.id || null,
+    }).eq("id", rep.id);
+    setBusyId(null); load();
+  };
+
+  if (!profile?.is_admin) {
+    return (
+      <div className="admin-view">
+        <p className="feed-empty">Moderation is restricted to administrators.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="admin-view">
+      <header className="admin-masthead"><span className="admin-dateline">Moderation</span></header>
+
+      <section className="admin-section">
+        <h2 className="admin-section-title">Reports — {reports.length} open</h2>
+        {loading && <p className="feed-empty">loading…</p>}
+        {!loading && reports.length === 0 && <p className="feed-empty">No open reports.</p>}
+        {reports.map(r => (
+          <div key={r.id} className="admin-row">
+            <div className="admin-row-body">
+              <span className="admin-tag">{r.target_type}</span>
+              <span className="admin-reason">{(REPORT_REASONS.find(x => x[0] === r.reason) || [])[1] || r.reason}</span>
+              {r.note && <p className="admin-note">“{r.note}”</p>}
+            </div>
+            <div className="admin-row-actions">
+              {r.target_type === "publication" && (
+                <button className="text-btn" onClick={() => onOpenPiece?.(r.target_id)}>View</button>
+              )}
+              <button className="text-btn text-btn-danger" disabled={busyId === r.id} onClick={() => resolveReport(r, "remove")}>Remove</button>
+              <button className="text-btn" disabled={busyId === r.id} onClick={() => resolveReport(r, "dismiss")}>Dismiss</button>
+            </div>
+          </div>
+        ))}
+      </section>
+
+      <section className="admin-section">
+        <h2 className="admin-section-title">Auto-flagged — {flagged.length}</h2>
+        {!loading && flagged.length === 0 && <p className="feed-empty">Nothing auto-flagged.</p>}
+        {flagged.map(item => {
+          const text = item._kind === "comment" ? item.body : (item.title || "Untitled");
+          const top  = topCategory(item.moderation_scores);
+          return (
+            <div key={item._kind + item.id} className="admin-row">
+              <div className="admin-row-body">
+                <span className="admin-tag">{item._kind}</span>
+                {top && <span className="admin-reason">{top}</span>}
+                <p className="admin-snippet">{stripHtml(text).slice(0, 160)}</p>
+              </div>
+              <div className="admin-row-actions">
+                {item._kind === "publication" && (
+                  <button className="text-btn" onClick={() => onOpenPiece?.(item.id)}>View</button>
+                )}
+                <button className="text-btn text-btn-danger" disabled={busyId === item.id} onClick={() => setStatus(item._kind, item.id, "removed")}>Remove</button>
+                <button className="text-btn" disabled={busyId === item.id} onClick={() => setStatus(item._kind, item.id, "ok")}>Keep</button>
+              </div>
+            </div>
+          );
+        })}
+      </section>
+    </div>
+  );
+}
 
 export default function App() {
   const { docs: initDocs, activeId: initActiveId } = initState();
@@ -3743,6 +4054,9 @@ export default function App() {
           onVerify={openVerify}
         />
       )}
+      {view === "admin" && (
+        <AdminView profile={profile} onOpenPiece={openPieceById} />
+      )}
       {view === "verify" && (
         <VerifyView
           initialCode={verifyCode}
@@ -3769,6 +4083,12 @@ export default function App() {
             <span className="nav-diamond" aria-hidden="true">◇</span>
             <span className="nav-label">Verify</span>
           </button>
+          {profile?.is_admin && (
+            <button className={`nav-tab ${view === "admin" ? "active" : ""}`} onClick={() => navigate("admin")}>
+              <Eye size={18} strokeWidth={1.75} />
+              <span className="nav-label">Mod</span>
+            </button>
+          )}
           <button
             className={`nav-tab ${view === "profile" ? "active" : ""}`}
             onClick={() => navigate("profile")}
