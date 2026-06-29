@@ -1,0 +1,74 @@
+{
+  "_comment": "Hand-written seed content for Inkk. Original short personal essays (NOT public domain), deliberately casual so they read as real early posts. Attributed to persona accounts and published with NO verification certificate. Each persona has a bio; most pieces carry a short author's note. seed.mjs reads THIS file. Edit freely, then `npm run seed`.",
+
+  "personas": [
+    { "username": "saltmarsh",     "display_name": "Saltmarsh",        "bio": "Mild complaints, escalators, and machines that 'do that.' Writing to see if it sticks better than my other hobbies." },
+    { "username": "oliveandash",   "display_name": "Olive Nakamura",   "bio": "Small things noticed from the same bus most mornings." },
+    { "username": "e.vestergaard", "display_name": "Elin Vestergaard", "bio": "Third city in five years. Writing my way into places before I leave them." },
+    { "username": "paper_kite",    "display_name": "Tomas Field",      "bio": "Walks, weather, and being outside on purpose. Not a nature writer, just a bloke who likes the rain." },
+    { "username": "marginalia",    "display_name": "Marginalia",       "bio": "Notes in the margins, mostly about books, mostly short." }
+  ],
+
+  "pieces": [
+    {
+      "author_username": "saltmarsh",
+      "title": "Stand on the right",
+      "note": "i complain into my phone on the commute. this is some of it.",
+      "content": "<p>There is a sign. There is always a sign. It says STAND ON THE RIGHT, and it is the single clearest instruction in the entire transport network. Clearer than the maps, clearer than the announcements nobody can hear.</p><p>And yet.</p><p>This morning a man stood square in the middle of the escalator with a wheelie suitcase parked beside him like a small obedient dog, and he looked back at the queue building up behind him with the mild, faraway expression of someone watching weather happen to other people.</p><p>I'm not a confrontational person. I rehearse arguments in my head for hours and then say \"no worries\" out loud. So I said nothing. I stood there composing this instead, which is, I'm starting to realise, the only thing I ever actually do about anything.</p>"
+    },
+    {
+      "author_username": "saltmarsh",
+      "title": "I bought a label maker",
+      "note": "37, too many hobbies, none of them finished. here to find out if writing is different.",
+      "content": "<p>I bought a label maker three weeks ago and I am now a different person.</p><p>It started reasonably. The spice jars. Fine, normal, the kind of thing a functioning adult does on a Sunday. But once the spice jars are done there's a small voice that says: what else doesn't have a name?</p><p>So far: the spices, the router (\"ROUTER: DO NOT UNPLUG\"), the drawer that's just chargers, and, this morning, the label maker itself, which now wears a label that says LABEL MAKER. I stood looking at that one for a while.</p><p>I think I believed that if I could get everything named and in its place, something else might settle down too. It hasn't. But the cupboard looks incredible.</p>"
+    },
+    {
+      "author_username": "saltmarsh",
+      "title": "It does that",
+      "note": "",
+      "content": "<p>\"Unexpected item in the bagging area.\"</p><p>There was no item. I had put nothing down. The machine and I both knew this, and it accused me anyway, in that flat voice, twice, until a teenager in a tabard wandered over, tapped the screen without looking at it or at me, and walked off having said the only words that matter: \"it does that.\"</p><p>It does that. I think about that phrase more than I'd like to admit. So much of being alive now is standing in front of something that isn't working, being told by someone exhausted that it does that, and just... accepting it. Nodding. Bagging your unexpected items and going home.</p>"
+    },
+    {
+      "author_username": "oliveandash",
+      "title": "The pigeon man",
+      "note": "i take the same bus every day and notice things. mostly that's what these are.",
+      "content": "<p>There's a man on the bench by the station who feeds the pigeons every morning, and he doesn't do it the way you'd expect.</p><p>He doesn't scatter. He holds the seed out on a flat, open hand and waits, completely still, until one bird is brave enough to land on him. Only then do the others come. It takes ages. He stands there in all weather doing this slow, patient thing for birds the council puts spikes up to discourage.</p><p>I know nothing about him. I've invented about six different lives for him by now. But I think about him on the mornings I'm rushing, coffee in hand, late for something that won't matter by Thursday, and there he is, hand out, waiting for a pigeon to trust him.</p>"
+    },
+    {
+      "author_username": "oliveandash",
+      "title": "Instead of",
+      "note": "",
+      "content": "<p>Today, instead of writing the email, I: watered a plant that didn't need it, read the entire Wikipedia page for a war I will never be asked about, reorganised my photos into an album called \"2019??\", sent my sister a picture of a dog, ate lunch standing at the counter, looked up how much it costs to keep bees, and then decided against keeping bees.</p><p>The email took, in the end, about four minutes. I'd spent a whole day building an elaborate cathedral of avoidance around a four-minute task.</p><p>I don't have a lesson about this. I just think it's funny, and a bit sad, and extremely human, and I wanted to write it down before I tidied it into something that sounded wiser than it actually was.</p>"
+    },
+    {
+      "author_username": "oliveandash",
+      "title": "My nan's handwriting",
+      "note": "small things, mostly. this one less small.",
+      "content": "<p>I found a recipe card in my nan's handwriting today, tucked inside a cookbook I inherited and never use.</p><p>It's for a fruit cake. Half the measurements are in \"teacups\" and one instruction just says \"until it looks right,\" which is the least helpful and most accurate baking instruction ever written.</p><p>But it was the handwriting that got me. That specific slant. I'd know it anywhere, and I hadn't seen it in four years, and there it was, telling me to use the good butter and not be mean with it. I'm not going to make the cake. I just wanted it out of the drawer and somewhere I'd see it.</p>"
+    },
+    {
+      "author_username": "e.vestergaard",
+      "title": "Third city",
+      "note": "moved around a lot. writing it down so it feels less like it just happened to me.",
+      "content": "<p>This is the third city in five years, and I have packing down to a science now, which is not the flex I once thought it was.</p><p>I know which boxes to label fragile and which ones I'll just throw in the boot myself. I know to keep a single mug, a phone charger and a towel out of all of it: the survival kit for the first night before anything's unpacked. I'm good at leaving. I've had the practice.</p><p>What I'm bad at is the part after. The standing-in-an-empty-room part. The where-do-I-buy-bin-bags-here part. Everyone congratulates you on the adventure. Nobody warns you that you'll cry in a Wilko looking for a colander.</p>"
+    },
+    {
+      "author_username": "e.vestergaard",
+      "title": "He learned my name",
+      "note": "",
+      "content": "<p>The man in the corner shop learned my name this week, and I nearly cried in the crisp aisle about it.</p><p>Six months I've been going in. Milk, mostly, and the occasional sad-day chocolate. This week he said \"see you tomorrow, Elin,\" and I have no memory of ever telling him my name, which means he caught it somewhere, and kept it.</p><p>It's such a small thing. But when you move somewhere new you become no one for a while, just a face that buys milk, and then one day someone hands a little piece of you back and says: here, you live here now. I bought chocolate I didn't need, just to have a reason to go back tomorrow.</p>"
+    },
+    {
+      "author_username": "paper_kite",
+      "title": "Rain on purpose",
+      "note": "i mostly write about being outside.",
+      "content": "<p>Walked in the rain on purpose today. Proper rain, too. Not a drizzle you can argue with.</p><p>Everyone else was doing that hunched scuttle from doorway to doorway, and I just... didn't. Put the hood down, actually. There's a thing that happens when you stop trying to stay dry and accept you're going to be soaked through, a kind of giving up that feels much more like winning. The park was empty. The ducks didn't care. I had the whole grey, dripping place to myself.</p><p>Came home looking like I'd fallen in a canal. Best hour of my week.</p>"
+    },
+    {
+      "author_username": "marginalia",
+      "title": "Books I've started",
+      "note": "notes in margins, mostly about books. occasionally i finish one.",
+      "content": "<p>Books I have started and not finished, a partial census of the bedside pile:</p><p>The big one about Rome (got to the Punic Wars, lost the thread). A novel everyone swore would change my life, abandoned around page 40 out of pure spite by then. Two separate books about how to read more books. And one genuinely wonderful book I stopped reading <em>precisely because</em> I was enjoying it and wanted to make it last, which is its own special kind of madness.</p><p>I used to feel guilty about this. Now I think a half-read book is just a conversation you stepped out of. You can always go back. The Romans will wait.</p>"
+    }
+  ]
+}

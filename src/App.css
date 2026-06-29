@@ -1680,6 +1680,15 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   margin-top: 4px;
 }
 
+#profile-bio {
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 8px 0 0;
+  max-width: 30rem;
+  white-space: pre-wrap;
+}
+
 #profile-joined {
   font-size: 0.62rem;
   color: var(--subtle);
@@ -2185,6 +2194,13 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 .profile-edit-input:focus { outline: none; border-bottom-color: var(--text); }
 .profile-edit-input::placeholder { color: var(--subtle); }
+.profile-edit-bio {
+  resize: vertical;
+  min-height: 2.6rem;
+  line-height: 1.5;
+  font-family: inherit;
+  text-align: left;
+}
 .profile-edit-actions {
   display: flex;
   gap: 24px;
@@ -2374,6 +2390,15 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   margin-top: 2px;
 }
 
+#user-profile-bio {
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 8px 0 0;
+  max-width: 32rem;
+  white-space: pre-wrap;
+}
+
 #user-profile-stats {
   display: flex;
   align-items: center;
@@ -2495,6 +2520,18 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .reading-author-btn:disabled { cursor: default; }
 
 .reading-dot { color: #d0ceca; }
+
+.reading-author-note {
+  max-width: 34rem;
+  margin: 0 auto 20px;
+  padding: 0 24px;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--muted);
+  text-align: center;
+}
 
 .reading-zoom {
   display: flex;
@@ -2743,6 +2780,20 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 #auth-modal input::placeholder { color: #d0ceca; }
 #auth-modal input:focus { border-bottom-color: #888; }
+
+.publish-note-input {
+  width: 100%;
+  font: inherit;
+  font-size: 0.9rem;
+  border: none; border-bottom: 1px solid #e0ded9;
+  background: transparent;
+  padding: 8px 0; margin-bottom: 14px;
+  outline: none; color: var(--text);
+  resize: vertical;
+  line-height: 1.5;
+}
+.publish-note-input::placeholder { color: #d0ceca; }
+.publish-note-input:focus { border-bottom-color: #888; }
 
 .auth-error {
   font-size: 0.78rem;
