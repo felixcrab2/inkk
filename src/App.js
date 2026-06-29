@@ -1206,7 +1206,6 @@ function PublishModal({ doc, user, profile, onConfirm, onClose }) {
 
 function DownloadModal({ onConfirm, onClose }) {
   const [format,          setFormat]          = useState("pdf");
-  const [dropCap,         setDropCap]         = useState(true);
   const [justify,         setJustify]         = useState(true);
   const [paragraphIndent, setParagraphIndent] = useState(true);
   const [titleGap,        setTitleGap]        = useState("normal");
@@ -1220,7 +1219,7 @@ function DownloadModal({ onConfirm, onClose }) {
     setBusy(true);
     await onConfirm({
       format,
-      style: { dropCap, justify, paragraphIndent, titleGap, paperTexture: isPng ? paperTexture : true },
+      style: { justify, paragraphIndent, titleGap, paperTexture: isPng ? paperTexture : true },
     });
     setBusy(false);
     onClose();
@@ -1247,7 +1246,6 @@ function DownloadModal({ onConfirm, onClose }) {
           </div>
 
           <div className="dl-section-label">Style</div>
-          <label className="dl-check"><input type="checkbox" checked={dropCap}         onChange={e => setDropCap(e.target.checked)} /><span>Drop cap</span></label>
           <label className="dl-check"><input type="checkbox" checked={justify}         onChange={e => setJustify(e.target.checked)} /><span>Justify text</span></label>
           <label className="dl-check"><input type="checkbox" checked={paragraphIndent} onChange={e => setParagraphIndent(e.target.checked)} /><span>Paragraph indent</span></label>
           {isPng && (
@@ -2114,7 +2112,7 @@ function ReadingView({ pub, user, dropCapImages, focus, onRequestAuth, onAuthorC
       title: pub.title || "",
       byline: pub.author_name || "",
       html: pub.content || "",
-      options: { dropCap: true, justify: true, paragraphIndent: true, paperTexture: true },
+      options: { justify: true, paragraphIndent: true, paperTexture: true },
       async onPage(canvas) {
         const url = canvas.toDataURL("image/jpeg", 0.95);
         setPages(prev => [...prev, url]);
@@ -3511,7 +3509,6 @@ export default function App() {
     const renderOptions = {
       pageW: preset.w,
       pageH: preset.h,
-      dropCap:         style.dropCap         ?? true,
       justify:         style.justify         ?? true,
       titleGap:        style.titleGap        ?? "normal",
       paragraphIndent: style.paragraphIndent ?? true,
@@ -3726,7 +3723,7 @@ export default function App() {
       title: stripHtml(titleRef.current) || "Untitled",
       byline: profileRef.current?.display_name || profileRef.current?.username || "",
       html: contentRef.current || "",
-      options: { dropCap: true, justify: true, paragraphIndent: true, paperTexture: true },
+      options: { justify: true, paragraphIndent: true, paperTexture: true },
       async onPage(canvas) {
         const url = canvas.toDataURL("image/jpeg", 0.95);
         setPreviewPages(prev => [...prev, url]);
