@@ -1028,7 +1028,7 @@ function LandingScreen({ onDone }) {
       <div id="landing-inner">
         <div id="landing-headline">{display}<span id="landing-cursor" /></div>
         <p id="landing-subtitle" style={{ opacity: showSubtitle ? 1 : 0 }}>
-          Inkk records the writing process, from drafts to revisions to time spent, so readers can see signs of real human thought.
+          Inkk studies the writing process — drafts, revisions, pauses — to understand what makes writing distinctly human.
         </p>
       </div>
     </div>
@@ -1044,7 +1044,7 @@ function HumanSignalModal({ onClose }) {
         <button id="auth-close" onClick={onClose}>×</button>
         <div id="hs-modal-title">A small study of writing.</div>
         <p id="hs-modal-body">
-          When you write in Inkk, the rhythm of your typing (pauses, revisions, bursts) is recorded as anonymous, character-free metadata. We use it to study what human writing process looks like in latent space, so we can one day separate it from machine-written text on its own terms.
+          When you write in Inkk, your text and the rhythm of your typing — pauses, revisions, bursts — are captured as part of a study into human writing. We use this to study what distinguishes human writing from machine-generated text.
         </p>
         <p className="hs-modal-body" style={{ marginTop: "12px" }}>
           You can opt out, download, or delete your contribution at any time from your Profile.
@@ -2159,7 +2159,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
           <h2 className="profile-section-label">Research</h2>
         </div>
         <p id="research-blurb">
-          When you write in Inkk, the rhythm of your typing (pauses, revisions, bursts) is recorded as anonymous, character-free metadata. We use it to study what human writing looks like in latent space. You can turn this off at any time, and the editor keeps working exactly as before.
+          When you write in Inkk, your text and the rhythm of your typing — pauses, revisions, bursts — are captured as part of a study into human writing. We use this to study what distinguishes human writing from machine-generated text. You can turn this off at any time, and the editor keeps working exactly as before.
         </p>
 
         {researchOptIn && ((Number(contribution?.event_count) || 0) + pendingLocal) > 0 && (() => {
@@ -4456,11 +4456,11 @@ export default function App() {
           className={menuClass}
           onClick={() => setHsModalOpen(true)}
           aria-label="About inkk research"
-          title="Click for info. Your typing patterns contribute to a research study (no characters stored)"
+          title="Click for info. Your writing contributes to a study of human writing"
         >
           <span className="research-pulse" aria-hidden="true" />
           <span className="research-strip-text">
-            recording · {liveStats.events.toLocaleString()} {liveStats.events === 1 ? "event" : "events"}
+            studying · {liveStats.events.toLocaleString()} {liveStats.events === 1 ? "event" : "events"}
             {liveStats.sessionStartedAt && ` · ${Math.max(1, Math.round((Date.now() - liveStats.sessionStartedAt) / 60000))}m`}
           </span>
         </button>
