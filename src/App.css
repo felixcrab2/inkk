@@ -3283,3 +3283,99 @@ body.focus-mode #text-container {
   color: var(--subtle);
 }
 .pac-code-link:hover { color: var(--text); }
+
+/* ─── Content moderation: report control ──────────────────────────────────── */
+.report-btn {
+  background: none; border: none; padding: 2px 4px; cursor: pointer;
+  font-size: 0.62rem; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--subtle); transition: color 0.18s;
+}
+.report-btn:hover { color: #9a6a62; }
+.comment-report { margin-left: auto; }
+.report-done {
+  font-size: 0.62rem; letter-spacing: 0.06em; color: var(--subtle);
+}
+.comment-report.report-done { margin-left: auto; }
+
+.reading-report-row { margin-top: 14px; }
+
+.report-panel {
+  width: 100%;
+  margin-top: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.comment-header .report-panel { flex-basis: 100%; }
+.report-panel-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.report-panel-title {
+  font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--muted);
+}
+.report-cancel {
+  background: none; border: none; padding: 0; cursor: pointer;
+  font-size: 0.68rem; color: var(--subtle);
+}
+.report-cancel:hover { color: var(--muted); }
+.report-reasons {
+  display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px;
+}
+.report-reason {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.8rem; color: var(--text); cursor: pointer;
+}
+.report-reason input { accent-color: #9a6a62; margin: 0; }
+.report-note {
+  width: 100%; resize: vertical; padding: 8px 10px;
+  border: 1px solid var(--border); background: var(--bg);
+  font-family: var(--font-ui); font-size: 0.82rem; color: var(--text);
+  margin-bottom: 10px;
+}
+.report-note:focus { outline: none; border-color: var(--subtle); }
+.report-err { margin: 0 0 10px; font-size: 0.74rem; color: #7a3a32; }
+.report-actions { display: flex; justify-content: flex-end; }
+.report-submit {
+  background: none; border: 1px solid #9a6a62; padding: 6px 14px; cursor: pointer;
+  font-size: 0.6rem; letter-spacing: 0.16em; text-transform: uppercase;
+  color: #7a3a32; transition: background 0.18s, color 0.18s;
+}
+.report-submit:hover:not(:disabled) { background: #9a6a62; color: var(--bg); }
+.report-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ─── Content moderation: admin queue ─────────────────────────────────────── */
+.admin-view {
+  max-width: 720px; margin: 0 auto; padding: 40px 24px calc(var(--bottom-nav) + 48px);
+}
+.admin-masthead { text-align: center; margin-bottom: 32px; }
+.admin-dateline {
+  font-size: 0.66rem; letter-spacing: 0.32em; text-transform: uppercase;
+  color: var(--muted);
+}
+.admin-section { margin-bottom: 40px; }
+.admin-section-title {
+  font-family: var(--font-serif); font-weight: 500; font-size: 1.2rem;
+  color: var(--text); margin: 0 0 16px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.admin-row {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  padding: 14px 0; border-bottom: 1px solid var(--border);
+}
+.admin-row-body { min-width: 0; flex: 1; }
+.admin-tag {
+  display: inline-block; margin-right: 10px;
+  font-size: 0.58rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--subtle);
+}
+.admin-reason { font-size: 0.8rem; color: var(--text); }
+.admin-note { margin: 6px 0 0; font-size: 0.82rem; color: var(--muted); }
+.admin-snippet {
+  margin: 6px 0 0; font-family: var(--font-serif); font-size: 0.92rem;
+  line-height: 1.45; color: var(--muted);
+}
+.admin-row-actions {
+  display: flex; gap: 14px; flex-shrink: 0; align-items: center; padding-top: 2px;
+}

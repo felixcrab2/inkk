@@ -253,3 +253,87 @@ as $$
 $$;
 
 grant execute on function public.verify_by_code(text) to anon, authenticated;
+
+-- ── 11. Content moderation ─────────────────────────────────────────────────
+-- Two layers, both feeding one review queue:
+--   (a) Auto-triage: at publish/comment time the client calls /api/moderate
+--       (OpenAI Moderation) and caches the verdict on the content row.
+--   (b) Human reports: signed-in users flag content into the reports table.
+-- NOTHING is auto-deleted. An admin reviews and sets moderation_status='removed';
+-- the feed then hides it. Auto-flagged content stays visible until reviewed.
+
+-- 11a. Admin flag on profiles (set true by hand for moderators):
+--      update public.profiles set is_admin = true where username = '<you>';
+alter table public.profiles
+  add column if not exists is_admin boolean not null default false;
+
+-- Security-definer helper so RLS policies can check admin without recursing
+-- into profiles' own policies.
+create or replace function public.is_admin()
+returns boolean
+language sql stable security definer set search_path = public
+as $$ select coalesce((select is_admin from public.profiles where id = auth.uid()), false) $$;
+grant execute on function public.is_admin() to authenticated;
+
+-- 11b. Moderation cache on the content rows.
+-- Status: 'pending' (never checked) | 'ok' | 'flagged' (auto or reported) |
+-- 'removed' (admin-hidden). Existing rows default to 'pending'.
+alter table public.publications
+  add column if not exists moderation_status     text not null default 'pending',
+  add column if not exists moderation_scores     jsonb,
+  add column if not exists moderation_checked_at timestamptz;
+alter table public.comments
+  add column if not exists moderation_status     text not null default 'pending',
+  add column if not exists moderation_scores     jsonb,
+  add column if not exists moderation_checked_at timestamptz;
+
+-- 11c. Admins may update (hide) anyone's content. Authors keep updating their
+-- own rows via existing "own" policies — that's also how each author's client
+-- writes the auto-triage verdict for their own piece/comment. RLS permissive
+-- policies are OR'd, so this only adds admin reach.
+drop policy if exists "pub_admin_update" on public.publications;
+create policy "pub_admin_update" on public.publications
+  for update using (public.is_admin()) with check (public.is_admin());
+drop policy if exists "comments_admin_update" on public.comments;
+create policy "comments_admin_update" on public.comments
+  for update using (public.is_admin()) with check (public.is_admin());
+
+-- 11d. Human reports.
+create table if not exists public.reports (
+  id             uuid primary key default gen_random_uuid(),
+  reporter_id    uuid references public.profiles(id) on delete set null,
+  target_type    text not null check (target_type in ('publication','comment','profile')),
+  target_id      uuid not null,
+  target_user_id uuid,                              -- author of the reported content (denormalised)
+  reason         text not null check (reason in
+                   ('spam','harassment','hate','sexual','violence','self_harm','illegal','other')),
+  note           text check (note is null or length(note) <= 1000),
+  status         text not null default 'open' check (status in ('open','actioned','dismissed')),
+  created_at     timestamptz not null default now(),
+  reviewed_at    timestamptz,
+  reviewed_by    uuid references public.profiles(id) on delete set null
+);
+create index if not exists reports_status_idx on public.reports(status, created_at desc);
+create index if not exists reports_target_idx on public.reports(target_type, target_id);
+-- One report per user per target (re-reporting just updates the reason/note).
+-- NULLs are distinct in Postgres, so anonymised (reporter_id=null) rows are fine.
+create unique index if not exists reports_one_per_user_target
+  on public.reports(reporter_id, target_type, target_id);
+
+alter table public.reports enable row level security;
+
+-- Signed-in users file reports as themselves and can see their own.
+drop policy if exists "reports_insert_own" on public.reports;
+create policy "reports_insert_own" on public.reports
+  for insert with check (auth.uid() = reporter_id);
+drop policy if exists "reports_select_own" on public.reports;
+create policy "reports_select_own" on public.reports
+  for select using (auth.uid() = reporter_id);
+
+-- Admins see and action every report.
+drop policy if exists "reports_select_admin" on public.reports;
+create policy "reports_select_admin" on public.reports
+  for select using (public.is_admin());
+drop policy if exists "reports_update_admin" on public.reports;
+create policy "reports_update_admin" on public.reports
+  for update using (public.is_admin()) with check (public.is_admin());
