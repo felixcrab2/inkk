@@ -177,6 +177,28 @@ function applySmartTypography() {
     setCaret(node, offset);
     return;
   }
+
+  // Markdown emphasis on close: *word*/_word_ → italic, **word**/__word__ → bold.
+  // The opening marker must sit at a word boundary, so snake_case, file_names and
+  // "2 * 3" are left alone.
+  const lastCh = before.slice(-1);
+  if ((lastCh === "_" || lastCh === "*") && node.parentNode) {
+    const mBold = before.match(/(^|[\s([{“‘"'—–])(\*\*|__)([^\s*_][^*_\n]*?)\2$/);
+    const mItal = before.match(/(^|[\s([{“‘"'—–])([*_])([^\s*_][^*_\n]*?)\2$/);
+    const m = mBold || mItal;
+    if (m) {
+      const pre = m[1], inner = m[3];
+      const startIdx = offset - (m[0].length - pre.length);   // index of the opening marker
+      node.nodeValue = text.slice(0, startIdx);               // keep text before it (incl. pre)
+      const el = document.createElement(mBold ? "strong" : "em");
+      el.textContent = inner;
+      const afterNode = document.createTextNode(after);
+      node.parentNode.insertBefore(afterNode, node.nextSibling);
+      node.parentNode.insertBefore(el, afterNode);
+      setCaret(afterNode, 0);
+      return;
+    }
+  }
 }
 
 function stripHtml(html) {
@@ -190,15 +212,34 @@ function stripHtml(html) {
     .replace(/\n{3,}/g, "\n\n").trim();
 }
 
+// Defence-in-depth: strip script-bearing markup before HTML is placed into a
+// live editable node. Parses in an inert <template> (no execution), removes
+// <script>/<iframe>/etc, on* handlers and javascript: URLs, and keeps all
+// formatting and data:image content intact.
+function sanitizeContentHtml(html) {
+  if (!html) return "";
+  const tpl = document.createElement("template");
+  tpl.innerHTML = html;
+  tpl.content.querySelectorAll("script,style,iframe,object,embed,link,meta,base,form,svg").forEach(n => n.remove());
+  tpl.content.querySelectorAll("*").forEach(el => {
+    for (const attr of [...el.attributes]) {
+      const name = attr.name.toLowerCase();
+      if (name.startsWith("on")) el.removeAttribute(attr.name);
+      else if ((name === "href" || name === "src" || name === "xlink:href") && /^\s*javascript:/i.test(attr.value)) el.removeAttribute(attr.name);
+    }
+  });
+  return tpl.innerHTML;
+}
+
 function setEditorHtml(el, content) {
   if (!content) { el.innerHTML = ""; return; }
-  if (/<(div|br|img|p)\b/i.test(content)) { el.innerHTML = content; }
+  if (/<(div|br|img|p)\b/i.test(content)) { el.innerHTML = sanitizeContentHtml(content); }
   else { el.innerText = content; }
 }
 
 function setTitleHtml(el, content) {
   if (!content) { el.innerHTML = ""; return; }
-  if (/<\w+/.test(content) || /&\w+;/.test(content)) { el.innerHTML = content; }
+  if (/<\w+/.test(content) || /&\w+;/.test(content)) { el.innerHTML = sanitizeContentHtml(content); }
   else { el.innerText = content; }
 }
 
@@ -481,7 +522,7 @@ function mergeDocs(local, cloud) {
 // ─── publications ─────────────────────────────────────────────────────────────
 
 const PUB_SELECT = "id, title, content, published_at, author_name, author_username, user_id, writing_time_seconds, revision_count, human_score, score_tier, score_features, keystrokes, deletions, pastes, verify_code, content_hash";
-const PUB_SELECT_WITH_COUNTS = PUB_SELECT + ", moderation_status, render_justify, render_indent, like_count:likes(count), comment_count:comments(count)";
+const PUB_SELECT_WITH_COUNTS = PUB_SELECT + ", author_note, moderation_status, render_justify, render_indent, like_count:likes(count), comment_count:comments(count)";
 
 function getRelCount(rel) {
   if (!rel) return 0;
@@ -578,9 +619,14 @@ function extractImages(html, max = 8) {
 // the user. On success returns { status: 'ok' | 'flagged', scores }.
 async function moderateText(text, images) {
   try {
+    const headers = { "Content-Type": "application/json" };
+    if (supabase) {
+      const { data: s } = await supabase.auth.getSession();
+      if (s?.session?.access_token) headers.Authorization = `Bearer ${s.session.access_token}`;
+    }
     const res = await fetch("/api/moderate", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ text: stripHtml(text), images: images || [] }),
     });
     if (!res.ok) return null;
@@ -607,7 +653,7 @@ function withModeration(payload, mod) {
 function stripModeration(p) {
   const {
     moderation_status, moderation_scores, moderation_checked_at,
-    render_justify, render_indent,
+    render_justify, render_indent, author_note,
     ...rest
   } = p;
   return rest;
@@ -809,6 +855,7 @@ async function doPublish(doc, user, title, authorName, authorUsername, renderOpt
     score_features: doc.scoreFeatures  ?? null,
     render_justify: !!renderOpts.justify,
     render_indent:  !!renderOpts.indent,
+    author_note:    renderOpts.note ? renderOpts.note : null,
   };
   // Auto-triage the publication's text (title + body) before writing it.
   // Fail-open: an outage leaves moderation_status at its 'pending' default.
@@ -849,20 +896,31 @@ async function doUnpublish(docId) {
 
 async function fetchProfile(userId) {
   if (!supabase || !userId) return null;
-  const { data } = await supabase
-    .from("profiles").select("id, username, display_name, avatar_data, research_opt_in, tos_accepted_at, is_admin").eq("id", userId).maybeSingle();
+  let { data, error } = await supabase
+    .from("profiles").select("id, username, display_name, avatar_data, research_opt_in, tos_accepted_at, is_admin, bio").eq("id", userId).maybeSingle();
+  // Graceful fallback if the bio column hasn't been migrated yet.
+  if (error && /column/i.test(error.message || "")) {
+    ({ data } = await supabase
+      .from("profiles").select("id, username, display_name, avatar_data, research_opt_in, tos_accepted_at, is_admin").eq("id", userId).maybeSingle());
+  }
   return data || null;
 }
 
-async function upsertProfile(userId, username, displayName, { tosAccepted = false, tosVersion = null } = {}) {
+async function upsertProfile(userId, username, displayName, { tosAccepted = false, tosVersion = null, bio } = {}) {
   if (!supabase || !userId) return "Not signed in.";
   const row = { id: userId, username, display_name: displayName || null };
+  if (bio !== undefined) row.bio = bio || null;
   if (tosAccepted) {
     row.research_opt_in = true;
     row.tos_accepted_at = new Date().toISOString();
     row.tos_version     = tosVersion;
   }
-  const { error } = await supabase.from("profiles").upsert(row);
+  let { error } = await supabase.from("profiles").upsert(row);
+  // Graceful fallback if the bio column hasn't been migrated yet.
+  if (error && /column/i.test(error.message || "") && "bio" in row) {
+    delete row.bio;
+    ({ error } = await supabase.from("profiles").upsert(row));
+  }
   return error ? error.message : null;
 }
 
@@ -882,11 +940,24 @@ async function fetchPublicationById(id) {
   return data || null;
 }
 
+// The author's note already on a published piece, so re-publishing pre-fills it
+// (and doesn't wipe it). Returns "" when there's no publication / no note.
+async function fetchPublicationNote(docId) {
+  if (!supabase || !docId) return "";
+  const { data } = await supabase.from("publications").select("author_note").eq("doc_id", docId).maybeSingle();
+  return data?.author_note || "";
+}
+
 async function fetchProfileByUsername(username) {
   if (!supabase || !username) return null;
-  const { data } = await supabase
-    .from("profiles").select("id, username, display_name, avatar_data")
+  let { data, error } = await supabase
+    .from("profiles").select("id, username, display_name, avatar_data, bio")
     .eq("username", username).maybeSingle();
+  if (error && /column/i.test(error.message || "")) {
+    ({ data } = await supabase
+      .from("profiles").select("id, username, display_name, avatar_data")
+      .eq("username", username).maybeSingle());
+  }
   return data || null;
 }
 
@@ -929,21 +1000,34 @@ function pathToView(path) {
   return "editor";
 }
 
+// Strip characters that are significant in a PostgREST filter string, so a search
+// term can't break out of the ilike pattern and inject extra filter conditions.
+function sanitizeSearch(query) {
+  return (query || "").replace(/[,()*:%\\]/g, " ").replace(/\s+/g, " ").trim();
+}
+
 async function searchProfiles(query) {
-  if (!supabase || !query.trim()) return [];
-  const q = query.trim();
-  const { data, error } = await supabase
+  const q = sanitizeSearch(query);
+  if (!supabase || !q) return [];
+  let { data, error } = await supabase
     .from("profiles")
-    .select("id, username, display_name, avatar_data")
+    .select("id, username, display_name, avatar_data, bio")
     .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
     .limit(20);
+  if (error && /column/i.test(error.message || "")) {
+    ({ data, error } = await supabase
+      .from("profiles")
+      .select("id, username, display_name, avatar_data")
+      .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
+      .limit(20));
+  }
   if (error || !data) return [];
   return data;
 }
 
 async function searchPublications(query) {
-  if (!supabase || !query.trim()) return [];
-  const q = query.trim();
+  const q = sanitizeSearch(query);
+  if (!supabase || !q) return [];
   const { data, error } = await supabase
     .from("publications")
     .select(PUB_SELECT_WITH_COUNTS)
@@ -1063,7 +1147,7 @@ function LandingScreen({ onDone }) {
       <div id="landing-inner">
         <div id="landing-headline">{display}<span id="landing-cursor" /></div>
         <p id="landing-subtitle" style={{ opacity: showSubtitle ? 1 : 0 }}>
-          Inkk studies the writing process — drafts, revisions, pauses — to understand what makes writing distinctly human.
+          Inkk studies the writing process (drafts, revisions, pauses) to understand what makes writing distinctly human.
         </p>
       </div>
     </div>
@@ -1079,7 +1163,7 @@ function HumanSignalModal({ onClose }) {
         <button id="auth-close" onClick={onClose}>×</button>
         <div id="hs-modal-title">A small study of writing.</div>
         <p id="hs-modal-body">
-          When you write in Inkk, your text and the rhythm of your typing — pauses, revisions, bursts — are captured as part of a study into human writing. We use this to study what distinguishes human writing from machine-generated text.
+          When you write in Inkk, your text and the rhythm of your typing (pauses, revisions, bursts) are captured as part of a study into human writing. We use this to study what distinguishes human writing from machine-generated text.
         </p>
         <p className="hs-modal-body" style={{ marginTop: "12px" }}>
           You can opt out, download, or delete your contribution at any time from your Profile.
@@ -1533,6 +1617,7 @@ function PublishModal({ doc, user, profile, onConfirm, onClose, titleCapsOn }) {
   const [title, setTitle]     = useState(stripHtml(doc.title || ""));
   const [justify, setJustify] = useState(false);
   const [indent, setIndent]   = useState(false);
+  const [note, setNote]       = useState(stripHtml(doc.author_note || ""));
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
 
@@ -1545,7 +1630,7 @@ function PublishModal({ doc, user, profile, onConfirm, onClose, titleCapsOn }) {
     const t = (titleCapsOn ? titleCase(title) : title).trim();
     if (!t) return;
     setLoading(true); setError("");
-    const errMsg = await onConfirm(t, author, { justify, indent });
+    const errMsg = await onConfirm(t, author, { justify, indent, note: note.trim() });
     if (errMsg) setError(errMsg);
     setLoading(false);
   };
@@ -1562,6 +1647,15 @@ function PublishModal({ doc, user, profile, onConfirm, onClose, titleCapsOn }) {
           <div className="dl-section-label">Style</div>
           <label className="dl-check"><input type="checkbox" checked={justify} onChange={e => setJustify(e.target.checked)} /><span>Justify text</span></label>
           <label className="dl-check"><input type="checkbox" checked={indent}  onChange={e => setIndent(e.target.checked)} /><span>Paragraph indent</span></label>
+          <div className="dl-section-label">Note (optional)</div>
+          <textarea
+            className="publish-note-input"
+            placeholder="a line of context: who you are, what this is about"
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            maxLength={200}
+            rows={2}
+          />
           {error && <p className="auth-error">{error}</p>}
           <button id="auth-submit" type="submit" disabled={loading || !title.trim()}>
             {loading ? "publishing…" : "publish"}
@@ -1975,6 +2069,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
   const [editingProfile, setEditingProfile]   = useState(false);
   const [editUsername, setEditUsername]       = useState("");
   const [editDisplayName, setEditDisplayName] = useState("");
+  const [editBio, setEditBio]                 = useState("");
   const [profileSaving, setProfileSaving]     = useState(false);
   const [profileError, setProfileError]       = useState("");
   const fileInputRef              = useRef(null);
@@ -2068,6 +2163,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
   const startEditProfile = () => {
     setEditUsername(profile?.username || "");
     setEditDisplayName(profile?.display_name || "");
+    setEditBio(profile?.bio || "");
     setProfileError("");
     setEditingProfile(true);
   };
@@ -2075,6 +2171,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
   const saveProfile = async () => {
     const newUsername = editUsername.trim();
     const newDisplayName = editDisplayName.trim();
+    const newBio = editBio.trim();
     if (newUsername.length < 3) { setProfileError("Username must be at least 3 characters."); return; }
     setProfileSaving(true);
     setProfileError("");
@@ -2086,13 +2183,13 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
         return;
       }
     }
-    const err = await upsertProfile(user.id, newUsername, newDisplayName || null);
+    const err = await upsertProfile(user.id, newUsername, newDisplayName || null, { bio: newBio });
     setProfileSaving(false);
     if (err) {
       setProfileError(err.includes("unique") || err.includes("duplicate") ? "Username already taken." : err);
       return;
     }
-    onProfileUpdate?.({ ...profile, username: newUsername, display_name: newDisplayName || null });
+    onProfileUpdate?.({ ...profile, username: newUsername, display_name: newDisplayName || null, bio: newBio || null });
     setEditingProfile(false);
   };
 
@@ -2134,6 +2231,14 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
               placeholder="display name (optional)"
               maxLength={50}
             />
+            <textarea
+              className="profile-edit-input profile-edit-bio"
+              value={editBio}
+              onChange={e => setEditBio(e.target.value)}
+              placeholder="bio: who you are, what you write about (optional)"
+              maxLength={200}
+              rows={3}
+            />
             {profileError && <p className="profile-edit-error">{profileError}</p>}
             <div className="profile-edit-actions">
               <button className="text-btn" onClick={() => { setEditingProfile(false); setProfileError(""); }} disabled={profileSaving}>Cancel</button>
@@ -2144,6 +2249,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
           <div id="profile-identity">
             <h1 id="profile-username">{profile?.username ? `@${profile.username}` : user.email}</h1>
             {profile?.display_name && <div id="profile-displayname">{profile.display_name}</div>}
+            {profile?.bio && <p id="profile-bio">{profile.bio}</p>}
             {user.created_at && (
               <div id="profile-joined">Member since {formatJoined(user.created_at)}</div>
             )}
@@ -2290,7 +2396,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
           <h2 className="profile-section-label">Research</h2>
         </div>
         <p id="research-blurb">
-          When you write in Inkk, your text and the rhythm of your typing — pauses, revisions, bursts — are captured as part of a study into human writing. We use this to study what distinguishes human writing from machine-generated text. You can turn this off at any time, and the editor keeps working exactly as before.
+          When you write in Inkk, your text and the rhythm of your typing (pauses, revisions, bursts) are captured as part of a study into human writing. We use this to study what distinguishes human writing from machine-generated text. You can turn this off at any time, and the editor keeps working exactly as before.
         </p>
 
         {researchOptIn && ((Number(contribution?.event_count) || 0) + pendingLocal) > 0 && (() => {
@@ -2478,6 +2584,7 @@ function UserProfileView({ profile, onRead, dropCapImages, user, onRequestAuth }
         <div id="user-profile-info">
           <div id="user-profile-username">@{profile.username}</div>
           {profile.display_name && <div id="user-profile-name">{profile.display_name}</div>}
+          {profile.bio && <p id="user-profile-bio">{profile.bio}</p>}
           <div id="user-profile-stats">
             <span className="user-profile-stat">{pubs.length} {pubs.length === 1 ? "piece" : "pieces"}</span>
             <span className="user-profile-stat-sep">·</span>
@@ -2663,6 +2770,9 @@ function ReadingView({ pub, user, dropCapImages, focus, onRequestAuth, onAuthorC
           </div>
         </div>
         <div id="reading-inner" style={{ maxWidth: `${700 * zoom}px` }}>
+          {pub.author_note && (
+            <p className="reading-author-note">{pub.author_note}</p>
+          )}
           <div id="reading-pages">
             {pagesLoading && pages.length === 0 && (
               <p className="reading-pages-loading">rendering…</p>
@@ -3640,13 +3750,15 @@ export default function App() {
 
   // ─ publish ──────────────────────────────────────────────────────────────────
 
-  const openPublishModal = useCallback((doc, e) => {
+  const openPublishModal = useCallback(async (doc, e) => {
     if (e) e.stopPropagation();
     if (!userRef.current) { setAuthMode("signin"); setAuthOpen(true); return; }
     const content = doc.id === activeId ? contentRef.current : doc.content;
     if (!stripHtml(content || "").trim()) return;
-    setPublishModalDoc({ ...doc, content });
-  }, [activeId]);
+    // Pre-fill the existing note when re-publishing, so it persists.
+    const author_note = publishedDocIds.has(doc.id) ? await fetchPublicationNote(doc.id) : "";
+    setPublishModalDoc({ ...doc, content, author_note });
+  }, [activeId, publishedDocIds]);
 
   const confirmPublish = useCallback(async (title, authorName, renderOpts) => {
     if (!publishModalDoc) return "No document selected.";
@@ -4004,10 +4116,11 @@ export default function App() {
       selectImageWhenReady(img);
       return;
     }
-    // Strip formatting on paste — insert as plain text only
+    // Text paste is turned off for now — pieces should be written, not pasted in
+    // (it would bypass the keystroke recording behind Inkk's verification).
+    // Pasting an image still works (handled above).
     e.preventDefault();
-    const text = e.clipboardData?.getData("text/plain") || "";
-    if (text) document.execCommand("insertText", false, text);
+    if (e.clipboardData?.getData("text/plain")) addToast("Pasting text is turned off for now.");
   }, [onInput, selectImageWhenReady, addToast]);
 
   // ─ PDF export ───────────────────────────────────────────────────────────────
@@ -4632,11 +4745,7 @@ export default function App() {
           onInput={onTitleInput}
           onBlur={finalizeTitle}
           onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); finalizeTitle(); editorRef.current?.focus(); } }}
-          onPaste={e => {
-            e.preventDefault();
-            const text = (e.clipboardData?.getData("text/plain") || "").replace(/\s*\n\s*/g, " ");
-            document.execCommand("insertText", false, text);
-          }}
+          onPaste={e => e.preventDefault()}
         />
         <div id="writing-area">
           <div

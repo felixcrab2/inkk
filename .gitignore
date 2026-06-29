@@ -5,5 +5,11 @@ node_modules/
 .DS_Store
 scripts/_pdf-out/
 
+# seed: local credentials + the run ledger (records created users/passwords)
+scripts/seed/.env
+scripts/seed/.seed-ledger.json
+# regenerable Gutenberg pipeline output (active content is posts.json)
+scripts/seed/content.json
+
 # local font comparison screenshots (not for commit)
 font-previews/

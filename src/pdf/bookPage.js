@@ -147,8 +147,14 @@ function drawTrackedCentered(ctx, text, cx, baseline, sizePt, trackEm) {
 // A run is { text, b, i }. Segments inside a text block are joined by hard
 // line-breaks; blocks are joined by paragraph breaks.
 export function parseHtmlToBlocks(html) {
-  const container = document.createElement("div");
-  container.innerHTML = html || "";
+  // Parse in an inert <template>: its content is not connected to the document,
+  // so hostile markup in a published piece (e.g. <img onerror=...>) can never
+  // load a resource or run a handler when another reader views it. The parsed
+  // tree is identical to innerHTML for legitimate content, so rendering is
+  // unchanged — this only removes the script-execution path.
+  const tpl = document.createElement("template");
+  tpl.innerHTML = html || "";
+  const container = tpl.content;
 
   // tokens: { type: "text", text, b, i } | { type: "image", src } | { type: "break" }
   const tokens = [];
