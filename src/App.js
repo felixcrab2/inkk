@@ -2382,6 +2382,29 @@ export default function App() {
           mid_revisions: features.mid_revisions,
           typo_corrections: features.typo_corrections,
           pause_count_500: features.pause_count_500,
+          // Full nine-dimension sub-signal vector (value + confidence, 0..1) for
+          // the radar "fingerprint". Stripped of the heavier `raw` payloads.
+          dims: Object.entries(score.subs || {}).map(([key, s]) => ({
+            key,
+            value: Math.round((s.value || 0) * 1000) / 1000,
+            conf:  Math.round((s.conf  || 0) * 1000) / 1000,
+          })),
+          // Pause distribution buckets for the rhythm chart.
+          pause_micro: Math.max(0, (features.pause_count_500 || 0) - (features.pause_count_2000 || 0)),
+          pause_think: Math.max(0, (features.pause_count_2000 || 0) - (features.pause_count_10000 || 0)),
+          pause_long:  features.pause_count_10000 || 0,
+          // Cadence + provenance figures.
+          iki_median:      Math.round(features.iki?.median || 0),
+          iki_n:           features.iki?.n || 0,
+          dwell_mean:      Math.round(features.dwell?.mean || 0),
+          dwell_n:         features.dwell?.n || 0,
+          deleted_chars:   features.deleted_chars   || 0,
+          pasted_chars:    features.pasted_chars    || 0,
+          typing_events:   features.typing_events   || 0,
+          deletion_events: features.deletion_events || 0,
+          burst_total_ms:  features.burst_total_ms  || 0,
+          total_time_ms:   features.total_time_ms   || 0,
+          nav_events:      features.nav_events      || 0,
           velocity_series:   score.velocity_series  || [],
           avg_wpm:           score.avg_wpm          || 0,
           peak_wpm:          score.peak_wpm         || 0,
