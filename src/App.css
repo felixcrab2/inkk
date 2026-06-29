@@ -652,7 +652,11 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
   display: block;
   margin: 14px auto;
   border-radius: 4px;
-  cursor: default;
+  cursor: pointer;
+}
+#text img.img-selected {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
 }
 
 #text:empty::after {
@@ -3550,3 +3554,41 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
   border: 1px solid var(--border);
   border-radius: 1px;
 }
+
+/* ─── Image toolbar (editor) ──────────────────────────────────────────────── */
+.img-toolbar {
+  position: fixed;
+  transform: translateX(-50%);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.1);
+}
+.img-tb-group { display: flex; align-items: center; gap: 2px; }
+.img-tb-sep { width: 1px; align-self: stretch; background: var(--border); margin: 2px 3px; }
+.img-tb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 7px;
+  background: none;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: background 0.15s, color 0.15s;
+}
+.img-tb-btn:hover { background: var(--surface); color: var(--text); }
+.img-tb-btn.active { color: var(--text); background: var(--surface); }
+.img-tb-btn:last-child:hover { color: #9a6a62; }
