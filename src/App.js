@@ -330,9 +330,10 @@ function dropCapSrc(letter, images) {
   const l = letter.toLowerCase();
   const list = images[l];
   if (!list?.length) return null;
-  const area = name => { const m = name.match(/(\d+)x(\d+)$/); return m ? +m[1] * +m[2] : 80 * 80; };
-  const best = list.reduce((a, b) => area(b) > area(a) ? b : a);
-  return `/drop_caps/${l}/${best}.png`;
+  const minDim = name => { const m = name.match(/(\d+)x(\d+)$/); return m ? Math.min(+m[1], +m[2]) : 80; };
+  const hq = list.filter(n => minDim(n) >= 100);
+  const pool = hq.length ? hq : list;
+  return `/drop_caps/${l}/${pool[Math.floor(Math.random() * pool.length)]}.png`;
 }
 
 async function compressAvatar(file, size = 400) {
