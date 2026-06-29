@@ -374,7 +374,7 @@ function mergeDocs(local, cloud) {
 // ─── publications ─────────────────────────────────────────────────────────────
 
 const PUB_SELECT = "id, title, content, published_at, author_name, author_username, user_id, writing_time_seconds, revision_count, human_score, score_tier, score_features, keystrokes, deletions, pastes, verify_code, content_hash";
-const PUB_SELECT_WITH_COUNTS = PUB_SELECT + ", moderation_status, like_count:likes(count), comment_count:comments(count)";
+const PUB_SELECT_WITH_COUNTS = PUB_SELECT + ", moderation_status, render_justify, render_indent, like_count:likes(count), comment_count:comments(count)";
 
 function getRelCount(rel) {
   if (!rel) return 0;
@@ -495,9 +495,14 @@ function withModeration(payload, mod) {
   };
 }
 
-// Drop moderation keys — used to retry writes on databases not yet migrated.
+// Drop the newer optional columns (moderation + render flags) — used to retry
+// writes on databases not yet migrated.
 function stripModeration(p) {
-  const { moderation_status, moderation_scores, moderation_checked_at, ...rest } = p;
+  const {
+    moderation_status, moderation_scores, moderation_checked_at,
+    render_justify, render_indent,
+    ...rest
+  } = p;
   return rest;
 }
 
@@ -674,7 +679,7 @@ async function ensureCertificate(doc, user, { title, authorName, authorUsername 
 // Publish (or re-publish) a document to the feed. Publishing certifies the
 // piece too — reusing the document's existing code when the text is unchanged.
 // Returns { error, code, verified }.
-async function doPublish(doc, user, title, authorName, authorUsername) {
+async function doPublish(doc, user, title, authorName, authorUsername, renderOpts = {}) {
   if (!supabase || !user) return { error: "Not signed in." };
 
   const cert = await ensureCertificate(doc, user, { title, authorName, authorUsername });
@@ -695,6 +700,8 @@ async function doPublish(doc, user, title, authorName, authorUsername) {
     human_score:    doc.humanScore     ?? null,
     score_tier:     doc.scoreTier      ?? null,
     score_features: doc.scoreFeatures  ?? null,
+    render_justify: !!renderOpts.justify,
+    render_indent:  !!renderOpts.indent,
   };
   // Auto-triage the publication's text (title + body) before writing it.
   // Fail-open: an outage leaves moderation_status at its 'pending' default.
@@ -1172,6 +1179,8 @@ function UsernameModal({ user, onDone }) {
 function PublishModal({ doc, user, profile, onConfirm, onClose }) {
   const author = profile?.username || user.user_metadata?.full_name || user.email.split("@")[0];
   const [title, setTitle]     = useState(stripHtml(doc.title || ""));
+  const [justify, setJustify] = useState(false);
+  const [indent, setIndent]   = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
 
@@ -1180,7 +1189,7 @@ function PublishModal({ doc, user, profile, onConfirm, onClose }) {
     const t = title.trim();
     if (!t) return;
     setLoading(true); setError("");
-    const errMsg = await onConfirm(t, author);
+    const errMsg = await onConfirm(t, author, { justify, indent });
     if (errMsg) setError(errMsg);
     setLoading(false);
   };
@@ -1194,6 +1203,9 @@ function PublishModal({ doc, user, profile, onConfirm, onClose }) {
         </div>
         <form onSubmit={submit}>
           <input type="text" placeholder="article title" value={title} onChange={e => setTitle(e.target.value)} required autoFocus />
+          <div className="dl-section-label">Style</div>
+          <label className="dl-check"><input type="checkbox" checked={justify} onChange={e => setJustify(e.target.checked)} /><span>Justify text</span></label>
+          <label className="dl-check"><input type="checkbox" checked={indent}  onChange={e => setIndent(e.target.checked)} /><span>Paragraph indent</span></label>
           {error && <p className="auth-error">{error}</p>}
           <button id="auth-submit" type="submit" disabled={loading || !title.trim()}>
             {loading ? "publishing…" : "publish"}
@@ -1208,21 +1220,14 @@ function PublishModal({ doc, user, profile, onConfirm, onClose }) {
 
 function DownloadModal({ onConfirm, onClose }) {
   const [format,          setFormat]          = useState("pdf");
-  const [justify,         setJustify]         = useState(true);
-  const [paragraphIndent, setParagraphIndent] = useState(true);
-  const [titleGap,        setTitleGap]        = useState("normal");
-  const [paperTexture,    setPaperTexture]    = useState(true);
+  const [justify,         setJustify]         = useState(false);
+  const [paragraphIndent, setParagraphIndent] = useState(false);
   const [busy,            setBusy]            = useState(false);
-
-  const isPng = format !== "pdf";
 
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
-    await onConfirm({
-      format,
-      style: { justify, paragraphIndent, titleGap, paperTexture: isPng ? paperTexture : true },
-    });
+    await onConfirm({ format, style: { justify, paragraphIndent } });
     setBusy(false);
     onClose();
   };
@@ -1250,19 +1255,6 @@ function DownloadModal({ onConfirm, onClose }) {
           <div className="dl-section-label">Style</div>
           <label className="dl-check"><input type="checkbox" checked={justify}         onChange={e => setJustify(e.target.checked)} /><span>Justify text</span></label>
           <label className="dl-check"><input type="checkbox" checked={paragraphIndent} onChange={e => setParagraphIndent(e.target.checked)} /><span>Paragraph indent</span></label>
-          {isPng && (
-            <label className="dl-check"><input type="checkbox" checked={paperTexture} onChange={e => setPaperTexture(e.target.checked)} /><span>Paper texture</span></label>
-          )}
-
-          <div className="dl-section-label">Title spacing</div>
-          <div className="dl-radio-row">
-            {[{ v: "tight", l: "Tight" }, { v: "normal", l: "Normal" }, { v: "loose", l: "Loose" }].map(o => (
-              <label key={o.v} className={`dl-radio${titleGap === o.v ? " active" : ""}`}>
-                <input type="radio" name="titleGap" value={o.v} checked={titleGap === o.v} onChange={() => setTitleGap(o.v)} />
-                <span>{o.l}</span>
-              </label>
-            ))}
-          </div>
 
           <button id="auth-submit" type="submit" disabled={busy}>
             {busy ? "preparing…" : `Download ${format === "pdf" ? "PDF" : "PNG"}`}
@@ -2114,7 +2106,7 @@ function ReadingView({ pub, user, dropCapImages, focus, onRequestAuth, onAuthorC
       title: pub.title || "",
       byline: pub.author_name || "",
       html: pub.content || "",
-      options: { justify: true, paragraphIndent: true, paperTexture: true },
+      options: { justify: !!pub.render_justify, paragraphIndent: !!pub.render_indent, paperTexture: true },
       async onPage(canvas) {
         const url = canvas.toDataURL("image/jpeg", 0.95);
         setPages(prev => [...prev, url]);
@@ -3158,10 +3150,10 @@ export default function App() {
     setPublishModalDoc({ ...doc, content });
   }, [activeId]);
 
-  const confirmPublish = useCallback(async (title, authorName) => {
+  const confirmPublish = useCallback(async (title, authorName, renderOpts) => {
     if (!publishModalDoc) return "No document selected.";
     const wasAlreadyPublished = publishedDocIds.has(publishModalDoc.id);
-    const { error, code, verified, contentHash } = await doPublish(publishModalDoc, userRef.current, title, authorName, profile?.username);
+    const { error, code, verified, contentHash } = await doPublish(publishModalDoc, userRef.current, title, authorName, profile?.username, renderOpts);
     if (!error) {
       const docId = publishModalDoc.id;
       setPublishedDocIds(prev => new Set([...prev, docId]));
@@ -3506,8 +3498,8 @@ export default function App() {
       format === "png-portrait" ? "portrait" :
       "book"
     ];
-    // PNG outputs default to inkk background; user can override.
-    const paperTexture = style.paperTexture ?? (format === "pdf");
+    // PDF keeps the paper look; PNG exports on the clean inkk background.
+    const paperTexture = (format === "pdf");
     // Verification certificate for this piece, if it's certified. Written into
     // the PDF's (invisible) document metadata only — the code is surfaced in
     // the app (Profile, reading view, Verify tab), not stamped on the page.
@@ -3530,9 +3522,8 @@ export default function App() {
     const renderOptions = {
       pageW: preset.w,
       pageH: preset.h,
-      justify:         style.justify         ?? true,
-      titleGap:        style.titleGap        ?? "normal",
-      paragraphIndent: style.paragraphIndent ?? true,
+      justify:         style.justify         ?? false,
+      paragraphIndent: style.paragraphIndent ?? false,
       paperTexture,
     };
 
@@ -3744,7 +3735,7 @@ export default function App() {
       title: stripHtml(titleRef.current) || "Untitled",
       byline: profileRef.current?.display_name || profileRef.current?.username || "",
       html: contentRef.current || "",
-      options: { justify: true, paragraphIndent: true, paperTexture: true },
+      options: { justify: false, paragraphIndent: false, paperTexture: true },
       async onPage(canvas) {
         const url = canvas.toDataURL("image/jpeg", 0.95);
         setPreviewPages(prev => [...prev, url]);

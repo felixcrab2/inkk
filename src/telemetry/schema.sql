@@ -35,7 +35,10 @@ alter table public.publications
   add column if not exists pastes            integer,
   add column if not exists human_score       smallint,
   add column if not exists score_tier        text,
-  add column if not exists score_features    jsonb;
+  add column if not exists score_features    jsonb,
+  -- Per-piece render options chosen at publish time (default off = plain look).
+  add column if not exists render_justify    boolean not null default false,
+  add column if not exists render_indent     boolean not null default false;
 
 -- 4. Writing sessions: REMOVED.
 -- This table was never written by the client — sync.js only uploads
