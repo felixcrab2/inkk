@@ -337,14 +337,14 @@ body.focus-mode #hs-editor-status {
 body.focus-mode #text-container {
   top: 0 !important;
   bottom: 0 !important;
-  padding-top: 12vh;
+  padding-top: 36vh;
   -webkit-mask-image: none !important;
   mask-image: none !important;
 }
-/* In fullscreen the viewport is taller, so the default 22vh→9vh settle travels
-   far more pixels and reads as a large jump. Keep the title/body essentially
-   put — a ~1vh settle that's barely perceptible. */
-body.focus-mode #text-container.writing-started { padding-top: 11vh; }
+/* In fullscreen, sit the title/body well down the screen (about a third down)
+   with only a small ~4vh settle once writing begins, so it stays low and barely
+   moves rather than jumping up toward the top. */
+body.focus-mode #text-container.writing-started { padding-top: 32vh; }
 
 /* ─── Document panel ──────────────────────────────────────────────────────── */
 #panel-backdrop {
