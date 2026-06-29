@@ -481,7 +481,7 @@ function mergeDocs(local, cloud) {
 // ─── publications ─────────────────────────────────────────────────────────────
 
 const PUB_SELECT = "id, title, content, published_at, author_name, author_username, user_id, writing_time_seconds, revision_count, human_score, score_tier, score_features, keystrokes, deletions, pastes, verify_code, content_hash";
-const PUB_SELECT_WITH_COUNTS = PUB_SELECT + ", moderation_status, render_justify, render_indent, like_count:likes(count), comment_count:comments(count)";
+const PUB_SELECT_WITH_COUNTS = PUB_SELECT + ", author_note, moderation_status, render_justify, render_indent, like_count:likes(count), comment_count:comments(count)";
 
 function getRelCount(rel) {
   if (!rel) return 0;
@@ -607,7 +607,7 @@ function withModeration(payload, mod) {
 function stripModeration(p) {
   const {
     moderation_status, moderation_scores, moderation_checked_at,
-    render_justify, render_indent,
+    render_justify, render_indent, author_note,
     ...rest
   } = p;
   return rest;
@@ -809,6 +809,7 @@ async function doPublish(doc, user, title, authorName, authorUsername, renderOpt
     score_features: doc.scoreFeatures  ?? null,
     render_justify: !!renderOpts.justify,
     render_indent:  !!renderOpts.indent,
+    author_note:    renderOpts.note ? renderOpts.note : null,
   };
   // Auto-triage the publication's text (title + body) before writing it.
   // Fail-open: an outage leaves moderation_status at its 'pending' default.
@@ -849,20 +850,31 @@ async function doUnpublish(docId) {
 
 async function fetchProfile(userId) {
   if (!supabase || !userId) return null;
-  const { data } = await supabase
-    .from("profiles").select("id, username, display_name, avatar_data, research_opt_in, tos_accepted_at, is_admin").eq("id", userId).maybeSingle();
+  let { data, error } = await supabase
+    .from("profiles").select("id, username, display_name, avatar_data, research_opt_in, tos_accepted_at, is_admin, bio").eq("id", userId).maybeSingle();
+  // Graceful fallback if the bio column hasn't been migrated yet.
+  if (error && /column/i.test(error.message || "")) {
+    ({ data } = await supabase
+      .from("profiles").select("id, username, display_name, avatar_data, research_opt_in, tos_accepted_at, is_admin").eq("id", userId).maybeSingle());
+  }
   return data || null;
 }
 
-async function upsertProfile(userId, username, displayName, { tosAccepted = false, tosVersion = null } = {}) {
+async function upsertProfile(userId, username, displayName, { tosAccepted = false, tosVersion = null, bio } = {}) {
   if (!supabase || !userId) return "Not signed in.";
   const row = { id: userId, username, display_name: displayName || null };
+  if (bio !== undefined) row.bio = bio || null;
   if (tosAccepted) {
     row.research_opt_in = true;
     row.tos_accepted_at = new Date().toISOString();
     row.tos_version     = tosVersion;
   }
-  const { error } = await supabase.from("profiles").upsert(row);
+  let { error } = await supabase.from("profiles").upsert(row);
+  // Graceful fallback if the bio column hasn't been migrated yet.
+  if (error && /column/i.test(error.message || "") && "bio" in row) {
+    delete row.bio;
+    ({ error } = await supabase.from("profiles").upsert(row));
+  }
   return error ? error.message : null;
 }
 
@@ -884,9 +896,14 @@ async function fetchPublicationById(id) {
 
 async function fetchProfileByUsername(username) {
   if (!supabase || !username) return null;
-  const { data } = await supabase
-    .from("profiles").select("id, username, display_name, avatar_data")
+  let { data, error } = await supabase
+    .from("profiles").select("id, username, display_name, avatar_data, bio")
     .eq("username", username).maybeSingle();
+  if (error && /column/i.test(error.message || "")) {
+    ({ data } = await supabase
+      .from("profiles").select("id, username, display_name, avatar_data")
+      .eq("username", username).maybeSingle());
+  }
   return data || null;
 }
 
@@ -915,11 +932,18 @@ function pathToView(path) {
 async function searchProfiles(query) {
   if (!supabase || !query.trim()) return [];
   const q = query.trim();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("profiles")
-    .select("id, username, display_name, avatar_data")
+    .select("id, username, display_name, avatar_data, bio")
     .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
     .limit(20);
+  if (error && /column/i.test(error.message || "")) {
+    ({ data, error } = await supabase
+      .from("profiles")
+      .select("id, username, display_name, avatar_data")
+      .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
+      .limit(20));
+  }
   if (error || !data) return [];
   return data;
 }
@@ -1486,6 +1510,7 @@ function PublishModal({ doc, user, profile, onConfirm, onClose, titleCapsOn }) {
   const [title, setTitle]     = useState(stripHtml(doc.title || ""));
   const [justify, setJustify] = useState(false);
   const [indent, setIndent]   = useState(false);
+  const [note, setNote]       = useState(stripHtml(doc.author_note || ""));
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
 
@@ -1498,7 +1523,7 @@ function PublishModal({ doc, user, profile, onConfirm, onClose, titleCapsOn }) {
     const t = (titleCapsOn ? titleCase(title) : title).trim();
     if (!t) return;
     setLoading(true); setError("");
-    const errMsg = await onConfirm(t, author, { justify, indent });
+    const errMsg = await onConfirm(t, author, { justify, indent, note: note.trim() });
     if (errMsg) setError(errMsg);
     setLoading(false);
   };
@@ -1515,6 +1540,15 @@ function PublishModal({ doc, user, profile, onConfirm, onClose, titleCapsOn }) {
           <div className="dl-section-label">Style</div>
           <label className="dl-check"><input type="checkbox" checked={justify} onChange={e => setJustify(e.target.checked)} /><span>Justify text</span></label>
           <label className="dl-check"><input type="checkbox" checked={indent}  onChange={e => setIndent(e.target.checked)} /><span>Paragraph indent</span></label>
+          <div className="dl-section-label">Note (optional)</div>
+          <textarea
+            className="publish-note-input"
+            placeholder="a line of context: who you are, what this is about"
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            maxLength={200}
+            rows={2}
+          />
           {error && <p className="auth-error">{error}</p>}
           <button id="auth-submit" type="submit" disabled={loading || !title.trim()}>
             {loading ? "publishing…" : "publish"}
@@ -1928,6 +1962,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
   const [editingProfile, setEditingProfile]   = useState(false);
   const [editUsername, setEditUsername]       = useState("");
   const [editDisplayName, setEditDisplayName] = useState("");
+  const [editBio, setEditBio]                 = useState("");
   const [profileSaving, setProfileSaving]     = useState(false);
   const [profileError, setProfileError]       = useState("");
   const fileInputRef              = useRef(null);
@@ -2021,6 +2056,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
   const startEditProfile = () => {
     setEditUsername(profile?.username || "");
     setEditDisplayName(profile?.display_name || "");
+    setEditBio(profile?.bio || "");
     setProfileError("");
     setEditingProfile(true);
   };
@@ -2028,6 +2064,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
   const saveProfile = async () => {
     const newUsername = editUsername.trim();
     const newDisplayName = editDisplayName.trim();
+    const newBio = editBio.trim();
     if (newUsername.length < 3) { setProfileError("Username must be at least 3 characters."); return; }
     setProfileSaving(true);
     setProfileError("");
@@ -2039,13 +2076,13 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
         return;
       }
     }
-    const err = await upsertProfile(user.id, newUsername, newDisplayName || null);
+    const err = await upsertProfile(user.id, newUsername, newDisplayName || null, { bio: newBio });
     setProfileSaving(false);
     if (err) {
       setProfileError(err.includes("unique") || err.includes("duplicate") ? "Username already taken." : err);
       return;
     }
-    onProfileUpdate?.({ ...profile, username: newUsername, display_name: newDisplayName || null });
+    onProfileUpdate?.({ ...profile, username: newUsername, display_name: newDisplayName || null, bio: newBio || null });
     setEditingProfile(false);
   };
 
@@ -2087,6 +2124,14 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
               placeholder="display name (optional)"
               maxLength={50}
             />
+            <textarea
+              className="profile-edit-input profile-edit-bio"
+              value={editBio}
+              onChange={e => setEditBio(e.target.value)}
+              placeholder="bio — who you are, what you write about (optional)"
+              maxLength={200}
+              rows={3}
+            />
             {profileError && <p className="profile-edit-error">{profileError}</p>}
             <div className="profile-edit-actions">
               <button className="text-btn" onClick={() => { setEditingProfile(false); setProfileError(""); }} disabled={profileSaving}>Cancel</button>
@@ -2097,6 +2142,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
           <div id="profile-identity">
             <h1 id="profile-username">{profile?.username ? `@${profile.username}` : user.email}</h1>
             {profile?.display_name && <div id="profile-displayname">{profile.display_name}</div>}
+            {profile?.bio && <p id="profile-bio">{profile.bio}</p>}
             {user.created_at && (
               <div id="profile-joined">Member since {formatJoined(user.created_at)}</div>
             )}
@@ -2431,6 +2477,7 @@ function UserProfileView({ profile, onRead, dropCapImages, user, onRequestAuth }
         <div id="user-profile-info">
           <div id="user-profile-username">@{profile.username}</div>
           {profile.display_name && <div id="user-profile-name">{profile.display_name}</div>}
+          {profile.bio && <p id="user-profile-bio">{profile.bio}</p>}
           <div id="user-profile-stats">
             <span className="user-profile-stat">{pubs.length} {pubs.length === 1 ? "piece" : "pieces"}</span>
             <span className="user-profile-stat-sep">·</span>
@@ -2616,6 +2663,9 @@ function ReadingView({ pub, user, dropCapImages, focus, onRequestAuth, onAuthorC
           </div>
         </div>
         <div id="reading-inner" style={{ maxWidth: `${700 * zoom}px` }}>
+          {pub.author_note && (
+            <p className="reading-author-note">{pub.author_note}</p>
+          )}
           <div id="reading-pages">
             {pagesLoading && pages.length === 0 && (
               <p className="reading-pages-loading">rendering…</p>

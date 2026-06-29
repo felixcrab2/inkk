@@ -1,0 +1,87 @@
+{
+  "_comment": "Seed manifest for Inkk. All sources are public-domain works from Project Gutenberg. Each piece is attributed to an Inkk persona (a fictional account) and published with NO verification certificate (it was not written in the editor). Edit freely: add personas, add picks, repoint sources. Run `npm run seed:build` to (re)generate content.json, then `npm run seed` to load it.",
+
+  "personas": [
+    { "username": "marginalia",    "display_name": "Marginalia",        "bio": "Notes in the margins. Mostly about small things." },
+    { "username": "paper_kite",    "display_name": "Tomas Field",       "bio": "Walks, weather, and whatever's in my coat pocket." },
+    { "username": "junebug",       "display_name": "June Halloran",     "bio": "" },
+    { "username": "nightporter",   "display_name": "the night porter",  "bio": "I keep odd hours." },
+    { "username": "clementine",    "display_name": "Clementine Adeyemi", "bio": "Soft things, sharp endings." },
+    { "username": "inkwell_ghost", "display_name": "",                  "bio": "" },
+    { "username": "e.vestergaard", "display_name": "Elin Vestergaard",  "bio": "Reading my way out of the city." },
+    { "username": "quietcar",      "display_name": "Daniel Okafor",     "bio": "Please do not make calls." },
+    { "username": "wending",       "display_name": "Wending",           "bio": "On foot, preferably." },
+    { "username": "r.mendoza",     "display_name": "Rafael Mendoza",    "bio": "Essays, mostly. The old kind." },
+    { "username": "oliveandash",   "display_name": "Olive Nakamura",    "bio": "" },
+    { "username": "fern",          "display_name": "Fern Whitlock",     "bio": "Small lives, closely watched." },
+    { "username": "saltmarsh",     "display_name": "Saltmarsh",         "bio": "Tidal. Argumentative." },
+    { "username": "the_understory","display_name": "Understory",        "bio": "Whatever grows in the shade." }
+  ],
+
+  "standalone": [
+    { "id": 1080, "title": "A Modest Proposal", "author": "Jonathan Swift",            "kind": "essay", "persona": "saltmarsh" },
+    { "id": 1952, "title": "The Yellow Wallpaper", "author": "Charlotte Perkins Gilman", "kind": "story", "persona": "junebug" },
+    { "id": 375,  "title": "An Occurrence at Owl Creek Bridge", "author": "Ambrose Bierce", "kind": "story", "persona": "nightporter" },
+    { "id": 7256, "title": "The Gift of the Magi", "author": "O. Henry",               "kind": "story", "persona": "clementine" },
+    { "id": 1063, "title": "The Cask of Amontillado", "author": "Edgar Allan Poe",     "kind": "story", "persona": "inkwell_ghost" }
+  ],
+
+  "collections": [
+    {
+      "id": 8092, "source": "Tremendous Trifles", "author": "G. K. Chesterton", "kind": "essay",
+      "autosplit": "roman",
+      "publish": [
+        { "title": "A Piece of Chalk",               "persona": "marginalia" },
+        { "title": "On Lying in Bed",                 "persona": "marginalia" },
+        { "title": "The Twelve Men",                  "persona": "marginalia" },
+        { "title": "What I Found in My Pocket",       "persona": "paper_kite" },
+        { "title": "The Little Birds Who Won't Sing", "persona": "paper_kite" },
+        { "title": "A Tragedy of Twopence",           "persona": "paper_kite" }
+      ]
+    },
+    {
+      "id": 2814, "source": "Dubliners", "author": "James Joyce", "kind": "story",
+      "titles": [
+        "THE SISTERS","AN ENCOUNTER","ARABY","EVELINE","AFTER THE RACE","TWO GALLANTS",
+        "THE BOARDING HOUSE","A LITTLE CLOUD","COUNTERPARTS","CLAY","A PAINFUL CASE",
+        "IVY DAY IN THE COMMITTEE ROOM","A MOTHER","GRACE","THE DEAD"
+      ],
+      "publish": [
+        { "title": "ARABY",         "persona": "e.vestergaard" },
+        { "title": "EVELINE",       "persona": "e.vestergaard" },
+        { "title": "A LITTLE CLOUD", "persona": "quietcar" },
+        { "title": "CLAY",          "persona": "quietcar" }
+      ]
+    },
+    {
+      "id": 386, "source": "Virginibus Puerisque", "author": "Robert Louis Stevenson", "kind": "essay",
+      "titles": [
+        "VIRGINIBUS PUERISQUE","CRABBED AGE AND YOUTH","AN APOLOGY FOR IDLERS","ORDERED SOUTH",
+        "Æs Triplex","EL DORADO","THE ENGLISH ADMIRALS","SOME PORTRAITS BY RAEBURN",
+        "WALKING TOURS","A PLEA FOR GAS LAMPS","FOOTNOTES"
+      ],
+      "publish": [
+        { "title": "AN APOLOGY FOR IDLERS", "persona": "wending" },
+        { "title": "WALKING TOURS",         "persona": "wending" },
+        { "title": "EL DORADO",             "persona": "wending" },
+        { "title": "Æs Triplex",            "persona": "r.mendoza" },
+        { "title": "CRABBED AGE AND YOUTH", "persona": "r.mendoza" }
+      ]
+    },
+    {
+      "id": 1429, "source": "The Garden Party, and Other Stories", "author": "Katherine Mansfield", "kind": "story",
+      "titles": [
+        "At the Bay","The Garden-Party","The Daughters of the Late Colonel","Mr. and Mrs. Dove",
+        "The Young Girl","Life of Ma Parker","Marriage a la Mode","The Voyage","Miss Brill",
+        "Her First Ball","The Singing Lesson","The Stranger","Bank Holiday","An Ideal Family","The Lady's Maid"
+      ],
+      "publish": [
+        { "title": "Miss Brill",        "persona": "oliveandash" },
+        { "title": "The Voyage",        "persona": "oliveandash" },
+        { "title": "Her First Ball",    "persona": "oliveandash" },
+        { "title": "Life of Ma Parker", "persona": "fern" },
+        { "title": "An Ideal Family",   "persona": "fern" }
+      ]
+    }
+  ]
+}
