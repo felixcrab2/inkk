@@ -3452,7 +3452,15 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
 
 /* ─── Content moderation: admin queue ─────────────────────────────────────── */
 .admin-view {
-  max-width: 720px; margin: 0 auto; padding: 40px 24px calc(var(--bottom-nav) + 48px);
+  position: fixed;
+  top: var(--top-bar);
+  bottom: var(--bottom-nav);
+  left: 0;
+  right: 0;
+  overflow-y: auto;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 40px 24px 48px;
 }
 .admin-masthead { text-align: center; margin-bottom: 32px; }
 .admin-dateline {
