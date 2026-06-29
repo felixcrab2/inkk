@@ -894,6 +894,14 @@ async function fetchPublicationById(id) {
   return data || null;
 }
 
+// The author's note already on a published piece, so re-publishing pre-fills it
+// (and doesn't wipe it). Returns "" when there's no publication / no note.
+async function fetchPublicationNote(docId) {
+  if (!supabase || !docId) return "";
+  const { data } = await supabase.from("publications").select("author_note").eq("doc_id", docId).maybeSingle();
+  return data?.author_note || "";
+}
+
 async function fetchProfileByUsername(username) {
   if (!supabase || !username) return null;
   let { data, error } = await supabase
@@ -1070,7 +1078,7 @@ function LandingScreen({ onDone }) {
       <div id="landing-inner">
         <div id="landing-headline">{display}<span id="landing-cursor" /></div>
         <p id="landing-subtitle" style={{ opacity: showSubtitle ? 1 : 0 }}>
-          Inkk studies the writing process — drafts, revisions, pauses — to understand what makes writing distinctly human.
+          Inkk studies the writing process (drafts, revisions, pauses) to understand what makes writing distinctly human.
         </p>
       </div>
     </div>
@@ -1086,7 +1094,7 @@ function HumanSignalModal({ onClose }) {
         <button id="auth-close" onClick={onClose}>×</button>
         <div id="hs-modal-title">A small study of writing.</div>
         <p id="hs-modal-body">
-          When you write in Inkk, your text and the rhythm of your typing — pauses, revisions, bursts — are captured as part of a study into human writing. We use this to study what distinguishes human writing from machine-generated text.
+          When you write in Inkk, your text and the rhythm of your typing (pauses, revisions, bursts) are captured as part of a study into human writing. We use this to study what distinguishes human writing from machine-generated text.
         </p>
         <p className="hs-modal-body" style={{ marginTop: "12px" }}>
           You can opt out, download, or delete your contribution at any time from your Profile.
@@ -2128,7 +2136,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
               className="profile-edit-input profile-edit-bio"
               value={editBio}
               onChange={e => setEditBio(e.target.value)}
-              placeholder="bio — who you are, what you write about (optional)"
+              placeholder="bio: who you are, what you write about (optional)"
               maxLength={200}
               rows={3}
             />
@@ -2289,7 +2297,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
           <h2 className="profile-section-label">Research</h2>
         </div>
         <p id="research-blurb">
-          When you write in Inkk, your text and the rhythm of your typing — pauses, revisions, bursts — are captured as part of a study into human writing. We use this to study what distinguishes human writing from machine-generated text. You can turn this off at any time, and the editor keeps working exactly as before.
+          When you write in Inkk, your text and the rhythm of your typing (pauses, revisions, bursts) are captured as part of a study into human writing. We use this to study what distinguishes human writing from machine-generated text. You can turn this off at any time, and the editor keeps working exactly as before.
         </p>
 
         {researchOptIn && ((Number(contribution?.event_count) || 0) + pendingLocal) > 0 && (() => {
@@ -3628,13 +3636,15 @@ export default function App() {
 
   // ─ publish ──────────────────────────────────────────────────────────────────
 
-  const openPublishModal = useCallback((doc, e) => {
+  const openPublishModal = useCallback(async (doc, e) => {
     if (e) e.stopPropagation();
     if (!userRef.current) { setAuthMode("signin"); setAuthOpen(true); return; }
     const content = doc.id === activeId ? contentRef.current : doc.content;
     if (!stripHtml(content || "").trim()) return;
-    setPublishModalDoc({ ...doc, content });
-  }, [activeId]);
+    // Pre-fill the existing note when re-publishing, so it persists.
+    const author_note = publishedDocIds.has(doc.id) ? await fetchPublicationNote(doc.id) : "";
+    setPublishModalDoc({ ...doc, content, author_note });
+  }, [activeId, publishedDocIds]);
 
   const confirmPublish = useCallback(async (title, authorName, renderOpts) => {
     if (!publishModalDoc) return "No document selected.";
