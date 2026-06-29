@@ -11,7 +11,7 @@
   --bottom-nav:  58px;
   /* Garamond is the voice of the writing (brand, titles, prose); the sans is a
      quiet interface layer only (nav, meta, labels, buttons). */
-  --font-ui:     "Hanken Grotesk Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, sans-serif;
+  --font-ui:     "Instrument Sans Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, sans-serif;
   --font-serif:  "Cormorant Garamond", Georgia, serif;
 }
 
