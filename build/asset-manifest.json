@@ -1,7 +1,7 @@
 {
   "files": {
     "main.css": "/static/css/main.ec09bd31.css",
-    "main.js": "/static/js/main.30a628c8.js",
+    "main.js": "/static/js/main.117e7cf7.js",
     "static/js/239.d2863414.chunk.js": "/static/js/239.d2863414.chunk.js",
     "static/js/977.a1aca4e4.chunk.js": "/static/js/977.a1aca4e4.chunk.js",
     "static/js/732.d8915e0d.chunk.js": "/static/js/732.d8915e0d.chunk.js",
@@ -78,13 +78,13 @@
     "static/media/cormorant-garamond-vietnamese-700-normal.woff2": "/static/media/cormorant-garamond-vietnamese-700-normal.6d587588bed63e814b3b.woff2",
     "index.html": "/index.html",
     "main.ec09bd31.css.map": "/static/css/main.ec09bd31.css.map",
-    "main.30a628c8.js.map": "/static/js/main.30a628c8.js.map",
+    "main.117e7cf7.js.map": "/static/js/main.117e7cf7.js.map",
     "239.d2863414.chunk.js.map": "/static/js/239.d2863414.chunk.js.map",
     "977.a1aca4e4.chunk.js.map": "/static/js/977.a1aca4e4.chunk.js.map",
     "732.d8915e0d.chunk.js.map": "/static/js/732.d8915e0d.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.ec09bd31.css",
-    "static/js/main.30a628c8.js"
+    "static/js/main.117e7cf7.js"
   ]
 }

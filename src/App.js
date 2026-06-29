@@ -135,6 +135,12 @@ function applySmartTypography() {
     }
   }
 
+  // Em dash: -- → —
+  if (before.endsWith("--")) {
+    node.nodeValue = before.slice(0, -2) + "—" + after;
+    setCaret(node, offset - 1);
+    return;
+  }
   // Ellipsis: ... → …
   if (before.endsWith("...")) {
     node.nodeValue = before.slice(0, -3) + "…" + after;
@@ -262,6 +268,54 @@ function titleCase(input) {
     if (!forceCap && TITLE_MINOR_WORDS.has(bare)) return word.toLowerCase();
     return capitalizeTitleWord(word);
   }).join(" ");
+}
+
+// Title-case the words the user has already finished (those followed by
+// whitespace), leaving the word currently being typed alone — except the first
+// word, which is always capitalized. Last-word/minor-word fixes happen in the
+// full titleCase() pass on blur/Enter. Case-only, so caret offsets stay valid.
+function liveTitleCase(text) {
+  if (!text) return text;
+  const trailingWS = /\s$/.test(text);
+  const parts = text.split(/(\s+)/);   // words at even indices, whitespace at odd
+  let lastWordIdx = -1;
+  for (let i = 0; i < parts.length; i++) if (i % 2 === 0 && parts[i] !== "") lastWordIdx = i;
+  let firstSeen = false;
+  let capNext = true;
+  return parts.map((tok, i) => {
+    if (i % 2 === 1 || tok === "") return tok;
+    const isFirst = !firstSeen; firstSeen = true;
+    const inProgress = i === lastWordIdx && !trailingWS;
+    const forceCap = capNext;
+    capNext = /:$/.test(tok);
+    if (inProgress && !isFirst) return tok;   // don't touch the word being typed
+    const bare = tok.toLowerCase().replace(/[^a-z]/g, "");
+    if (!forceCap && TITLE_MINOR_WORDS.has(bare)) return tok.toLowerCase();
+    return capitalizeTitleWord(tok);
+  }).join("");
+}
+
+// Caret offset (character count from start) within a single-line editable.
+function titleCaretOffset(el) {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
+  const pre = range.cloneRange();
+  pre.selectNodeContents(el);
+  pre.setEnd(range.endContainer, range.endOffset);
+  return pre.toString().length;
+}
+
+function setTitleCaret(el, offset) {
+  const node = el.firstChild;
+  if (!node) return;
+  const len = (node.textContent || "").length;
+  const range = document.createRange();
+  range.setStart(node, Math.min(offset, len));
+  range.collapse(true);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
 }
 
 function isMobile() {
@@ -3441,9 +3495,19 @@ export default function App() {
     };
   }, [imgSelActive, clearImageSel]);
 
-  const onTitleInput = useCallback(() => {
+  const onTitleInput = useCallback((e) => {
     const el = titleEditorRef.current;
     if (!el) return;
+    // Live title-case finished words as you type (skip during IME composition).
+    if (titleCapsOn && !(e && e.nativeEvent && e.nativeEvent.isComposing)) {
+      const text = el.textContent || "";
+      const cased = liveTitleCase(text);
+      if (cased !== text) {
+        const off = titleCaretOffset(el);
+        el.textContent = cased;
+        if (off != null) setTitleCaret(el, off);
+      }
+    }
     titleRef.current = el.innerHTML;
     setSaveStatus("saving");
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -3460,7 +3524,7 @@ export default function App() {
       });
       setSaveStatus("saved");
     }, 500);
-  }, [activeId]);
+  }, [activeId, titleCapsOn]);
 
   // Apply title-case to the title when the user finishes it (blur / Enter),
   // unless they've turned auto-capitalization off.

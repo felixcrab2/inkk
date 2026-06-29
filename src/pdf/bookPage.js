@@ -145,7 +145,7 @@ function drawTrackedCentered(ctx, text, cx, baseline, sizePt, trackEm) {
 //   { type: "image", src }
 // A run is { text, b, i }. Segments inside a text block are joined by hard
 // line-breaks; blocks are joined by paragraph breaks.
-function parseHtmlToBlocks(html) {
+export function parseHtmlToBlocks(html) {
   const container = document.createElement("div");
   container.innerHTML = html || "";
 
@@ -182,6 +182,11 @@ function parseHtmlToBlocks(html) {
       b: ctx.b || tag === "b" || tag === "strong" || fw === "bold" || +fw >= 600,
       i: ctx.i || tag === "i" || tag === "em" || fs === "italic" || fs === "oblique",
     };
+    // A block element both starts and ends a paragraph. The leading break is
+    // what keeps a block (e.g. a <div> paragraph) from merging into preceding
+    // bare text — without it the first two paragraphs run together. Empty
+    // breaks collapse harmlessly during the block-building pass below.
+    if (block) tokens.push({ type: "break" });
     for (const child of node.childNodes) walk(child, next);
     if (block) tokens.push({ type: "break" });
   }
