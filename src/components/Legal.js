@@ -1,10 +1,10 @@
 // Privacy Policy and Terms of Service text + modal components.
 // Versioned by TOS_VERSION so we can prompt re-acceptance on material changes.
 
-export const TOS_VERSION = "2026-06-28";
+export const TOS_VERSION = "2026-06-29";
 
 export const PRIVACY_POLICY = `Inkk Privacy Policy
-Effective 28 June 2026
+Effective 29 June 2026
 
 Inkk is a writing tool that records how you write so researchers can study human writing patterns. This page explains, in plain English, what we collect, why, and what control you have.
 
@@ -31,7 +31,11 @@ HOW WE USE IT
 • Computing your visible Human Signal score.
 • Standard product features: editing, publishing, accounts.
 
-We do not sell your data. We do not share data with third parties beyond our database provider (Supabase).
+We do not sell your data. We share data with third parties only as needed to run the service: our database provider (Supabase) and, for content moderation, OpenAI (see below).
+
+KEEPING THE FEED SAFE (CONTENT MODERATION)
+
+To keep published work and comments free of illegal and abusive content, the text you publish to the feed and the comments you post are checked by an automated moderation service operated by OpenAI. Only that text is sent — never your keystroke data, your drafts, or your account details. OpenAI processes it to return a safety classification and, per its API terms, does not use it to train its models. Content may also be reported by other users. Anything flagged is reviewed by a moderator, who may hide content that breaks our Terms of Service.
 
 YOUR RIGHTS
 
@@ -54,7 +58,7 @@ hello@inkk.example
 `;
 
 export const TERMS_OF_SERVICE = `Inkk Terms of Service
-Effective 28 June 2026
+Effective 29 June 2026
 
 By creating an Inkk account or using the service, you agree to these terms.
 
@@ -70,19 +74,22 @@ You own the writing you create on Inkk. By publishing a piece to the Inkk feed, 
 4. ACCEPTABLE USE
 You agree not to use Inkk to publish illegal, harassing, infringing, or otherwise harmful content. Do not attempt to reverse-engineer the Human Signal score, abuse the platform, or scrape other users' data.
 
-5. RESEARCH PARTICIPATION
+5. MODERATION AND REPORTING
+Content you publish to the feed and comments you post are screened by an automated moderation service (see the Privacy Policy) and may be reported by other users. We may review, hide, or remove content that violates these terms, and may suspend repeat offenders. You can report content you believe breaks these terms using the report option on a piece or comment.
+
+6. RESEARCH PARTICIPATION
 By default, your anonymised writing-process metadata contributes to Inkk's research dataset. The Privacy Policy explains what is and is not collected. You can opt out at any time in your Profile.
 
-6. TERMINATION
+7. TERMINATION
 You may delete your account at any time. We may suspend or terminate accounts that violate these terms.
 
-7. DISCLAIMERS
+8. DISCLAIMERS
 Inkk is provided "AS IS" without warranties. The Human Signal score is a heuristic and not a guarantee. We are not liable for losses from outages, data loss, or score inaccuracies.
 
-8. CHANGES
+9. CHANGES
 We may update these terms. Continued use after changes constitutes acceptance. Material changes will be communicated in-app before they take effect.
 
-9. CONTACT
+10. CONTACT
 hello@inkk.example
 `;
 
