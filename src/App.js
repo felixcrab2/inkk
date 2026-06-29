@@ -229,6 +229,41 @@ function wordCount(content) {
   return t ? t.split(/\s+/).length : 0;
 }
 
+// ── Title case ────────────────────────────────────────────────────────────────
+// Capitalize a title the conventional way: the first and last word always go up,
+// and the first word after a colon (subtitle); short "minor" words (articles,
+// coordinating conjunctions, short prepositions) stay down in between. Acronyms
+// and intentional mixed-case (NASA, iPhone) are preserved.
+const TITLE_MINOR_WORDS = new Set([
+  "a", "an", "and", "as", "at", "but", "by", "en", "for", "if", "in", "nor",
+  "of", "on", "or", "per", "so", "the", "to", "v", "vs", "via", "yet",
+]);
+
+function capitalizeTitleWord(word) {
+  // Capitalize each hyphen-separated part: "self-portrait" -> "Self-Portrait".
+  return word.split("-").map(part => {
+    if (!part) return part;
+    // Preserve acronyms (NASA) and intentional inner caps (iPhone, McCoy).
+    if (/[A-Z]/.test(part.slice(1)) || (part.length > 1 && part === part.toUpperCase())) return part;
+    return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+  }).join("-");
+}
+
+function titleCase(input) {
+  const str = (input || "").replace(/\s+/g, " ").trim();
+  if (!str) return str;
+  const words = str.split(" ");
+  const last = words.length - 1;
+  let capNext = true;   // first word always capitalized
+  return words.map((word, i) => {
+    const forceCap = capNext || i === last;
+    capNext = /:$/.test(word);   // word after a colon starts a subtitle
+    const bare = word.toLowerCase().replace(/[^a-z]/g, "");
+    if (!forceCap && TITLE_MINOR_WORDS.has(bare)) return word.toLowerCase();
+    return capitalizeTitleWord(word);
+  }).join(" ");
+}
+
 function isMobile() {
   return (
     typeof navigator !== "undefined" &&
@@ -2604,6 +2639,7 @@ export default function App() {
     window.location.pathname.startsWith("/v/") ? window.location.pathname.slice(3) : "");
   const [publishModalDoc, setPublishModalDoc] = useState(null);
   const [font, setFont]               = useState(() => localStorage.getItem("inkk_font") || "garamond");
+  const [titleCapsOn, setTitleCapsOn] = useState(() => localStorage.getItem("inkk_title_caps") !== "0");
   const [showLanding, setShowLanding] = useState(() => !localStorage.getItem("inkk_visited"));
   const [hsModalOpen, setHsModalOpen] = useState(false);
   const [hsScoreOpen, setHsScoreOpen]   = useState(false);
@@ -2660,6 +2696,7 @@ export default function App() {
   useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
   useEffect(() => { optInRef.current = researchOptIn; }, [researchOptIn]);
   useEffect(() => { localStorage.setItem("inkk_font", font); }, [font]);
+  useEffect(() => { localStorage.setItem("inkk_title_caps", titleCapsOn ? "1" : "0"); }, [titleCapsOn]);
   useEffect(() => {
     fetch("/drop_caps/manifest.json").then(r => r.json()).then(setDropCapImages).catch(() => {});
   }, []);
@@ -3425,6 +3462,19 @@ export default function App() {
     }, 500);
   }, [activeId]);
 
+  // Apply title-case to the title when the user finishes it (blur / Enter),
+  // unless they've turned auto-capitalization off.
+  const finalizeTitle = useCallback(() => {
+    const el = titleEditorRef.current;
+    if (!el) return;
+    if (titleCapsOn) {
+      const current = el.textContent || "";
+      const cased = titleCase(current);
+      if (cased && cased !== current) el.textContent = cased;
+    }
+    titleRef.current = el.innerHTML ?? "";
+    onTitleInput();
+  }, [titleCapsOn, onTitleInput]);
 
   const handleEditorDrop = useCallback(async (e) => {
     // Only intercept file drops; let text/other drops behave normally.
@@ -3906,6 +3956,17 @@ export default function App() {
               )}
             </div>
           )}
+          {isEditor && (
+            <button
+              className={`icon-btn title-caps-btn ${menuClass}${titleCapsOn ? " active" : ""}`}
+              onClick={() => setTitleCapsOn(v => !v)}
+              title={titleCapsOn
+                ? "Title capitalization is on — titles auto-capitalize. Click to turn off."
+                : "Title capitalization is off — titles stay exactly as typed. Click to turn on."}
+            >
+              <span className="title-caps-glyph">Aa</span>
+            </button>
+          )}
           {isEditor && hasContent && (
             <button
               className={`icon-btn icon-btn-preview${previewMode ? " active" : ""}`}
@@ -4091,8 +4152,8 @@ export default function App() {
           data-placeholder="Title"
           className={font === "arial" ? "font-arial" : ""}
           onInput={onTitleInput}
-          onBlur={() => { titleRef.current = titleEditorRef.current?.innerHTML ?? ""; }}
-          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); titleRef.current = titleEditorRef.current?.innerHTML ?? ""; editorRef.current?.focus(); } }}
+          onBlur={finalizeTitle}
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); finalizeTitle(); editorRef.current?.focus(); } }}
           onPaste={e => {
             e.preventDefault();
             const text = (e.clipboardData?.getData("text/plain") || "").replace(/\s*\n\s*/g, " ");
