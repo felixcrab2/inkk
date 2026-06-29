@@ -1094,10 +1094,11 @@ function AuthModal({ onClose, initialMode = "signin" }) {
   const [loading, setLoading]       = useState(false);
   const [unameStatus, setUnameStatus] = useState(""); // "" | checking | available | taken | invalid
   const [resend, setResend]         = useState("");   // "" | sending | sent
+  const [needsConfirm, setNeedsConfirm] = useState(false); // show "resend confirmation" UI
   const sentEmailRef                = useRef("");
 
   const switchMode = (m) => {
-    setMode(m); setError(""); setMessage(""); setResend("");
+    setMode(m); setError(""); setMessage(""); setResend(""); setNeedsConfirm(false);
     if (m === "reset") setPassword("");
   };
 
@@ -1123,13 +1124,24 @@ function AuthModal({ onClose, initialMode = "signin" }) {
 
   const submit = async (e) => {
     e.preventDefault();
-    setError(""); setMessage("");
+    setError(""); setMessage(""); setNeedsConfirm(false);
 
     if (mode === "signin") {
       setLoading(true);
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       setLoading(false);
-      if (error) setError(error.message);
+      if (error) {
+        // Correct password but the address was never confirmed — Supabase returns
+        // a dedicated code/message. Surface it clearly and offer a resend instead
+        // of the generic "invalid credentials".
+        if (error.code === "email_not_confirmed" || /not confirmed/i.test(error.message || "")) {
+          sentEmailRef.current = email;
+          setNeedsConfirm(true);
+          setMessage(`${email} hasn't been confirmed yet. Check your inbox for the confirmation link to finish signing in.`);
+        } else {
+          setError(error.message);
+        }
+      }
       return;
     }
 
@@ -1172,7 +1184,10 @@ function AuthModal({ onClose, initialMode = "signin" }) {
     sentEmailRef.current = email;
     // No session means email confirmation is required; a session means we're in
     // and onAuthStateChange will create the profile from the metadata above.
-    if (!data.session) setMessage(`We sent a confirmation link to ${email}. Open it to finish creating your account.`);
+    if (!data.session) {
+      setNeedsConfirm(true);
+      setMessage(`We sent a confirmation link to ${email}. Open it to finish creating your account.`);
+    }
   };
 
   const resendConfirmation = async () => {
@@ -1206,12 +1221,12 @@ function AuthModal({ onClose, initialMode = "signin" }) {
         {message ? (
           <div id="auth-message-wrap">
             <p id="auth-message">{message}</p>
-            {sentEmailRef.current && mode === "signup" && (
+            {needsConfirm && sentEmailRef.current && (
               <div className="auth-resend">
                 {resend === "sent"
                   ? <span className="auth-resend-done">Sent again — check your inbox and spam folder.</span>
-                  : <>Didn't get it? <button type="button" onClick={resendConfirmation} disabled={resend === "sending"}>{resend === "sending" ? "sending…" : "resend email"}</button></>}
-                <button type="button" className="auth-back" onClick={() => { setMessage(""); setResend(""); }}>← use a different email</button>
+                  : <>Didn't get it? <button type="button" onClick={resendConfirmation} disabled={resend === "sending"}>{resend === "sending" ? "sending…" : "resend confirmation email"}</button></>}
+                <button type="button" className="auth-back" onClick={() => { setMessage(""); setResend(""); }}>← back</button>
               </div>
             )}
           </div>
