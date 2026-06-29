@@ -2252,6 +2252,41 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 
 .search-prompt { padding-top: 36px; }
 
+/* ─── Feed inline search ─────────────────────────────────────────────────── */
+.feed-tab-icon { padding: 0 10px; }
+
+.feed-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 14px 14px;
+  border-bottom: 1px solid var(--border);
+  margin: 0 -14px;
+}
+.feed-search-icon { color: var(--subtle); flex-shrink: 0; }
+.feed-search-input {
+  flex: 1;
+  background: none;
+  border: none;
+  font-size: 0.9rem;
+  font-family: var(--font-ui);
+  color: var(--text);
+  outline: none;
+}
+.feed-search-input::placeholder { color: var(--subtle); }
+.feed-search-clear {
+  background: none; border: none; color: var(--subtle);
+  font-size: 1.1rem; cursor: pointer; padding: 0 2px; line-height: 1;
+}
+.feed-search-clear:hover { color: var(--text); }
+.feed-search-label {
+  font-size: 0.6rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--subtle);
+  margin: 24px 0 8px;
+}
+
 /* ─── User cards (search results) ────────────────────────────────────────── */
 /* user-card now uses writer-card styles — kept as alias for legacy refs */
 .user-card {

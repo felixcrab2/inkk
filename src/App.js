@@ -920,6 +920,20 @@ async function searchProfiles(query) {
   return data;
 }
 
+async function searchPublications(query) {
+  if (!supabase || !query.trim()) return [];
+  const q = query.trim();
+  const { data, error } = await supabase
+    .from("publications")
+    .select(PUB_SELECT_WITH_COUNTS)
+    .or(`title.ilike.%${q}%,author_name.ilike.%${q}%`)
+    .neq("moderation_status", "removed")
+    .order("published_at", { ascending: false })
+    .limit(10);
+  if (error || !data) return [];
+  return data;
+}
+
 async function fetchUserPublications(userId) {
   if (!supabase || !userId) return [];
   const { data, error } = await pubQuery(
@@ -1691,6 +1705,11 @@ function Feed({ user, onRead, onAuthorClick, dropCapImages, onRequestAuth }) {
   const [followingPubs, setFollowingPubs]   = useState([]);
   const [followingLoading, setFollowingLoading] = useState(false);
   const [followingFetched, setFollowingFetched] = useState(false);
+  const [searchQuery, setSearchQuery]     = useState("");
+  const [searchPeople, setSearchPeople]   = useState([]);
+  const [searchStories, setSearchStories] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const searchInputRef = useRef(null);
   const inflightLikes = useRef(new Set());
 
   useEffect(() => {
@@ -1713,6 +1732,20 @@ function Feed({ user, onRead, onAuthorClick, dropCapImages, onRequestAuth }) {
     setFollowingFetched(false);
     setFollowingPubs([]);
   }, [user]);
+
+  useEffect(() => {
+    if (feedTab === "search") searchInputRef.current?.focus();
+  }, [feedTab]);
+
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      if (!searchQuery.trim()) { setSearchPeople([]); setSearchStories([]); return; }
+      setSearchLoading(true);
+      const [people, stories] = await Promise.all([searchProfiles(searchQuery), searchPublications(searchQuery)]);
+      setSearchPeople(people); setSearchStories(stories); setSearchLoading(false);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   const writers = useMemo(() => {
     const seen = new Set();
@@ -1764,6 +1797,7 @@ function Feed({ user, onRead, onAuthorClick, dropCapImages, onRequestAuth }) {
           )}
           <button className={`feed-tab${feedTab === "stories" ? " active" : ""}`} onClick={() => setFeedTab("stories")}>Stories</button>
           <button className={`feed-tab${feedTab === "writers" ? " active" : ""}`} onClick={() => setFeedTab("writers")}>Writers{writers.length > 0 && <span className="feed-tab-count">{writers.length}</span>}</button>
+          <button className={`feed-tab feed-tab-icon${feedTab === "search" ? " active" : ""}`} onClick={() => setFeedTab("search")} aria-label="Search"><Search size={13} strokeWidth={1.8} /></button>
         </div>
       </div>
 
@@ -1812,6 +1846,52 @@ function Feed({ user, onRead, onAuthorClick, dropCapImages, onRequestAuth }) {
             <FeedCard key={pub.id} pub={pub} index={i} featured={i === 0} dropCapImages={dropCapImages}
               onRead={onRead} onAuthorClick={onAuthorClick} onLike={handleLike} />
           ))}
+        </div>
+      )}
+
+      {feedTab === "search" && (
+        <div id="feed-list">
+          <div className="feed-search-bar">
+            <Search size={13} className="feed-search-icon" />
+            <input
+              ref={searchInputRef}
+              className="feed-search-input"
+              type="text"
+              placeholder="Search writers and stories…"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && <button className="feed-search-clear" onClick={() => setSearchQuery("")}>×</button>}
+          </div>
+          {searchLoading && <p className="feed-empty">searching…</p>}
+          {!searchLoading && !searchQuery.trim() && <p className="feed-empty search-prompt">Search for writers or stories.</p>}
+          {!searchLoading && searchQuery.trim() && searchPeople.length === 0 && searchStories.length === 0 && (
+            <p className="feed-empty">No results.</p>
+          )}
+          {searchPeople.length > 0 && (
+            <>
+              <p className="feed-search-label">Writers</p>
+              {searchPeople.map((p, i) => (
+                <div key={p.id} className="writer-card" style={{ "--card-index": i }} onClick={() => onAuthorClick(p.id)}>
+                  <DropCapAvatar letter={p.username?.[0]} avatarData={p.avatar_data} dropCapImages={dropCapImages} size={36} />
+                  <div className="writer-card-info">
+                    <span className="writer-card-name">{p.display_name || `@${p.username}`}</span>
+                    <span className="writer-card-meta">@{p.username}</span>
+                  </div>
+                  <span className="writer-card-arrow">→</span>
+                </div>
+              ))}
+            </>
+          )}
+          {searchStories.length > 0 && (
+            <>
+              <p className="feed-search-label">Stories</p>
+              {searchStories.map((pub, i) => (
+                <FeedCard key={pub.id} pub={pub} index={i} onRead={onRead} onAuthorClick={onAuthorClick}
+                  onLike={handleLike} dropCapImages={dropCapImages} noAvatar />
+              ))}
+            </>
+          )}
         </div>
       )}
     </div>
@@ -4633,10 +4713,6 @@ export default function App() {
           <button className={`nav-tab ${view === "feed" ? "active" : ""}`} onClick={() => navigate("feed")}>
             <Globe size={18} strokeWidth={1.75} />
             <span className="nav-label">Feed</span>
-          </button>
-          <button className={`nav-tab ${view === "search" ? "active" : ""}`} onClick={() => navigate("search")}>
-            <Search size={18} strokeWidth={1.75} />
-            <span className="nav-label">People</span>
           </button>
           <button className={`nav-tab ${view === "verify" ? "active" : ""}`} onClick={() => navigate("verify")}>
             <span className="nav-diamond" aria-hidden="true">◇</span>
