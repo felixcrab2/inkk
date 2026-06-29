@@ -329,7 +329,10 @@ function dropCapSrc(letter, images) {
   if (!letter || !images) return null;
   const l = letter.toLowerCase();
   const list = images[l];
-  return list?.length ? `/drop_caps/${l}/${list[0]}.png` : null;
+  if (!list?.length) return null;
+  const area = name => { const m = name.match(/(\d+)x(\d+)$/); return m ? +m[1] * +m[2] : 80 * 80; };
+  const best = list.reduce((a, b) => area(b) > area(a) ? b : a);
+  return `/drop_caps/${l}/${best}.png`;
 }
 
 async function compressAvatar(file, size = 400) {
