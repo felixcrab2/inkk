@@ -2002,6 +2002,14 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
   max-width: 260px;
   line-height: 1.5;
 }
+#contribution-status {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 0.7rem;
+  margin-top: 10px;
+  letter-spacing: 0.02em;
+}
+#contribution-status.syncing { color: var(--muted); }
+#contribution-status.synced  { color: var(--subtle); }
 #contribution-since {
   font-size: 0.58rem;
   color: var(--subtle);
