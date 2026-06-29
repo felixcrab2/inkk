@@ -177,6 +177,39 @@ function applySmartTypography() {
     setCaret(node, offset);
     return;
   }
+
+  // Markdown emphasis on close: *word*/_word_ → italic, **word**/__word__ → bold.
+  // The opening marker must sit at a word boundary, so snake_case, file_names and
+  // "2 * 3" are left alone.
+  const lastCh = before.slice(-1);
+  if ((lastCh === "_" || lastCh === "*") && node.parentNode) {
+    const mBold = before.match(/(^|[\s([{“‘"'—–])(\*\*|__)([^\s*_][^*_\n]*?)\2$/);
+    const mItal = before.match(/(^|[\s([{“‘"'—–])([*_])([^\s*_][^*_\n]*?)\2$/);
+    const m = mBold || mItal;
+    if (m) {
+      const pre = m[1], inner = m[3];
+      const startIdx = offset - (m[0].length - pre.length);   // index of the opening marker
+      node.nodeValue = text.slice(0, startIdx);               // keep text before it (incl. pre)
+      const el = document.createElement(mBold ? "strong" : "em");
+      el.textContent = inner;
+      const afterNode = document.createTextNode(after);
+      node.parentNode.insertBefore(afterNode, node.nextSibling);
+      node.parentNode.insertBefore(el, afterNode);
+      setCaret(afterNode, 0);
+      return;
+    }
+  }
+}
+
+// Convert markdown emphasis in a pasted plain-text block to inline HTML, escaping
+// everything else. Used so pasted *italics*/**bold** survive instead of showing
+// raw markers. Same word-boundary guard as the typed path.
+function pastedTextToHtml(text) {
+  const esc = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const emph = esc
+    .replace(/(^|[\s([{>"'“‘—–])(\*\*|__)(?=\S)(.+?)\2(?=[\s.,!?;:)\]}"'”’]|$)/g, "$1<strong>$3</strong>")
+    .replace(/(^|[\s([{>"'“‘—–])([*_])(?=\S)([^*_\n]+?)\2(?=[\s.,!?;:)\]}"'”’]|$)/g, "$1<em>$3</em>");
+  return emph.replace(/\r?\n/g, "<br>");
 }
 
 function stripHtml(html) {
@@ -4002,10 +4035,14 @@ export default function App() {
       selectImageWhenReady(img);
       return;
     }
-    // Strip formatting on paste — insert as plain text only
+    // Strip rich formatting on paste, but keep markdown emphasis as real italics
+    // and bold so pasted *italics*/**bold** don't show their raw markers.
     e.preventDefault();
     const text = e.clipboardData?.getData("text/plain") || "";
-    if (text) document.execCommand("insertText", false, text);
+    if (!text) return;
+    const html = pastedTextToHtml(text);
+    if (/<(em|strong)>/.test(html)) document.execCommand("insertHTML", false, html);
+    else document.execCommand("insertText", false, text);
   }, [onInput, selectImageWhenReady, addToast]);
 
   // ─ PDF export ───────────────────────────────────────────────────────────────
