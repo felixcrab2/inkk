@@ -1705,11 +1705,11 @@ body.focus-mode #text-container {
 .pac-title {
   display: block;
   font-family: var(--font-serif);
-  font-size: 1.02rem;
+  font-size: 0.92rem;
   font-weight: 600;
   font-style: normal;
   color: var(--text);
-  letter-spacing: 0;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
