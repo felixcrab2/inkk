@@ -3130,7 +3130,7 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
   margin-bottom: 16px;
 }
 .verify-title {
-  font-family: var(--font-ui);
+  font-family: var(--font-serif);
   font-weight: 500;
   font-size: 2.4rem;
   letter-spacing: 0.01em;
