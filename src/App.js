@@ -445,16 +445,30 @@ async function deleteCommentRow(commentId) {
 }
 
 // ─── Content moderation ──────────────────────────────────────────────────────
-// Ask the server-side /api/moderate endpoint (OpenAI) to classify text.
-// stripHtml() (defined above) gives the classifier prose, not markup.
+// Pull embedded image sources (data URLs or http) from HTML so they can be
+// moderated alongside the prose — omni-moderation scores images too.
+function extractImages(html, max = 8) {
+  if (!html) return [];
+  const out = [];
+  const re = /<img[^>]+src=["']([^"']+)["']/gi;
+  let m;
+  while ((m = re.exec(html)) && out.length < max) {
+    const src = m[1];
+    if (src.startsWith("data:image") || src.startsWith("http")) out.push(src);
+  }
+  return out;
+}
+
+// Ask the server-side /api/moderate endpoint (OpenAI) to classify text and/or
+// images. stripHtml() (defined above) gives the classifier prose, not markup.
 // Fail-open: returns null on any failure so a moderation outage never blocks
 // the user. On success returns { status: 'ok' | 'flagged', scores }.
-async function moderateText(text) {
+async function moderateText(text, images) {
   try {
     const res = await fetch("/api/moderate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: stripHtml(text) }),
+      body: JSON.stringify({ text: stripHtml(text), images: images || [] }),
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -678,7 +692,7 @@ async function doPublish(doc, user, title, authorName, authorUsername) {
   };
   // Auto-triage the publication's text (title + body) before writing it.
   // Fail-open: an outage leaves moderation_status at its 'pending' default.
-  const mod = await moderateText((title ? title + "\n\n" : "") + (doc.content || ""));
+  const mod = await moderateText((title ? title + "\n\n" : "") + (doc.content || ""), extractImages(doc.content));
   if (mod) {
     payload.moderation_status     = mod.status;
     payload.moderation_scores     = mod.scores;
@@ -2839,6 +2853,15 @@ export default function App() {
 
   const handleAvatarChange = useCallback(async (avatarData) => {
     if (!userRef.current) return;
+    // Moderate uploaded avatars (skip when clearing). Reject on a flag;
+    // fail-open if the check itself is unavailable.
+    if (avatarData) {
+      const mod = await moderateText("", [avatarData]);
+      if (mod?.status === "flagged") {
+        addToast("That image can’t be used as a profile picture.");
+        return;
+      }
+    }
     const err = await updateAvatar(userRef.current.id, avatarData);
     if (!err) {
       setProfile(prev => prev ? { ...prev, avatar_data: avatarData } : prev);
