@@ -1127,6 +1127,42 @@ function passwordChecks(pw) {
   };
 }
 
+// ─── Google Identity Services (ID-token sign-in) ──────────────────────────────
+// When REACT_APP_GOOGLE_CLIENT_ID is set, "continue with Google" uses Google's
+// own button to obtain an ID token in-page, which we hand to
+// supabase.auth.signInWithIdToken. The whole consent flow runs on our own
+// domain (no redirect to <ref>.supabase.co), so Google's screen shows the Inkk
+// app, not the Supabase project URL. Without the env var we fall back to the
+// redirect flow (signInWithOAuth) so nothing breaks before it's configured.
+const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
+
+let gsiScriptPromise = null;
+function loadGoogleIdentity() {
+  if (gsiScriptPromise) return gsiScriptPromise;
+  gsiScriptPromise = new Promise((resolve, reject) => {
+    if (window.google?.accounts?.id) { resolve(); return; }
+    const s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client";
+    s.async = true; s.defer = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("Could not load Google sign-in."));
+    document.head.appendChild(s);
+  });
+  return gsiScriptPromise;
+}
+
+// Supabase validates the nonce by SHA-256-hashing the value passed to
+// signInWithIdToken and matching it to the token's nonce claim — so Google gets
+// the hashed nonce and Supabase gets the raw one.
+async function makeGoogleNonce() {
+  const raw = window.crypto?.randomUUID
+    ? window.crypto.randomUUID()
+    : `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+  const digest = await window.crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+  const hashed = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
+  return { raw, hashed };
+}
+
 function AuthModal({ onClose, initialMode = "signin" }) {
   const [mode, setMode]             = useState(initialMode); // signin | signup | reset
   const [email, setEmail]           = useState("");
@@ -1142,7 +1178,9 @@ function AuthModal({ onClose, initialMode = "signin" }) {
   const [unameStatus, setUnameStatus] = useState(""); // "" | checking | available | taken | invalid
   const [resend, setResend]         = useState("");   // "" | sending | sent
   const [needsConfirm, setNeedsConfirm] = useState(false); // show "resend confirmation" UI
+  const [gsiReady, setGsiReady]     = useState(false);     // Google Identity script loaded
   const sentEmailRef                = useRef("");
+  const googleBtnRef                = useRef(null);        // host for Google's rendered button
 
   const switchMode = (m) => {
     setMode(m); setError(""); setMessage(""); setResend(""); setNeedsConfirm(false);
@@ -1163,6 +1201,46 @@ function AuthModal({ onClose, initialMode = "signin" }) {
     }, 400);
     return () => { alive = false; clearTimeout(t); };
   }, [username, mode]);
+
+  // Load Google Identity Services once, if a client ID is configured.
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) return;
+    let active = true;
+    loadGoogleIdentity().then(() => { if (active) setGsiReady(true); }).catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  // Render Google's button once the script is ready and the Terms are accepted.
+  // The credential callback trades the Google ID token for a Supabase session via
+  // signInWithIdToken — no redirect ever leaves our own domain.
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID || !gsiReady || mode === "reset" || !accepted) return;
+    const el = googleBtnRef.current;
+    const gid = window.google?.accounts?.id;
+    if (!el || !gid) return;
+    let active = true;
+    makeGoogleNonce().then(({ raw, hashed }) => {
+      if (!active) return;
+      gid.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        nonce: hashed,
+        callback: async (resp) => {
+          // Record Terms acceptance for the profile auto-provisioner.
+          try { localStorage.setItem("inkk_pending_tos", TOS_VERSION); } catch {}
+          const { error } = await supabase.auth.signInWithIdToken({
+            provider: "google", token: resp.credential, nonce: raw,
+          });
+          if (error) setError(error.message);
+        },
+      });
+      el.innerHTML = "";
+      gid.renderButton(el, {
+        type: "standard", theme: "outline", size: "large",
+        text: "continue_with", shape: "rectangular", width: 320,
+      });
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [gsiReady, accepted, mode]);
 
   const pw       = passwordChecks(password);
   const pwOk     = pw.length && pw.letter && pw.number;
@@ -1389,7 +1467,13 @@ function AuthModal({ onClose, initialMode = "signin" }) {
                 </span>
               </label>
             )}
-            <button id="google-btn" onClick={googleSignIn} disabled={!accepted}>continue with Google</button>
+            {GOOGLE_CLIENT_ID ? (
+              accepted
+                ? <div ref={googleBtnRef} style={{ display: "flex", justifyContent: "center" }} />
+                : <button id="google-btn" disabled>continue with Google</button>
+            ) : (
+              <button id="google-btn" onClick={googleSignIn} disabled={!accepted}>continue with Google</button>
+            )}
           </>
         )}
       </div>
