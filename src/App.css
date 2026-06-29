@@ -1269,7 +1269,7 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
   display: flex; align-items: baseline; gap: 3px;
 }
 .hs-panel-score-num {
-  font-family: var(--font-ui);
+  font-family: var(--font-serif);
   font-size: 3.4rem; font-weight: 400; line-height: 1;
   color: var(--text); letter-spacing: -0.01em;
 }
@@ -1378,7 +1378,7 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
   min-width: 80px;
 }
 .hs-stat-val {
-  font-family: var(--font-ui);
+  font-family: var(--font-serif);
   font-size: 1.55rem; font-weight: 400; color: var(--text);
   line-height: 1.05; letter-spacing: -0.01em;
 }
@@ -1432,7 +1432,7 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
 }
 .hs-pause-val {
   text-align: right;
-  font-family: var(--font-ui);
+  font-family: var(--font-serif);
   font-size: 1rem; color: var(--text);
 }
 
@@ -1659,7 +1659,7 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
 }
 
 #profile-username {
-  font-family: var(--font-ui);
+  font-family: var(--font-serif);
   font-size: 1.85rem;
   font-weight: 600;
   letter-spacing: -0.015em;
@@ -1706,7 +1706,7 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
 .stat-fig + .stat-fig { border-left: 1px solid var(--border); }
 
 .stat-fig-num {
-  font-family: var(--font-ui);
+  font-family: var(--font-serif);
   font-size: 2.1rem;
   font-weight: 400;
   color: var(--text);
@@ -1999,7 +1999,7 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
   margin-top: 24px;
 }
 #contribution-num {
-  font-family: var(--font-ui);
+  font-family: var(--font-serif);
   font-weight: 400;
   font-size: 3.4rem;
   color: var(--text);
@@ -3244,7 +3244,7 @@ body.focus-mode #text-container.writing-started { padding-top: 32vh; }
   margin-right: 10px;
 }
 .verify-cert-score {
-  font-family: var(--font-ui);
+  font-family: var(--font-serif);
   font-size: 1.3rem;
   color: var(--muted);
 }
