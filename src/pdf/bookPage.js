@@ -2,7 +2,7 @@
 //
 // Parses the editor's HTML (paragraphs, line breaks and images), lays the
 // content out on a high-DPI canvas with classical book typography
-// (justified text, drop cap, paragraph indents, hard line breaks preserved),
+// (justified text, paragraph indents, hard line breaks preserved),
 // and embeds each page as a JPEG inside a custom-sized PDF.
 //
 // All ink (text and images) is drawn under `multiply` blend mode, then a
@@ -59,7 +59,6 @@ const FOOTER_FROM_BOTTOM = 34;
 const T_TITLE   = 12.0;
 const T_HEADER  = 6.0;   // running head (author): a lot smaller than the body
 const T_BODY    = 11.25;
-const T_DROPCAP = 42;
 const T_FOOTER  = 10.5;
 
 // Letter-spacing (em) for the uppercase running head — the wide tracking is
@@ -69,11 +68,6 @@ const HEADER_TRACK = 0.16;
 // Letter-spacing (em) for the page-1 title. Kept very tight to match the
 // editor's uppercase title (CSS letter-spacing: -0.02em).
 const TITLE_TRACK = -0.02;
-
-// Drop cap spans this many body lines.
-// At T_DROPCAP=42pt, cap-height ≈ 0.72 × 42 = 30.2pt = 1.73 body lines,
-// so 2 reserved lines clears the cap without an empty third line.
-const DROPCAP_LINES = 2;
 
 const LINE_H_PT      = T_BODY * 1.55;
 const LINE_H         = LINE_H_PT * PX;
@@ -542,7 +536,6 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
   const {
     pageW            = PAGE_W_PT,
     pageH            = PAGE_H_PT,
-    dropCap: dropCapOpt   = true,
     justify          = true,
     titleGap         = "normal",   // 'tight' | 'normal' | 'loose'
     paragraphIndent  = true,
@@ -596,24 +589,6 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
   // Strip leading empty text blocks.
   while (blocks.length && blocks[0].type === "text" && !blocks[0].segments.length) blocks.shift();
 
-  // Drop cap based on the first character of the first text block.
-  let firstChar = "";
-  let useDropCap = false;
-  if (dropCapOpt && blocks.length && blocks[0].type === "text" && blocks[0].segments.length) {
-    const seg = blocks[0].segments[0];
-    const firstRun = seg[0];
-    const c = firstRun ? (firstRun.text.match(/^\s*([A-Za-z])/) || [])[1] : null;
-    if (c) {
-      firstChar = c.toUpperCase();
-      useDropCap = true;
-      firstRun.text = firstRun.text.replace(/^\s*[A-Za-z]/, "");
-      if (!firstRun.text) seg.shift();
-    }
-  }
-
-  const dropCapW   = useDropCap ? T_DROPCAP * PX * 0.72 : 0;
-  const dropCapIndent = useDropCap ? dropCapW + 10 * PX : 0;
-
   // Preload images so we can size them during pagination.
   await Promise.all(blocks.filter(b => b.type === "image").map(async (b) => {
     b.img = await loadImg(b.src);
@@ -628,44 +603,25 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
     }
     // text block
     if (bi > 0) items.push({ type: "gap" });
-    let dropCapLinesLeft = (bi === 0 && useDropCap) ? DROPCAP_LINES : 0;
     const isFirstParaForIndent = bi > 0;
     block.segments.forEach((seg, si) => {
       // For segment 0 of a paragraph (not first paragraph) → first-line indent.
       const wantsParaIndent = paragraphIndent && si === 0 && isFirstParaForIndent;
       const wrapOpts = {};
-      if (dropCapLinesLeft > 0) {
-        wrapOpts.narrowCount = dropCapLinesLeft;
-        wrapOpts.narrowWidth = fullWidth - dropCapIndent;
-      } else if (wantsParaIndent) {
+      if (wantsParaIndent) {
         wrapOpts.narrowCount = 1;
         wrapOpts.narrowWidth = fullWidth - PARA_INDENT;
       }
       const lines = wrapRuns(mctx, seg || [], fullWidth, wrapOpts);
       lines.forEach((ln, li) => {
-        const item = {
+        items.push({
           type: "line",
           tokens: ln.tokens,
           width: ln.width,
           endOfSegment: !!ln.endOfSegment,
-        };
-        if (li < (wrapOpts.narrowCount || 0)) {
-          // Apply indent visually.
-          if (dropCapLinesLeft > 0) {
-            item.indent = dropCapIndent;
-            dropCapLinesLeft = Math.max(0, dropCapLinesLeft - 1);
-          } else if (wantsParaIndent && li === 0) {
-            item.indent = PARA_INDENT;
-          }
-        } else if (dropCapLinesLeft > 0 && li >= (wrapOpts.narrowCount || 0)) {
-          // Should not happen with the above wrapOpts, but be defensive.
-          dropCapLinesLeft = 0;
-        }
-        items.push(item);
+          indent: (wantsParaIndent && li === 0) ? PARA_INDENT : 0,
+        });
       });
-      // If segment wrapped into fewer lines than dropCapLinesLeft, we still
-      // need to consume those lines. Subtract by lines.length on top of what
-      // was applied above? Already handled in the loop.
     });
   });
 
@@ -712,16 +668,6 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
             y += T_TITLE * PX * TITLE_LINE_MULT;
           }
           y += TITLE_BODY_GAP;
-        }
-
-        // ── Drop cap (page 1 only) ──────────────────────────────────────
-        if (isFirst && useDropCap) {
-          ctx.font = font(T_DROPCAP);
-          ctx.fillStyle = INK_TITLE;
-          ctx.textAlign = "left";
-          const capAscent   = T_DROPCAP * PX * 0.72;
-          const capBaseline = y + capAscent;
-          ctx.fillText(firstChar, mX * PX, capBaseline);
         }
 
         // ── Body ────────────────────────────────────────────────────────
