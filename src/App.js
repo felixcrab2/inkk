@@ -344,20 +344,24 @@ function dropCapSrc(letter, images) {
   return list?.length ? `/drop_caps/${l}/${list[0]}.png` : null;
 }
 
-async function compressAvatar(file, size = 400) {
+// Store avatars at high resolution so they stay razor-sharp in a small circle
+// (and on high-DPI screens): the physical display size is small, the source
+// image is large. Never upscale past the original.
+async function compressAvatar(file, size = 512) {
   return new Promise(resolve => {
     const reader = new FileReader();
     reader.onload = e => {
       const img = new window.Image();
       img.onload = () => {
+        const s = Math.min(img.width, img.height);
+        const out = Math.min(size, s); // don't upscale a small source
         const canvas = document.createElement("canvas");
-        canvas.width = size; canvas.height = size;
+        canvas.width = out; canvas.height = out;
         const ctx = canvas.getContext("2d");
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = "high";
-        const s = Math.min(img.width, img.height);
-        ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size);
-        resolve(canvas.toDataURL("image/jpeg", 0.92));
+        ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, out, out);
+        resolve(canvas.toDataURL("image/jpeg", 0.95));
       };
       img.src = e.target.result;
     };

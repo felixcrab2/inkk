@@ -1595,7 +1595,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 #profile-header {
   display: flex;
   flex-direction: row;
-  align-items: center;
+  align-items: flex-start;
   text-align: left;
   gap: 18px;
   width: 100%;
@@ -1664,12 +1664,13 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 
 #profile-username {
   font-family: var(--font-serif);
-  font-size: 1.85rem;
+  font-size: 1.55rem;
   font-weight: 600;
   letter-spacing: -0.015em;
   color: var(--text);
   margin: 0;
-  line-height: 1.15;
+  /* Tight leading so the cap height sits in line with the top of the avatar. */
+  line-height: 1.05;
   word-break: break-word;
 }
 
@@ -3090,7 +3091,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 
   /* ── Profile ── */
   #profile-container { padding: 44px 20px 28px; }
-  #profile-username { font-size: 1.6rem; }
+  #profile-username { font-size: 1.4rem; }
   .stat-fig { padding: 0 18px; }
   .stat-fig-num { font-size: 1.7rem; }
   .pac-actions { opacity: 1; }
