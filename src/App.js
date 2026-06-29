@@ -1265,7 +1265,7 @@ function UsernameModal({ user, onDone }) {
 
 // ─── PublishModal ─────────────────────────────────────────────────────────────
 
-function PublishModal({ doc, user, profile, onConfirm, onClose }) {
+function PublishModal({ doc, user, profile, onConfirm, onClose, titleCapsOn }) {
   const author = profile?.username || user.user_metadata?.full_name || user.email.split("@")[0];
   const [title, setTitle]     = useState(stripHtml(doc.title || ""));
   const [justify, setJustify] = useState(false);
@@ -1273,9 +1273,13 @@ function PublishModal({ doc, user, profile, onConfirm, onClose }) {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
 
+  const applyCase = useCallback((val) => {
+    if (titleCapsOn && val.trim()) setTitle(titleCase(val));
+  }, [titleCapsOn]);
+
   const submit = async (e) => {
     e.preventDefault();
-    const t = title.trim();
+    const t = (titleCapsOn ? titleCase(title) : title).trim();
     if (!t) return;
     setLoading(true); setError("");
     const errMsg = await onConfirm(t, author, { justify, indent });
@@ -1291,7 +1295,7 @@ function PublishModal({ doc, user, profile, onConfirm, onClose }) {
           <button className="active" style={{ cursor: "default" }}>publish to feed</button>
         </div>
         <form onSubmit={submit}>
-          <input type="text" placeholder="article title" value={title} onChange={e => setTitle(e.target.value)} required autoFocus />
+          <input type="text" placeholder="article title" value={title} onChange={e => setTitle(e.target.value)} onBlur={e => applyCase(e.target.value)} required autoFocus />
           <div className="dl-section-label">Style</div>
           <label className="dl-check"><input type="checkbox" checked={justify} onChange={e => setJustify(e.target.checked)} /><span>Justify text</span></label>
           <label className="dl-check"><input type="checkbox" checked={indent}  onChange={e => setIndent(e.target.checked)} /><span>Paragraph indent</span></label>
@@ -4400,7 +4404,7 @@ export default function App() {
 
       {/* ── modals ── */}
       {publishModalDoc && user && (
-        <PublishModal doc={publishModalDoc} user={user} profile={profile} onConfirm={confirmPublish} onClose={() => setPublishModalDoc(null)} />
+        <PublishModal doc={publishModalDoc} user={user} profile={profile} onConfirm={confirmPublish} onClose={() => setPublishModalDoc(null)} titleCapsOn={titleCapsOn} />
       )}
       {downloadModalOpen && (
         <DownloadModal onConfirm={downloadDoc} onClose={() => setDownloadModalOpen(false)} />
