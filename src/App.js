@@ -1965,7 +1965,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
     <div id="profile-container">
       <header id="profile-header">
         <div id="profile-avatar-wrap">
-          <DropCapAvatar letter={avatarLetter} avatarData={profile?.avatar_data} dropCapImages={dropCapImages} size={96} />
+          <DropCapAvatar letter={avatarLetter} avatarData={profile?.avatar_data} dropCapImages={dropCapImages} size={64} />
           <button id="avatar-upload-btn" onClick={() => fileInputRef.current?.click()} title="Change photo">
             {uploading ? "…" : "✎"}
           </button>
@@ -4659,7 +4659,7 @@ export default function App() {
               <User size={18} strokeWidth={1.75} />
             )}
             <span className="nav-label">{user ? "Profile" : "Sign in"}</span>
-            {streak > 1 && <span className="nav-streak">🔥{streak}</span>}
+            {streak > 1 && <span className="nav-streak">{streak}</span>}
           </button>
         </nav>
       )}
