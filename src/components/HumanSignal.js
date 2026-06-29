@@ -274,8 +274,10 @@ export function HumanSignalPanel({ score, onClose }) {
     : 0;
 
   const dims = buildDims(score).map(d => ({ ...d, label: RADAR_LABELS[d.key] }));
-  const confidentDims = dims.filter(d => d.conf > 0.05).length;
-  const showRadar = confidentDims >= 3;
+  // Show the fingerprint whenever there's any measurable signal. The panel only
+  // opens once a score exists, so this is effectively always true; the polygon
+  // is driven by the dimension *values*, and confidence only fades the vertices.
+  const showRadar = dims.some(d => d.value > 0.02);
 
   const micro = score.pause_micro ?? Math.max(0, (score.pause_count_500 || 0) - (score.thinking_pauses || 0));
   const think = score.pause_think ?? (score.thinking_pauses || 0);
@@ -310,7 +312,9 @@ export function HumanSignalPanel({ score, onClose }) {
               <p className="hs-panel-blurb">
                 Built from rhythm, pauses, corrections, and revision behaviour, not the words themselves.
               </p>
-              {showRadar && <RadarChart dims={dims} />}
+              {showRadar
+                ? <RadarChart dims={dims} />
+                : <div className="hs-chart-empty">The fingerprint forms as a few signals become confident. Keep writing.</div>}
               {contributors.length === 0 && (
                 <div className="hs-panel-empty">Keep writing. The signal builds with a little more typing.</div>
               )}
@@ -349,19 +353,19 @@ export function HumanSignalPanel({ score, onClose }) {
             <div className="hs-tab-patterns">
               <p className="hs-panel-blurb">Behavioural fingerprint, what the process metadata shows.</p>
 
-              {hasPauses && (<>
-                <div className="hs-section-label">Pace of thought</div>
-                <PauseChart micro={micro} think={think} long={long_} />
-              </>)}
+              <div className="hs-section-label">Pace of thought</div>
+              {hasPauses
+                ? <PauseChart micro={micro} think={think} long={long_} />
+                : <div className="hs-chart-empty">Pauses appear here as your writing settles into a rhythm.</div>}
 
-              {(score.typed_chars > 0 || score.pasted_chars > 0) && (<>
-                <div className="hs-section-label">Where the words came from</div>
-                <CompositionBar
-                  typed={score.typed_chars || 0}
-                  pasted={score.pasted_chars || 0}
-                  deleted={score.deleted_chars || 0}
-                />
-              </>)}
+              <div className="hs-section-label">Where the words came from</div>
+              {(score.typed_chars > 0 || score.pasted_chars > 0)
+                ? <CompositionBar
+                    typed={score.typed_chars || 0}
+                    pasted={score.pasted_chars || 0}
+                    deleted={score.deleted_chars || 0}
+                  />
+                : <div className="hs-chart-empty">Typed and pasted characters appear here as you write.</div>}
 
               <div className="hs-section-label">At a glance</div>
               <div className="hs-stat-row hs-stat-row-grid">
