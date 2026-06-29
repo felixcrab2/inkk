@@ -38,17 +38,15 @@ const INK_ALPHA   = 1.0;
 // Paper tone: heavy desaturation + slight brightness for near-white paper.
 // Lower saturation pulls the yellow out; the brightness lift keeps it a touch
 // brighter than the raw scan without going to bleached white.
-const PAPER_FILTER = "saturate(0.34) brightness(1.045)";
+const PAPER_FILTER = "saturate(0.2) brightness(1.06)";
 
 // The scanned sheet has a warm "tea-dipped" darkening in its lower corners and
-// edges. Compositing a warm paper tone in `lighten` raises only the pixels
+// edges. Compositing a neutral paper tone in `lighten` raises only the pixels
 // darker than the tone toward it, so the heavy corners come up to an even,
-// luminous paper while the bright field and fibre texture stay untouched (a
-// flat fill or symmetric vignette would wash out the texture or miss the
-// asymmetric staining). Kept warm and below pure white so it still reads as
-// paper, not bleached stock.
-const PAPER_LIFT_COLOR = "rgb(246, 244, 240)";
-const PAPER_LIFT_ALPHA = 0.87;
+// luminous paper while the bright field and fibre texture stay untouched.
+// Higher alpha = more even illumination across the sheet.
+const PAPER_LIFT_COLOR = "rgb(249, 248, 246)";
+const PAPER_LIFT_ALPHA = 0.92;
 
 // Header / footer offsets (pt). Margins are now computed proportionally
 // per page size inside renderBookPdfPages so non-default aspects still
