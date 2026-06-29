@@ -58,30 +58,50 @@ function logNormalShape(pauses) {
 }
 
 const VELOCITY_WINDOW_MS = 30_000;
+// Inter-keystroke gaps longer than this are treated as "away" (stepped out,
+// switched tabs, left the doc open) and are excluded from the writing timeline.
+// Without this, idle time dilutes every window and the whole session reads as a
+// few words per minute. 10s lines up with the upper bound of a thinking pause.
+const VELOCITY_IDLE_CUTOFF_MS = 10_000;
 
 function buildVelocitySeries(inputEvents, statsFunc) {
   if (!inputEvents.length) return { series: [], avg_wpm: 0, peak_wpm: 0, velocity_cv: 0 };
-  const firstT = inputEvents[0].t;
-  const lastT = inputEvents[inputEvents.length - 1].t;
-  const span = lastT - firstT;
+
+  // Project each input event onto an *active* writing timeline. The clock only
+  // advances during genuine activity; long idle gaps are collapsed so the speed
+  // reflects how fast the author actually wrote, not how long the tab was open.
+  const proj = [];                 // { at: activeMs, chars }
+  let activeT = 0;
+  proj.push({ at: 0, chars: Math.max(0, inputEvents[0].len_delta || 0) });
+  for (let i = 1; i < inputEvents.length; i++) {
+    const gap = inputEvents[i].t - inputEvents[i - 1].t;
+    if (gap > 0 && gap < VELOCITY_IDLE_CUTOFF_MS) activeT += gap;
+    proj.push({ at: activeT, chars: Math.max(0, inputEvents[i].len_delta || 0) });
+  }
+  const span = activeT;
+  const totalChars = proj.reduce((s, p) => s + p.chars, 0);
+
   if (span < 10_000) {
-    const chars = inputEvents.reduce((s, e) => s + Math.max(0, e.len_delta || 0), 0);
-    const wpm = span > 0 ? Math.round((chars / 5) / (span / 60000)) : 0;
+    const wpm = span > 0 ? Math.round((totalChars / 5) / (span / 60000)) : 0;
     return { series: [{ tMs: 0, pct: 0.5, wpm }], avg_wpm: wpm, peak_wpm: wpm, velocity_cv: 0 };
   }
-  const windowMs = Math.max(VELOCITY_WINDOW_MS, Math.ceil(span / 24));
-  const numWindows = Math.ceil(span / windowMs);
+
+  // Uniform windows over the active span (avoids a tiny trailing window that
+  // would otherwise spike). Capped at ~24 windows for very long sessions.
+  const target = Math.max(VELOCITY_WINDOW_MS, Math.ceil(span / 24));
+  const numWindows = Math.max(1, Math.round(span / target));
+  const windowMs = span / numWindows;
   const wpmArr = [];
   const series = [];
   for (let i = 0; i < numWindows; i++) {
-    const wStart = firstT + i * windowMs;
+    const wStart = i * windowMs;
     const wEnd = wStart + windowMs;
-    const chars = inputEvents
-      .filter(e => e.t >= wStart && e.t < wEnd)
-      .reduce((s, e) => s + Math.max(0, e.len_delta || 0), 0);
+    const chars = proj
+      .filter(p => p.at >= wStart && p.at < wEnd)
+      .reduce((s, p) => s + p.chars, 0);
     const wpm = Math.round((chars / 5) / (windowMs / 60000));
     wpmArr.push(wpm);
-    series.push({ tMs: i * windowMs, pct: numWindows > 1 ? i / (numWindows - 1) : 0, wpm });
+    series.push({ tMs: Math.round(wStart), pct: numWindows > 1 ? i / (numWindows - 1) : 0, wpm });
   }
   const nonZero = wpmArr.filter(v => v > 0);
   const avg_wpm = nonZero.length ? Math.round(nonZero.reduce((s, v) => s + v, 0) / nonZero.length) : 0;
