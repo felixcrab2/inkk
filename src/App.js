@@ -1044,7 +1044,7 @@ function HumanSignalModal({ onClose }) {
         <button id="auth-close" onClick={onClose}>×</button>
         <div id="hs-modal-title">A small study of writing.</div>
         <p id="hs-modal-body">
-          When you write in Inkk, your text and the rhythm of your typing — pauses, revisions, bursts — are captured as part of a study into human writing. We use this to train a model that can distinguish human writing from machine-generated text.
+          When you write in Inkk, your text and the rhythm of your typing — pauses, revisions, bursts — are captured as part of a study into human writing. We use this to study what distinguishes human writing from machine-generated text.
         </p>
         <p className="hs-modal-body" style={{ marginTop: "12px" }}>
           You can opt out, download, or delete your contribution at any time from your Profile.
@@ -2159,7 +2159,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
           <h2 className="profile-section-label">Research</h2>
         </div>
         <p id="research-blurb">
-          When you write in Inkk, your text and the rhythm of your typing — pauses, revisions, bursts — are captured as part of a study into human writing. We use this to train a model that can distinguish human writing from machine-generated text. You can turn this off at any time, and the editor keeps working exactly as before.
+          When you write in Inkk, your text and the rhythm of your typing — pauses, revisions, bursts — are captured as part of a study into human writing. We use this to study what distinguishes human writing from machine-generated text. You can turn this off at any time, and the editor keeps working exactly as before.
         </p>
 
         {researchOptIn && ((Number(contribution?.event_count) || 0) + pendingLocal) > 0 && (() => {
