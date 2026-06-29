@@ -1080,8 +1080,8 @@ function passwordChecks(pw) {
   };
 }
 
-function AuthModal({ onClose }) {
-  const [mode, setMode]             = useState("signin"); // signin | signup | reset
+function AuthModal({ onClose, initialMode = "signin" }) {
+  const [mode, setMode]             = useState(initialMode); // signin | signup | reset
   const [email, setEmail]           = useState("");
   const [username, setUsername]     = useState("");
   const [password, setPassword]     = useState("");
@@ -1787,7 +1787,7 @@ function Feed({ user, onRead, onAuthorClick, dropCapImages, onRequestAuth }) {
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
-function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapImages, onRead, onUnpublish, onSignIn, onSignOut, onAvatarChange, onEditDoc, onNewDoc, onDeleteDoc, onPublishDoc, researchOptIn, onToggleOptIn, onDownloadData, onDeleteData, onChangePassword, onProfileUpdate, onOpenVerify }) {
+function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapImages, onRead, onUnpublish, onSignIn, onCreateAccount, onSignOut, onAvatarChange, onEditDoc, onNewDoc, onDeleteDoc, onPublishDoc, researchOptIn, onToggleOptIn, onDownloadData, onDeleteData, onChangePassword, onProfileUpdate, onOpenVerify }) {
   const [pubs, setPubs]           = useState([]);
   const [loading, setLoading]     = useState(!!user);
   const [uploading, setUploading] = useState(false);
@@ -1883,7 +1883,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
           <p id="profile-signin-sub">Write privately, or publish to the feed, all with Human&nbsp;Signal tracking.</p>
           <div id="profile-signin-actions">
             <button className="profile-cta" onClick={onSignIn}>Sign in</button>
-            <button className="profile-cta-ghost" onClick={onSignIn}>Create account</button>
+            <button className="profile-cta-ghost" onClick={onCreateAccount || onSignIn}>Create account</button>
           </div>
         </div>
       </div>
@@ -2856,6 +2856,7 @@ export default function App() {
   const [words, setWords]             = useState(() => wordCount(initDocs.find(d => d.id === initActiveId)?.content));
   const [user, setUser]               = useState(null);
   const [authOpen, setAuthOpen]       = useState(false);
+  const [authMode, setAuthMode]       = useState("signin"); // which tab the modal opens on
   const [view, setView]               = useState(() => pathToView(window.location.pathname));
   const [readingPub, setReadingPub]   = useState(null);
   const [readingFocus, setReadingFocus] = useState(null);
@@ -3424,7 +3425,7 @@ export default function App() {
 
   const openPublishModal = useCallback((doc, e) => {
     if (e) e.stopPropagation();
-    if (!userRef.current) { setAuthOpen(true); return; }
+    if (!userRef.current) { setAuthMode("signin"); setAuthOpen(true); return; }
     const content = doc.id === activeId ? contentRef.current : doc.content;
     if (!stripHtml(content || "").trim()) return;
     setPublishModalDoc({ ...doc, content });
@@ -3455,7 +3456,7 @@ export default function App() {
   // Certify the active document — mint/show a verification code WITHOUT
   // publishing it to the feed.
   const certifyActiveDoc = useCallback(async () => {
-    if (!userRef.current) { setAuthOpen(true); return; }
+    if (!userRef.current) { setAuthMode("signin"); setAuthOpen(true); return; }
     const docId = activeIdRef.current;
     const base = docsRef.current.find(d => d.id === docId);
     if (!base) return;
@@ -3488,6 +3489,13 @@ export default function App() {
     if (!prof) { addToast("This writer hasn't set up their profile."); return; }
     navigate("userProfile", { userProfile: prof });
   }, [navigate, addToast]);
+
+  // Open the auth modal on a specific tab. Mode is set before the modal mounts,
+  // so each open lands on the requested tab (signin by default).
+  const openAuth = useCallback((mode = "signin") => {
+    setAuthMode(mode);
+    setAuthOpen(true);
+  }, []);
 
   // ─ sign out ─────────────────────────────────────────────────────────────────
 
@@ -4480,7 +4488,7 @@ export default function App() {
           onRead={openReading}
           onAuthorClick={openUserProfile}
           dropCapImages={dropCapImages}
-          onRequestAuth={() => setAuthOpen(true)}
+          onRequestAuth={() => openAuth()}
         />
       )}
       {view === "profile" && (
@@ -4493,7 +4501,8 @@ export default function App() {
           dropCapImages={dropCapImages}
           onRead={openReading}
           onUnpublish={docId => setPublishedDocIds(prev => { const s = new Set(prev); s.delete(docId); return s; })}
-          onSignIn={() => setAuthOpen(true)}
+          onSignIn={() => openAuth("signin")}
+          onCreateAccount={() => openAuth("signup")}
           onSignOut={signOut}
           onAvatarChange={handleAvatarChange}
           onEditDoc={(id) => { switchDoc(id); navigate("editor"); }}
@@ -4518,7 +4527,7 @@ export default function App() {
           onRead={openReading}
           dropCapImages={dropCapImages}
           user={user}
-          onRequestAuth={() => setAuthOpen(true)}
+          onRequestAuth={() => openAuth()}
         />
       )}
       {view === "reading" && readingPub && (
@@ -4527,7 +4536,7 @@ export default function App() {
           user={user}
           dropCapImages={dropCapImages}
           focus={readingFocus}
-          onRequestAuth={() => setAuthOpen(true)}
+          onRequestAuth={() => openAuth()}
           onAuthorClick={openUserProfile}
           onVerify={openVerify}
         />
@@ -4594,7 +4603,7 @@ export default function App() {
       {downloadModalOpen && (
         <DownloadModal onConfirm={downloadDoc} onClose={() => setDownloadModalOpen(false)} />
       )}
-      {authOpen && supabase && <AuthModal onClose={() => setAuthOpen(false)} />}
+      {authOpen && supabase && <AuthModal onClose={() => setAuthOpen(false)} initialMode={authMode} />}
       {hsModalOpen && <HumanSignalModal onClose={() => setHsModalOpen(false)} />}
       {hsScoreOpen && (() => {
         const doc = docs.find(d => d.id === activeId);
