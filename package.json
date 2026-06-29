@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@fontsource-variable/hanken-grotesk": "^5.2.8",
     "@fontsource/cormorant-garamond": "^5.2.11",
     "@fontsource/eb-garamond": "^5.2.7",
     "@supabase/supabase-js": "^2.105.3",

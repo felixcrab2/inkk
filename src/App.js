@@ -6,6 +6,7 @@ import "@fontsource/cormorant-garamond/400.css";
 import "@fontsource/cormorant-garamond/500.css";
 import "@fontsource/cormorant-garamond/600.css";
 import "@fontsource/cormorant-garamond/700.css";
+import "@fontsource-variable/hanken-grotesk";
 import { jsPDF } from "jspdf";
 import { supabase } from "./supabase";
 import { renderBookPdfPages, PAGE_PRESETS } from "./pdf/bookPage";
