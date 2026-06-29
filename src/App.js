@@ -6,6 +6,7 @@ import "@fontsource/cormorant-garamond/400.css";
 import "@fontsource/cormorant-garamond/500.css";
 import "@fontsource/cormorant-garamond/600.css";
 import "@fontsource/cormorant-garamond/700.css";
+import "@fontsource-variable/instrument-sans";
 import { jsPDF } from "jspdf";
 import { supabase } from "./supabase";
 import { renderBookPdfPages, PAGE_PRESETS } from "./pdf/bookPage";
@@ -24,7 +25,7 @@ import {
   deleteMyEvents, dumpMyEvents,
   flushNow as syncFlushNow,
 } from "./telemetry/sync";
-import { claimAnonymous as claimAnonymousEvents, clearForUser as clearLocalForUser } from "./telemetry/store";
+import { claimAnonymous as claimAnonymousEvents, clearForUser as clearLocalForUser, countForUser as countLocalEvents } from "./telemetry/store";
 import { HumanSignalBadge, HumanSignalPanel } from "./components/HumanSignal";
 import { PrivacyModal, TermsModal, TOS_VERSION } from "./components/Legal";
 import { VerifyView } from "./components/Verify";
@@ -1548,6 +1549,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
     });
   };
   const [contribution, setContribution] = useState(null);
+  const [pendingLocal, setPendingLocal] = useState(0);
   const [editingProfile, setEditingProfile]   = useState(false);
   const [editUsername, setEditUsername]       = useState("");
   const [editDisplayName, setEditDisplayName] = useState("");
@@ -1556,8 +1558,33 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
   const fileInputRef              = useRef(null);
 
   useEffect(() => {
-    if (!user || !researchOptIn) { setContribution(null); return; }
-    fetchMyContribution(user.id).then(setContribution);
+    if (!user || !researchOptIn) { setContribution(null); setPendingLocal(0); return; }
+    let alive = true;
+    const refresh = async () => {
+      // Nudge the syncer so the server total keeps pace, then read both the
+      // synced (server) count and the not-yet-uploaded (local queue) count.
+      // Showing the local queue makes recording visible immediately and makes a
+      // stalled upload obvious instead of looking like a frozen number.
+      try { syncFlushNow?.(); } catch {}
+      const [contrib, pending] = await Promise.all([
+        fetchMyContribution(user.id),
+        countLocalEvents(user.id),
+      ]);
+      if (!alive) return;
+      if (contrib) setContribution(contrib);
+      setPendingLocal(pending || 0);
+    };
+    refresh();
+    const id = setInterval(refresh, 4000);
+    const onVis = () => { if (!document.hidden) refresh(); };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", refresh);
+    return () => {
+      alive = false;
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", refresh);
+    };
   }, [user, researchOptIn]);
 
   useEffect(() => {
@@ -1844,15 +1871,24 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
           When you write in Inkk, the rhythm of your typing (pauses, revisions, bursts) is recorded as anonymous, character-free metadata. We use it to study what human writing looks like in latent space. You can turn this off at any time, and the editor keeps working exactly as before.
         </p>
 
-        {researchOptIn && contribution && contribution.event_count > 0 && (
-          <div id="contribution-card">
-            <div id="contribution-num">{Number(contribution.event_count).toLocaleString()}</div>
-            <div id="contribution-label">events contributed to the inkk writing study</div>
-            {contribution.first_t && (
-              <div id="contribution-since">since {formatDate(new Date(Number(contribution.first_t)).toISOString())}</div>
-            )}
-          </div>
-        )}
+        {researchOptIn && ((Number(contribution?.event_count) || 0) + pendingLocal) > 0 && (() => {
+          const synced = Number(contribution?.event_count) || 0;
+          const total = synced + pendingLocal;
+          return (
+            <div id="contribution-card">
+              <div id="contribution-num">{total.toLocaleString()}</div>
+              <div id="contribution-label">events contributed to the inkk writing study</div>
+              <div id="contribution-status" className={pendingLocal > 0 ? "syncing" : "synced"}>
+                {pendingLocal > 0
+                  ? <><span className="research-pulse" aria-hidden="true" />{pendingLocal.toLocaleString()} just recorded, uploading…</>
+                  : "all events uploaded"}
+              </div>
+              {contribution?.first_t && (
+                <div id="contribution-since">since {formatDate(new Date(Number(contribution.first_t)).toISOString())}</div>
+              )}
+            </div>
+          );
+        })()}
 
         <label className="research-toggle">
           <input
