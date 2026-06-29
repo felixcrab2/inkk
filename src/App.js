@@ -201,17 +201,6 @@ function applySmartTypography() {
   }
 }
 
-// Convert markdown emphasis in a pasted plain-text block to inline HTML, escaping
-// everything else. Used so pasted *italics*/**bold** survive instead of showing
-// raw markers. Same word-boundary guard as the typed path.
-function pastedTextToHtml(text) {
-  const esc = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const emph = esc
-    .replace(/(^|[\s([{>"'“‘—–])(\*\*|__)(?=\S)(.+?)\2(?=[\s.,!?;:)\]}"'”’]|$)/g, "$1<strong>$3</strong>")
-    .replace(/(^|[\s([{>"'“‘—–])([*_])(?=\S)([^*_\n]+?)\2(?=[\s.,!?;:)\]}"'”’]|$)/g, "$1<em>$3</em>");
-  return emph.replace(/\r?\n/g, "<br>");
-}
-
 function stripHtml(html) {
   if (!html) return "";
   return html
@@ -4035,14 +4024,11 @@ export default function App() {
       selectImageWhenReady(img);
       return;
     }
-    // Strip rich formatting on paste, but keep markdown emphasis as real italics
-    // and bold so pasted *italics*/**bold** don't show their raw markers.
+    // Text paste is turned off for now — pieces should be written, not pasted in
+    // (it would bypass the keystroke recording behind Inkk's verification).
+    // Pasting an image still works (handled above).
     e.preventDefault();
-    const text = e.clipboardData?.getData("text/plain") || "";
-    if (!text) return;
-    const html = pastedTextToHtml(text);
-    if (/<(em|strong)>/.test(html)) document.execCommand("insertHTML", false, html);
-    else document.execCommand("insertText", false, text);
+    if (e.clipboardData?.getData("text/plain")) addToast("Pasting text is turned off for now.");
   }, [onInput, selectImageWhenReady, addToast]);
 
   // ─ PDF export ───────────────────────────────────────────────────────────────
@@ -4668,11 +4654,7 @@ export default function App() {
           onInput={onTitleInput}
           onBlur={finalizeTitle}
           onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); finalizeTitle(); editorRef.current?.focus(); } }}
-          onPaste={e => {
-            e.preventDefault();
-            const text = (e.clipboardData?.getData("text/plain") || "").replace(/\s*\n\s*/g, " ");
-            document.execCommand("insertText", false, text);
-          }}
+          onPaste={e => e.preventDefault()}
         />
         <div id="writing-area">
           <div
