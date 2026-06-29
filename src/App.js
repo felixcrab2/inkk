@@ -3423,9 +3423,11 @@ export default function App() {
 
 
   const handleEditorDrop = useCallback(async (e) => {
+    // Only intercept file drops; let text/other drops behave normally.
+    if (!Array.from(e.dataTransfer?.types || []).includes("Files")) return;
+    e.preventDefault();   // stop the browser from opening the dropped file
     const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith("image/"));
     if (!files.length) return;
-    e.preventDefault();
     const range = caretRangeAt(e.clientX, e.clientY);
     let lastImg = null;
     for (const file of files) {
@@ -4097,7 +4099,8 @@ export default function App() {
             autoCapitalize="off"
             onInput={onInput}
             onDrop={handleEditorDrop}
-            onDragOver={e => { if (Array.from(e.dataTransfer?.items || []).some(i => i.type.startsWith("image/"))) e.preventDefault(); }}
+            onDragEnter={e => { if (Array.from(e.dataTransfer?.types || []).includes("Files")) e.preventDefault(); }}
+            onDragOver={e => { if (Array.from(e.dataTransfer?.types || []).includes("Files")) e.preventDefault(); }}
             onPaste={handleEditorPaste}
             onClick={e => { if (e.target.tagName === "IMG") selectEditorImage(e.target); else clearImageSel(); }}
             onKeyDown={() => { if (imgElRef.current) clearImageSel(); }}
