@@ -27,12 +27,12 @@ export const PAGE_PRESETS = {
   portrait:     { w: 480, h: 600 },                          // 4:5 (Instagram portrait)
 };
 
-// Warm ink, slightly transparent under multiply for "absorbed letterpress".
-const INK_BODY    = "#241a12";
-const INK_TITLE   = "#1f1610";
-const INK_FOOTER  = "#3e3326";
-const INK_HEADER  = "#a8967e";
-const INK_ALPHA   = 0.93;
+// Solid black ink at full opacity for crisp, fully-black text on the page.
+const INK_BODY    = "#000000";
+const INK_TITLE   = "#000000";
+const INK_FOOTER  = "#000000";
+const INK_HEADER  = "#000000";   // running head (author) — black, like the body
+const INK_ALPHA   = 1.0;
 
 // Paper tone: heavy desaturation + slight brightness for near-white paper.
 const PAPER_FILTER = "saturate(0.45) brightness(1.01)";
@@ -57,7 +57,7 @@ const FOOTER_FROM_BOTTOM = 34;
 // Title is kept only slightly larger than the body so the rendered page
 // matches the editor, where the title sits just above the prose size.
 const T_TITLE   = 12.0;
-const T_HEADER  = 8.5;
+const T_HEADER  = 6.0;   // running head (author): a lot smaller than the body
 const T_BODY    = 11.25;
 const T_DROPCAP = 42;
 const T_FOOTER  = 10.5;
