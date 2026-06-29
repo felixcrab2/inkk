@@ -6,7 +6,7 @@ import "@fontsource/cormorant-garamond/400.css";
 import "@fontsource/cormorant-garamond/500.css";
 import "@fontsource/cormorant-garamond/600.css";
 import "@fontsource/cormorant-garamond/700.css";
-import "@fontsource-variable/instrument-sans";
+import "@fontsource-variable/work-sans";
 import { jsPDF } from "jspdf";
 import { supabase } from "./supabase";
 import { renderBookPdfPages, PAGE_PRESETS } from "./pdf/bookPage";
@@ -194,7 +194,7 @@ function caretRangeAt(x, y) {
   return r;
 }
 
-async function compressImage(file, maxDim = 2000) {
+async function compressImage(file, maxDim = 2600) {
   return new Promise(resolve => {
     const reader = new FileReader();
     reader.onload = e => {
@@ -209,7 +209,7 @@ async function compressImage(file, maxDim = 2000) {
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = "high";   // crisper downscaling
         ctx.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL("image/jpeg", 0.85));
+        resolve(canvas.toDataURL("image/jpeg", 0.9));
       };
       img.src = e.target.result;
     };
@@ -3539,7 +3539,7 @@ export default function App() {
           options: renderOptions,
           async onPage(canvas, pageIndex) {
             if (pageIndex > 0) pdf.addPage([preset.w, preset.h]);
-            const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.96);
             pdf.addImage(dataUrl, "JPEG", 0, 0, preset.w, preset.h, undefined, "MEDIUM");
           },
         });

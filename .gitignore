@@ -4,3 +4,6 @@ node_modules/
 .env*.local
 .DS_Store
 scripts/_pdf-out/
+
+# local font comparison screenshots (not for commit)
+font-previews/

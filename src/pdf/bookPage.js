@@ -17,8 +17,9 @@ const TEX_H = 1930;
 export const PAGE_W_PT = 480;                                      // ~6.67"
 export const PAGE_H_PT = Math.round(PAGE_W_PT * (TEX_H / TEX_W));  // ~639
 
-// Canvas scale. 4× ≈ 288 dpi — crisp at Instagram sizes.
-const PX = 4;
+// Canvas scale (supersampling). 6× ≈ 432 dpi — crisp text and images in print
+// and at Instagram sizes. Higher = sharper output at the cost of memory/time.
+const PX = 6;
 
 // Preset page dimensions (pt) for Instagram-style PNG exports.
 export const PAGE_PRESETS = {
@@ -35,7 +36,9 @@ const INK_HEADER  = "#a8967e";
 const INK_ALPHA   = 0.93;
 
 // Paper tone: heavy desaturation + slight brightness for near-white paper.
-const PAPER_FILTER = "saturate(0.45) brightness(1.01)";
+// Lower saturation pulls the yellow out; the brightness lift keeps it a touch
+// brighter than the raw scan without going to bleached white.
+const PAPER_FILTER = "saturate(0.34) brightness(1.045)";
 
 // The scanned sheet has a warm "tea-dipped" darkening in its lower corners and
 // edges. Compositing a warm paper tone in `lighten` raises only the pixels
@@ -44,8 +47,8 @@ const PAPER_FILTER = "saturate(0.45) brightness(1.01)";
 // flat fill or symmetric vignette would wash out the texture or miss the
 // asymmetric staining). Kept warm and below pure white so it still reads as
 // paper, not bleached stock.
-const PAPER_LIFT_COLOR = "rgb(241, 236, 229)";
-const PAPER_LIFT_ALPHA = 0.85;
+const PAPER_LIFT_COLOR = "rgb(246, 244, 240)";
+const PAPER_LIFT_ALPHA = 0.87;
 
 // Header / footer offsets (pt). Margins are now computed proportionally
 // per page size inside renderBookPdfPages so non-default aspects still
@@ -470,6 +473,9 @@ async function renderOnePage({ texture, drawInk, cw, ch, paperTexture }) {
   canvas.width  = cw;
   canvas.height = ch;
   const ctx = canvas.getContext("2d");
+  // High-quality resampling for the upscaled paper texture and any photos.
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
 
   // 1. Background — paper texture or flat inkk background.
   if (paperTexture && texture) {
