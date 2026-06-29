@@ -1265,6 +1265,7 @@ function AuthModal({ onClose, initialMode = "signin" }) {
   const [gsiReady, setGsiReady]     = useState(false);     // Google Identity script loaded
   const sentEmailRef                = useRef("");
   const googleBtnRef                = useRef(null);        // host for Google's rendered button
+  const acceptedRef                 = useRef(false);       // latest Terms state for the GIS callback
 
   const switchMode = (m) => {
     setMode(m); setError(""); setMessage(""); setResend(""); setNeedsConfirm(false);
@@ -1286,6 +1287,9 @@ function AuthModal({ onClose, initialMode = "signin" }) {
     return () => { alive = false; clearTimeout(t); };
   }, [username, mode]);
 
+  // Keep the latest Terms state available to the (long-lived) GIS callback.
+  useEffect(() => { acceptedRef.current = accepted; }, [accepted]);
+
   // Load Google Identity Services once, if a client ID is configured.
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return;
@@ -1294,11 +1298,12 @@ function AuthModal({ onClose, initialMode = "signin" }) {
     return () => { active = false; };
   }, []);
 
-  // Render Google's button once the script is ready and the Terms are accepted.
-  // The credential callback trades the Google ID token for a Supabase session via
-  // signInWithIdToken — no redirect ever leaves our own domain.
+  // Render Google's button as soon as the script is ready (so it's never a dead
+  // placeholder). Terms are enforced inside the callback, which exchanges the
+  // Google ID token for a Supabase session via signInWithIdToken — no redirect
+  // ever leaves our own domain.
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID || !gsiReady || mode === "reset" || !accepted) return;
+    if (!GOOGLE_CLIENT_ID || !gsiReady || mode === "reset") return;
     const el = googleBtnRef.current;
     const gid = window.google?.accounts?.id;
     if (!el || !gid) return;
@@ -1309,6 +1314,10 @@ function AuthModal({ onClose, initialMode = "signin" }) {
         client_id: GOOGLE_CLIENT_ID,
         nonce: hashed,
         callback: async (resp) => {
+          if (!acceptedRef.current) {
+            setError("Please accept the Terms & Privacy Policy first.");
+            return;
+          }
           // Record Terms acceptance for the profile auto-provisioner.
           try { localStorage.setItem("inkk_pending_tos", TOS_VERSION); } catch {}
           const { error } = await supabase.auth.signInWithIdToken({
@@ -1324,7 +1333,7 @@ function AuthModal({ onClose, initialMode = "signin" }) {
       });
     }).catch(() => {});
     return () => { active = false; };
-  }, [gsiReady, accepted, mode]);
+  }, [gsiReady, mode]);
 
   const pw       = passwordChecks(password);
   const pwOk     = pw.length && pw.letter && pw.number;
@@ -1552,9 +1561,7 @@ function AuthModal({ onClose, initialMode = "signin" }) {
               </label>
             )}
             {GOOGLE_CLIENT_ID ? (
-              accepted
-                ? <div ref={googleBtnRef} style={{ display: "flex", justifyContent: "center" }} />
-                : <button id="google-btn" disabled>continue with Google</button>
+              <div ref={googleBtnRef} style={{ display: "flex", justifyContent: "center" }} />
             ) : (
               <button id="google-btn" onClick={googleSignIn} disabled={!accepted}>continue with Google</button>
             )}
