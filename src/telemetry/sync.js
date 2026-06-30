@@ -1,6 +1,7 @@
-// Drains IndexedDB writing_events queue → Supabase, batched, in the background.
-// Only runs when (signed in) AND (research_opt_in = true) AND (online).
-// Honours RLS: writing_events insert is also gated server-side by opt-in.
+// Drains the IndexedDB telemetry queue → Supabase, packed into batch rows, in
+// the background. Only runs when (signed in) AND (research_opt_in = true) AND
+// (online). Honours RLS: writing_event_batches insert is also gated server-side
+// by opt-in.
 
 import * as store from "./store";
 
@@ -22,11 +23,31 @@ async function drainOnce() {
     const batch = await store.drain(userId, BATCH);
     if (!batch.length) return;
 
-    // Strip local-only fields just in case (no schema mismatch).
-    const rows = batch.map(({ id, schema_version, user_id, doc_id, session_id, seq, t, pt, kind, key_class, key_char, input_type, len_delta, caret_pos, selection_len, payload }) =>
+    // Pack the whole batch into ONE row: a JSONB array of events plus a count
+    // and time span. ~5–10× less storage than one row per event (no per-row
+    // tuple + 3 index entries × thousands of tiny rows). Strip local-only fields
+    // so the stored corpus matches the documented event shape exactly.
+    const events = batch.map(({ id, schema_version, user_id, doc_id, session_id, seq, t, pt, kind, key_class, key_char, input_type, len_delta, caret_pos, selection_len, payload }) =>
       ({ id, schema_version, user_id, doc_id, session_id, seq, t, pt, kind, key_class, key_char, input_type, len_delta, caret_pos, selection_len, payload }));
 
-    const { error } = await supabase.from("writing_events").upsert(rows, { onConflict: "id", ignoreDuplicates: true });
+    let minT = Infinity, maxT = -Infinity;
+    for (const e of events) {
+      const t = Number(e.t);
+      if (Number.isFinite(t)) { if (t < minT) minT = t; if (t > maxT) maxT = t; }
+    }
+    if (!Number.isFinite(minT)) { minT = 0; maxT = 0; }
+
+    const row = {
+      id: events[0].id,                       // deterministic → idempotent if a retry re-drains the same batch
+      schema_version: events[0].schema_version ?? null,
+      user_id: userId,
+      event_count: events.length,
+      min_t: minT,
+      max_t: maxT,
+      events,
+    };
+
+    const { error } = await supabase.from("writing_event_batches").upsert(row, { onConflict: "id", ignoreDuplicates: true });
     if (!error) {
       await store.remove(batch.map(b => b.id));
     } else {
@@ -81,13 +102,24 @@ export async function deleteMyEvents(sb) {
   return error?.message || null;
 }
 
-// "Download my data" — pulls a snapshot from the cloud (researcher's events).
+// "Download my data" — pulls a snapshot from the cloud and re-expands the packed
+// batches back into a flat, time-ordered list of raw events (the same shape the
+// recorder produced), so the exported corpus is identical to the pre-packing
+// format. Paginates through all batches (no 50k cap).
 export async function dumpMyEvents(sb, userId) {
   if (!sb || !userId) return [];
-  const { data } = await sb
-    .from("writing_events")
-    .select("*")
-    .order("t", { ascending: true })
-    .limit(50_000);
-  return data || [];
+  const out = [];
+  const PAGE = 1000;                              // batches per request
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await sb
+      .from("writing_event_batches")
+      .select("events")
+      .order("min_t", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error || !data || !data.length) break;
+    for (const b of data) if (Array.isArray(b.events)) out.push(...b.events);
+    if (data.length < PAGE) break;
+  }
+  out.sort((a, b) => (Number(a.t) || 0) - (Number(b.t) || 0));
+  return out;
 }

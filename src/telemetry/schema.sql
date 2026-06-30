@@ -47,49 +47,47 @@ alter table public.publications
 -- which can never drift from the event stream. Drop the dead table if present.
 drop table if exists public.writing_sessions cascade;
 
--- 5. Writing events — append-only fine-grained event stream
--- Only synced when profile.research_opt_in = true (enforced client-side AND below).
-create table if not exists public.writing_events (
-  id             uuid primary key,
-  schema_version smallint,                       -- recorder event-shape version (bumped when fields change)
+-- 5. Writing events — PACKED storage.
+-- Previously one row PER raw event (keydown/keyup/input/caret/…). At 3–4 events
+-- per character, plus three indexes, those tiny rows were ~90% Postgres tuple +
+-- index overhead and filled the 500 MB free tier fast. We now store ONE row per
+-- upload batch (≤500 events) as a single TOAST-compressed JSONB array, with the
+-- batch's event count and time span denormalised onto columns for the profile
+-- view. Storage drops ~5–10×. Feature extraction is UNAFFECTED: it runs
+-- client-side from the in-memory ring / IndexedDB and never reads these rows
+-- back. The raw per-event corpus is preserved verbatim inside `events`, and the
+-- "Download my data" export re-expands it to the exact pre-packing shape.
+-- Only synced when profile.research_opt_in = true (enforced client-side AND RLS).
+
+-- Drop the old one-row-per-event table and its dependent views. DESTRUCTIVE:
+-- export any raw rows you still want (Profile → Download my data) first.
+drop view  if exists public.writing_session_features;
+drop view  if exists public.my_writing_event_counts;
+drop table if exists public.writing_events cascade;
+
+create table if not exists public.writing_event_batches (
+  id             uuid primary key,               -- = first event's id → idempotent re-upload on retry
+  schema_version smallint,                        -- recorder event-shape version (bumped when fields change)
   user_id        uuid not null references auth.users(id) on delete cascade,
-  doc_id         uuid not null,
-  session_id     uuid not null,
-  seq            integer,                         -- monotonic order within a session (breaks same-ms ties)
-  t              bigint not null,                 -- epoch ms client-side (wall clock — calendar alignment)
-  pt             double precision,                -- monotonic hi-res ms (performance.now) — precise IKI / dwell
-  kind           text not null,                  -- keydown|keyup|input|delete|paste|drop|caret|focus|blur|visibility|compose_start|compose_end|session_start|session_end|doc_switch
-  key_class      text,                           -- letter|digit|punct|space|nav|edit|modifier|other
-  key_char       text,                           -- literal key/inserted text (letters, digits, punct); null for non-character keys & deletes/pastes
-  input_type     text,                           -- InputEvent.inputType
-  len_delta      integer,                        -- chars added/removed
-  caret_pos      integer,
-  selection_len  integer,
-  payload        jsonb,
+  event_count    integer not null,               -- number of events packed into `events`
+  min_t          bigint  not null,               -- epoch ms of earliest event in the batch
+  max_t          bigint  not null,               -- epoch ms of latest event in the batch
+  events         jsonb   not null,               -- [{id,doc_id,session_id,seq,t,pt,kind,key_class,key_char,input_type,len_delta,caret_pos,selection_len,payload}, …]
   created_at     timestamptz not null default now()
 );
 
--- New columns for deployments where writing_events already exists (idempotent).
-alter table public.writing_events
-  add column if not exists schema_version smallint,
-  add column if not exists seq            integer,
-  add column if not exists pt             double precision,
-  add column if not exists key_char       text;
+create index if not exists writing_event_batches_user_t_idx
+  on public.writing_event_batches(user_id, min_t);
 
-create index if not exists writing_events_user_doc_t_idx
-  on public.writing_events(user_id, doc_id, t);
-create index if not exists writing_events_session_idx
-  on public.writing_events(session_id);
+alter table public.writing_event_batches enable row level security;
 
-alter table public.writing_events enable row level security;
-
-drop policy if exists "we_select_own" on public.writing_events;
-create policy "we_select_own" on public.writing_events
+drop policy if exists "web_select_own" on public.writing_event_batches;
+create policy "web_select_own" on public.writing_event_batches
   for select using (auth.uid() = user_id);
 
 -- Server-side enforcement of opt-in: insert only allowed when caller is opted in.
-drop policy if exists "we_insert_optin" on public.writing_events;
-create policy "we_insert_optin" on public.writing_events
+drop policy if exists "web_insert_optin" on public.writing_event_batches;
+create policy "web_insert_optin" on public.writing_event_batches
   for insert with check (
     auth.uid() = user_id
     and exists (
@@ -98,8 +96,8 @@ create policy "we_insert_optin" on public.writing_events
     )
   );
 
-drop policy if exists "we_delete_own" on public.writing_events;
-create policy "we_delete_own" on public.writing_events
+drop policy if exists "web_delete_own" on public.writing_event_batches;
+create policy "web_delete_own" on public.writing_event_batches
   for delete using (auth.uid() = user_id);
 
 -- 6. RPC: delete all of caller's events (used by Profile → "Delete my research data")
@@ -108,44 +106,47 @@ returns void
 language sql
 security invoker
 as $$
-  delete from public.writing_events where user_id = auth.uid();
+  delete from public.writing_event_batches where user_id = auth.uid();
 $$;
 
--- 7. View: aggregate per-user counts (used by Profile)
+-- 7. View: aggregate per-user counts (used by Profile). Sums the packed batches,
+-- so the displayed total is identical to the old per-row count(*).
 create or replace view public.my_writing_event_counts as
   select user_id,
-         count(*) as event_count,
-         min(t)   as first_t,
-         max(t)   as last_t
-  from public.writing_events
+         coalesce(sum(event_count), 0)::bigint as event_count,
+         min(min_t)                            as first_t,
+         max(max_t)                            as last_t
+  from public.writing_event_batches
   where user_id = auth.uid()
   group by user_id;
 
--- 7b. View: per-session aggregates reconstructed from the event stream.
--- Replaces the old writing_sessions table (dropped in section 4): it derives
--- clean per-session labels straight from the raw stream, so it can never drift
--- from the events and needs no extra client writes.
+-- 7b. View: per-session aggregates reconstructed from the packed event stream.
+-- Unpacks each batch's `events` array (jsonb_array_elements) and re-groups by
+-- session, so it derives clean per-session labels straight from the raw stream
+-- and can never drift from the events. Currently unused by the app — kept for
+-- offline research SQL; safe to drop if you never query it.
 create or replace view public.writing_session_features as
   select
-    session_id,
-    user_id,
-    doc_id,
-    min(t)                                                          as started_at,   -- epoch ms
-    max(t)                                                          as ended_at,
-    min(pt)                                                         as started_pt,   -- hi-res ms
-    max(pt)                                                         as ended_pt,
+    (e.value->>'session_id')::uuid                                  as session_id,
+    b.user_id,
+    (e.value->>'doc_id')::uuid                                      as doc_id,
+    min((e.value->>'t')::bigint)                                    as started_at,   -- epoch ms
+    max((e.value->>'t')::bigint)                                    as ended_at,
+    min((e.value->>'pt')::double precision)                         as started_pt,   -- hi-res ms
+    max((e.value->>'pt')::double precision)                         as ended_pt,
     count(*)                                                        as event_count,
-    count(*) filter (where kind = 'input')                         as typing_events,
-    count(*) filter (where kind = 'delete')                        as deletion_events,
-    count(*) filter (where kind = 'paste')                         as paste_events,
-    count(*) filter (where kind = 'keydown')                       as keystrokes,
-    coalesce(sum(len_delta)  filter (where kind = 'input'  and len_delta > 0), 0) as chars_added,
-    coalesce(sum(-len_delta) filter (where kind = 'delete' and len_delta < 0), 0) as chars_deleted,
-    coalesce(sum(len_delta)  filter (where kind = 'paste'  and len_delta > 0), 0) as chars_pasted,
-    count(*) filter (where (payload->>'composing') = 'true')       as composed_events
-  from public.writing_events
-  where user_id = auth.uid()
-  group by session_id, user_id, doc_id;
+    count(*) filter (where e.value->>'kind' = 'input')             as typing_events,
+    count(*) filter (where e.value->>'kind' = 'delete')            as deletion_events,
+    count(*) filter (where e.value->>'kind' = 'paste')             as paste_events,
+    count(*) filter (where e.value->>'kind' = 'keydown')           as keystrokes,
+    coalesce(sum((e.value->>'len_delta')::int)  filter (where e.value->>'kind' = 'input'  and (e.value->>'len_delta')::int > 0), 0) as chars_added,
+    coalesce(sum(-(e.value->>'len_delta')::int) filter (where e.value->>'kind' = 'delete' and (e.value->>'len_delta')::int < 0), 0) as chars_deleted,
+    coalesce(sum((e.value->>'len_delta')::int)  filter (where e.value->>'kind' = 'paste'  and (e.value->>'len_delta')::int > 0), 0) as chars_pasted,
+    count(*) filter (where (e.value#>>'{payload,composing}') = 'true') as composed_events
+  from public.writing_event_batches b
+  cross join lateral jsonb_array_elements(b.events) as e
+  where b.user_id = auth.uid()
+  group by (e.value->>'session_id')::uuid, b.user_id, (e.value->>'doc_id')::uuid;
 
 -- ── 8. Likes ─────────────────────────────────────────────────────────────
 -- Anyone signed in sees like counts; users insert/delete their own row.
