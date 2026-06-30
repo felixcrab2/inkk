@@ -26,7 +26,7 @@ import {
   deleteMyEvents, dumpMyEvents,
   flushNow as syncFlushNow,
 } from "./telemetry/sync";
-import { claimAnonymous as claimAnonymousEvents, clearForUser as clearLocalForUser, countForUser as countLocalEvents } from "./telemetry/store";
+import { claimAnonymous as claimAnonymousEvents, clearForUser as clearLocalForUser, countForUser as countLocalEvents, dumpForUser as dumpLocalForUser } from "./telemetry/store";
 import { HumanSignalBadge, HumanSignalPanel } from "./components/HumanSignal";
 import { PrivacyModal, TermsModal, TOS_VERSION } from "./components/Legal";
 import { VerifyView } from "./components/Verify";
@@ -636,6 +636,45 @@ async function moderateText(text, images) {
   } catch { return null; }
 }
 
+// Ask the server-side /api/certify endpoint to recompute the human-signal score
+// from the doc's keystroke trace and write the certificate. The browser is NOT
+// trusted to assert its own score (the columns are locked in schema.sql §13), so
+// this is the only path that yields a *verified* certificate. Returns the
+// server's verdict, or null when the route is unavailable — the caller then
+// falls back to the legacy direct write (unverified once the lock is applied).
+async function certifyViaServer({ docId, code, events, contentHash, wordCount: wc, title, authorName, authorUsername }) {
+  if (!supabase) return null;
+  try {
+    const { data: s } = await supabase.auth.getSession();
+    const token = s?.session?.access_token;
+    if (!token) return null;
+    const res = await fetch("/api/certify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ docId, code, events: events || [], contentHash, wordCount: wc, title, authorName, authorUsername }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data && data.ok !== false) ? data : null;
+  } catch { return null; }
+}
+
+// Fallback for when /api/certify is unreachable: the previous client-side write.
+// Pre-migration this still records the client's score; once schema.sql §13 is
+// applied the score/verified columns are forced null/false on a client insert,
+// so a route outage degrades to an UNVERIFIED certificate rather than a forgeable
+// one. Idempotent (the ledger row for a code is immutable).
+async function writeCertFallback({ code, doc, user, title, authorName, authorUsername, contentHash }) {
+  const verified = isVerifiedTier(doc.scoreTier);
+  const { error } = await supabase.from("verifications").upsert({
+    code, doc_id: doc.id, user_id: user.id,
+    title: title ?? null, author_name: authorName ?? null, author_username: authorUsername || null,
+    content_hash: contentHash, word_count: wordCount(doc.content),
+    human_score: doc.humanScore ?? null, score_tier: doc.scoreTier ?? null, verified,
+  }, { onConflict: "code", ignoreDuplicates: true });
+  return { error, verified };
+}
+
 // Merge a moderation verdict into a content-row payload. When unchecked
 // (mod === null) the row keeps its column default ('pending').
 function withModeration(payload, mod) {
@@ -813,41 +852,54 @@ async function fetchMyPublications(userId) {
 // The code is bound to the text: if the doc already carries a code for this
 // exact hash we reuse it; otherwise we mint a fresh one and append an immutable
 // row to the ledger, so old codes keep verifying the older text.
-async function ensureCertificate(doc, user, { title, authorName, authorUsername }) {
+// Shared certificate write: ask /api/certify to (re)compute the score from the
+// keystroke trace and write the ledger row + stamp the live publication, with the
+// legacy client write as the offline fallback. The caller passes the already-
+// resolved code (reused or freshly minted) and content hash.
+async function issueCert({ doc, user, code, reuse, events, contentHash, title, authorName, authorUsername }) {
+  // The server recomputes the score and writes the ledger row — the browser never
+  // gets to assert its own number.
+  const server = await certifyViaServer({
+    docId: doc.id, code, events, contentHash,
+    wordCount: wordCount(doc.content), title, authorName, authorUsername,
+  });
+  if (server) {
+    return { code, verified: !!server.verified, contentHash, isNew: !reuse };
+  }
+  // Route unavailable. A reused code's ledger row already exists; for a new one,
+  // fall back to the legacy direct write (forced unverified once §13 is applied).
+  if (reuse) {
+    return { code, verified: isVerifiedTier(doc.scoreTier), contentHash, isNew: false };
+  }
+  const { error, verified } = await writeCertFallback({ code, doc, user, title, authorName, authorUsername, contentHash });
+  if (error) return { code: doc.verifyCode || null, verified: isVerifiedTier(doc.scoreTier), contentHash: doc.contentHash || null, isNew: false, error: error.message };
+  return { code, verified, contentHash, isNew: true };
+}
+
+async function ensureCertificate(doc, user, { title, authorName, authorUsername }, events) {
   const contentHash = await hashContent(doc.content);
-  const verified    = isVerifiedTier(doc.scoreTier);
   if (!contentHash) {
     // No Web Crypto (e.g. insecure context) — can't bind a certificate.
-    return { code: doc.verifyCode || null, verified, contentHash: doc.contentHash || null, isNew: false };
+    return { code: doc.verifyCode || null, verified: isVerifiedTier(doc.scoreTier), contentHash: doc.contentHash || null, isNew: false };
   }
-  if (doc.verifyCode && doc.contentHash && doc.contentHash === contentHash) {
-    return { code: doc.verifyCode, verified, contentHash, isNew: false };
-  }
-  const code = makeVerifyCode();
-  const { error } = await supabase.from("verifications").insert({
-    code,
-    doc_id: doc.id,
-    user_id: user.id,
-    title: title ?? null,
-    author_name: authorName ?? null,
-    author_username: authorUsername || null,
-    content_hash: contentHash,
-    word_count: wordCount(doc.content),
-    human_score: doc.humanScore ?? null,
-    score_tier:  doc.scoreTier  ?? null,
-    verified,
-  });
-  if (error) return { code: doc.verifyCode || null, verified, contentHash: doc.contentHash || null, isNew: false, error: error.message };
-  return { code, verified, contentHash, isNew: true };
+  // Unchanged text reuses its existing code; new/changed text mints a fresh one.
+  const reuse = !!(doc.verifyCode && doc.contentHash && doc.contentHash === contentHash);
+  const code = reuse ? doc.verifyCode : makeVerifyCode();
+  return issueCert({ doc, user, code, reuse, events, contentHash, title, authorName, authorUsername });
 }
 
 // Publish (or re-publish) a document to the feed. Publishing certifies the
 // piece too — reusing the document's existing code when the text is unchanged.
 // Returns { error, code, verified }.
-async function doPublish(doc, user, title, authorName, authorUsername, renderOpts = {}) {
+async function doPublish(doc, user, title, authorName, authorUsername, renderOpts = {}, events = []) {
   if (!supabase || !user) return { error: "Not signed in." };
 
-  const cert = await ensureCertificate(doc, user, { title, authorName, authorUsername });
+  // Resolve the code up front so the publication row carries it. The certificate
+  // itself is written once, AFTER the publication exists, so a single /api/certify
+  // call both records the ledger row and stamps this piece's badge.
+  const contentHash = await hashContent(doc.content);
+  const reuse = !!(contentHash && doc.verifyCode && doc.contentHash && doc.contentHash === contentHash);
+  const code = contentHash ? (reuse ? doc.verifyCode : makeVerifyCode()) : (doc.verifyCode || null);
 
   const { data: existing, error: fetchErr } = await supabase
     .from("publications").select("id").eq("doc_id", doc.id).maybeSingle();
@@ -877,9 +929,9 @@ async function doPublish(doc, user, title, authorName, authorUsername, renderOpt
     payload.moderation_scores     = mod.scores;
     payload.moderation_checked_at = new Date().toISOString();
   }
-  if (cert.code) {
-    payload.verify_code  = cert.code;
-    payload.content_hash = cert.contentHash;
+  if (code) {
+    payload.verify_code  = code;
+    payload.content_hash = contentHash ?? doc.contentHash ?? null;
   }
 
   let error;
@@ -896,7 +948,18 @@ async function doPublish(doc, user, title, authorName, authorUsername, renderOpt
   }
   if (error) return { error: error.message };
 
-  return { error: null, code: cert.code, verified: cert.verified, contentHash: cert.contentHash };
+  // The publication now exists: write the certificate once. The server recomputes
+  // the score, records the ledger row, and stamps this piece's badge in a single
+  // call. Falls back to the legacy client write (→ unverified once §13 is applied)
+  // if the route is down — the payload above already carried the fallback score.
+  let verified = isVerifiedTier(doc.scoreTier);
+  let outHash = contentHash ?? doc.contentHash ?? null;
+  if (contentHash && code) {
+    const cert = await issueCert({ doc, user, code, reuse, events, contentHash, title, authorName, authorUsername });
+    verified = cert.verified;
+    outHash = cert.contentHash ?? outHash;
+  }
+  return { error: null, code, verified, contentHash: outHash };
 }
 
 async function doUnpublish(docId) {
@@ -3320,6 +3383,23 @@ export default function App() {
   }, []);
 
   // ─── score recompute (debounced) ──────────────────────────────────────────
+  // Reassemble the fullest LOCAL keystroke trace we have for a doc: the recorder's
+  // in-memory ring plus the IndexedDB queue (which still holds everything for a
+  // user who never syncs). /api/certify unions this with the user's synced cloud
+  // batches, then recomputes the certified score from the result.
+  const gatherDocEvents = useCallback(async (docId) => {
+    const byId = new Map();
+    try {
+      const rec = recorderRef.current;
+      if (rec) for (const e of rec.snapshot(docId).events) if (e?.id) byId.set(e.id, e);
+    } catch {}
+    try {
+      const uid = userRef.current?.id;
+      if (uid) for (const e of await dumpLocalForUser(uid)) if (e?.doc_id === docId && e?.id) byId.set(e.id, e);
+    } catch {}
+    return [...byId.values()].sort((a, b) => (Number(a.t) || 0) - (Number(b.t) || 0));
+  }, []);
+
   const recomputeScore = useCallback(() => {
     const docId = activeIdRef.current;
     if (!docId) return;
@@ -3813,7 +3893,8 @@ export default function App() {
   const confirmPublish = useCallback(async (title, authorName, renderOpts) => {
     if (!publishModalDoc) return "No document selected.";
     const wasAlreadyPublished = publishedDocIds.has(publishModalDoc.id);
-    const { error, code, verified, contentHash } = await doPublish(publishModalDoc, userRef.current, title, authorName, profile?.username, renderOpts);
+    const events = await gatherDocEvents(publishModalDoc.id);
+    const { error, code, verified, contentHash } = await doPublish(publishModalDoc, userRef.current, title, authorName, profile?.username, renderOpts, events);
     if (!error) {
       const docId = publishModalDoc.id;
       setPublishedDocIds(prev => new Set([...prev, docId]));
@@ -3830,7 +3911,7 @@ export default function App() {
       addToast(verified ? "Published · human-verified." : (wasAlreadyPublished ? "Updated." : "Published to feed."));
     }
     return error;
-  }, [publishModalDoc, publishedDocIds, profile, addToast]);
+  }, [publishModalDoc, publishedDocIds, profile, addToast, gatherDocEvents]);
 
   // Certify the active document — mint/show a verification code WITHOUT
   // publishing it to the feed.
@@ -3847,7 +3928,8 @@ export default function App() {
     if (!stripHtml(liveDoc.content || "").trim()) return;
     setCertifying(true);
     const authorName = profile?.display_name || profile?.username || userRef.current.email?.split("@")[0] || "Anonymous";
-    const cert = await ensureCertificate(liveDoc, userRef.current, { title: stripHtml(titleRef.current || ""), authorName, authorUsername: profile?.username });
+    const events = await gatherDocEvents(docId);
+    const cert = await ensureCertificate(liveDoc, userRef.current, { title: stripHtml(titleRef.current || ""), authorName, authorUsername: profile?.username }, events);
     setCertifying(false);
     if (!cert.code) { addToast(cert.error ? "Could not certify." : "Certification needs a secure connection."); return; }
     setDocs(prev => {
@@ -3859,7 +3941,7 @@ export default function App() {
     });
     setCertMenuOpen(true);
     if (cert.isNew) addToast(cert.verified ? "Certified · human-verified." : "Certified.");
-  }, [profile, addToast]);
+  }, [profile, addToast, gatherDocEvents]);
 
   const openUserProfile = useCallback(async (userIdOrProfile) => {
     const prof = typeof userIdOrProfile === "string"
