@@ -4300,6 +4300,12 @@ export default function App() {
 
   useEffect(() => {
     isMobileRef.current = isMobile();
+    if (isMobileRef.current) {
+      // Tag the document so the editor top bar can declutter (CSS), and keep
+      // title capitalization on for good — the Aa toggle is hidden on mobile.
+      document.body.classList.add("is-mobile");
+      setTitleCapsOn(true);
+    }
     const doc = initDocs.find(d => d.id === initActiveId) || initDocs[0];
     if (doc) {
       titleRef.current = doc.title || "";
