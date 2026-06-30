@@ -5,6 +5,10 @@ node_modules/
 .DS_Store
 scripts/_pdf-out/
 
+# production build output — Vercel rebuilds from source, so it's not committed
+# (committing it caused content-hash merge conflicts on every change)
+/build
+
 # seed: local credentials + the run ledger (records created users/passwords)
 scripts/seed/.env
 scripts/seed/.seed-ledger.json
