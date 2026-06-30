@@ -3180,6 +3180,7 @@ export default function App() {
   const [readingFocus, setReadingFocus] = useState(null);
   const [publishedDocIds, setPublishedDocIds] = useState(new Set());
   const [certMenuOpen, setCertMenuOpen] = useState(false);
+  const [certConfirmOpen, setCertConfirmOpen] = useState(false); // mobile: explain Certify before acting
   const [certifying, setCertifying]   = useState(false);
   const [verifyCode, setVerifyCode]   = useState(() =>
     window.location.pathname.startsWith("/v/") ? window.location.pathname.slice(3) : "");
@@ -4515,12 +4516,26 @@ export default function App() {
                 disabled={certifying}
                 onClick={() => {
                   if (activeCert) setCertMenuOpen(v => !v);
+                  else if (isMobileRef.current) setCertConfirmOpen(v => !v);
                   else certifyActiveDoc();
                 }}
               >
                 <span className="cert-diamond" aria-hidden="true">◇</span>
                 <span className="btn-label">{certifying ? "Certifying…" : activeCert ? "Certified" : "Certify"}</span>
               </button>
+              {!activeCert && certConfirmOpen && (
+                <div id="cert-menu">
+                  <span className="cert-menu-label">Certify</span>
+                  <p className="cert-menu-note">
+                    Mint a verification code that proves this piece was written by hand.
+                    It stays private to you until you publish.
+                  </p>
+                  <button
+                    className="cert-menu-link"
+                    onClick={() => { setCertConfirmOpen(false); certifyActiveDoc(); }}
+                  >Certify this piece →</button>
+                </div>
+              )}
               {activeCert && certMenuOpen && (
                 <div id="cert-menu">
                   <span className="cert-menu-label">{activeCertOk ? "Human-verified" : "Verification code"}</span>
@@ -5001,6 +5016,7 @@ export default function App() {
       {/* ── publish menu backdrop ── */}
       {publishMenuOpen && <div id="publish-menu-backdrop" onClick={() => { setPublishMenuOpen(false); setConfirmUnpublishOpen(false); }} />}
       {certMenuOpen && <div id="publish-menu-backdrop" onClick={() => setCertMenuOpen(false)} />}
+      {certConfirmOpen && <div id="publish-menu-backdrop" onClick={() => setCertConfirmOpen(false)} />}
 
       {/* ── toasts ── */}
       <Toasts toasts={toasts} />
