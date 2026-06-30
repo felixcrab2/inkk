@@ -3395,35 +3395,10 @@ export default function App() {
     return [...byId.values()].sort((a, b) => (Number(a.t) || 0) - (Number(b.t) || 0));
   }, []);
 
-  const recomputeScore = useCallback(() => {
-    const docId = activeIdRef.current;
-    if (!docId) return;
-    const rec = recorderRef.current;
-    if (!rec) return;
-    const { events, startedAt } = rec.snapshot(docId);
-    // Always update the visible live counter — even on tiny sample sizes,
-    // so the research indicator ticks up in real time.
-    const lastT = events.length ? events[events.length - 1].t : null;
-    setLiveStats({
-      events: events.length,
-      sessionStartedAt: startedAt || null,
-      lastEventAt: lastT,
-    });
-    if (events.length < 8) return;        // very early — don't touch existing score
-    const words = wordCount(contentRef.current || "");
-    const features = extractFeatures(events, { words });
-    const score = computeScore(features);
-
-    // Don't overwrite a previously-persisted high-confidence score with a
-    // low-confidence one (happens briefly after page reload before enough
-    // post-reload telemetry has accumulated).
-    const prevDoc = docsRef.current.find(d => d.id === docId);
-    const prevConf = prevDoc?.scoreFeatures?.confidence ?? 0;
-    if (prevDoc?.humanScore != null && score.confidence + 0.1 < prevConf) {
-      return;
-    }
-
-    // Persist denormalised score + features to the active doc.
+  // Write a doc's score + full metrics object (local + cloud). Shared by the live
+  // recompute and the on-open restore so both store an identical shape — the same
+  // shape a publication carries in publications.score_features.
+  const persistDocScore = useCallback((docId, features, score) => {
     let nextDoc = null;
     setDocs(prev => {
       const next = prev.map(d => d.id !== docId ? d : ({
@@ -3478,7 +3453,7 @@ export default function App() {
           // Take the max so a page reload (which resets in-memory events) never
           // erases a previously observed higher session count.
           session_count: Math.max(
-            prevDoc?.scoreFeatures?.session_count || 0,
+            prev.find(d => d.id === docId)?.scoreFeatures?.session_count || 0,
             score.session_count || 0,
           ),
         },
@@ -3491,10 +3466,64 @@ export default function App() {
     if (userRef.current && nextDoc) pushDocToCloud(nextDoc, userRef.current.id);
   }, []);
 
+  // The stored score + metrics must only ever move to a *richer* trace, never a
+  // thinner one. Without this, reopening a draft (whose in-memory trace starts
+  // empty after a reload) would recompute from almost nothing and wipe the whole
+  // metrics panel. Typing-event count grows monotonically with writing, so it's a
+  // stable "how much was written" measure that survives reloads.
+  const isRicherThanStored = useCallback((docId, features) => {
+    const prevDoc = docsRef.current.find(d => d.id === docId);
+    if (prevDoc?.humanScore == null) return true;          // nothing stored yet
+    const prevKeystrokes = prevDoc?.scoreFeatures?.typing_events ?? prevDoc?.keystrokes ?? 0;
+    return (features.typing_events || 0) >= prevKeystrokes;
+  }, []);
+
+  const recomputeScore = useCallback(() => {
+    const docId = activeIdRef.current;
+    if (!docId) return;
+    const rec = recorderRef.current;
+    if (!rec) return;
+    const { events, startedAt } = rec.snapshot(docId);
+    // Always update the visible live counter — even on tiny sample sizes,
+    // so the research indicator ticks up in real time.
+    const lastT = events.length ? events[events.length - 1].t : null;
+    setLiveStats({
+      events: events.length,
+      sessionStartedAt: startedAt || null,
+      lastEventAt: lastT,
+    });
+    if (events.length < 8) return;        // very early — don't touch existing score
+    const words = wordCount(contentRef.current || "");
+    const features = extractFeatures(events, { words });
+    if (!isRicherThanStored(docId, features)) return;   // never thin the stored metrics
+    persistDocScore(docId, features, computeScore(features));
+  }, [isRicherThanStored, persistDocScore]);
+
   const scheduleRecompute = useCallback(() => {
     if (scoreTimerRef.current) clearTimeout(scoreTimerRef.current);
     scoreTimerRef.current = setTimeout(recomputeScore, 700);
   }, [recomputeScore]);
+
+  // On opening a doc, rebuild its score + full metrics from the complete LOCAL
+  // keystroke trace (in-memory ring ∪ IndexedDB queue). The in-memory ring is
+  // empty right after a reload, so this is what restores the panel for a draft
+  // written in an earlier session. Guarded by isRicherThanStored, so it can only
+  // restore/refresh the metrics, never thin them — and so a doc whose fuller
+  // trace lives only in the synced cloud keeps its stored metrics untouched.
+  useEffect(() => {
+    const docId = activeId;
+    if (!docId) return;
+    let cancelled = false;
+    (async () => {
+      const events = await gatherDocEvents(docId);
+      if (cancelled || events.length < 8) return;
+      const words = wordCount(contentRef.current || "");
+      const features = extractFeatures(events, { words });
+      if (cancelled || !isRicherThanStored(docId, features)) return;
+      persistDocScore(docId, features, computeScore(features));
+    })();
+    return () => { cancelled = true; };
+  }, [activeId, gatherDocEvents, isRicherThanStored, persistDocScore]);
 
   // ─── recorder lifecycle ───────────────────────────────────────────────────
   useEffect(() => {
