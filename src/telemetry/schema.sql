@@ -395,3 +395,74 @@ drop trigger if exists lock_is_admin on public.profiles;
 create trigger lock_is_admin
   before insert or update on public.profiles
   for each row execute function public.lock_is_admin();
+
+-- ── 13. Lock the human-signal score against client forgery ──────────────────
+-- human_score / score_tier / verified ARE the "human-verified" claim. Exactly
+-- like is_admin (section 12), the "write your own row" RLS policies are
+-- row-level, not column-level — so without this a signed-in user can POST
+--   { human_score: 100, score_tier: 'Distinct', verified: true }
+-- straight through the public API and mint a verified certificate without
+-- writing a single word. (No need to read score.js or forge any telemetry: the
+-- score is just a number the client hands us, and the table trusts it.)
+--
+-- So we force these columns for the public API roles (anon / authenticated):
+-- on INSERT they are nulled / set false, on UPDATE they are pinned to their old
+-- value. They can therefore be set ONLY by a trusted writer — the service_role
+-- key used by /api/certify, which recomputes the score server-side from the raw
+-- event stream. The SQL editor (postgres) and service_role are unaffected.
+--
+-- IMPORTANT: deploy this together with the /api/certify route + the client
+-- switch. On its own it makes EVERY new certificate come out unverified, because
+-- today the client is the only thing that writes a score.
+
+create or replace function public.lock_verification_score()
+returns trigger
+language plpgsql
+as $$
+begin
+  if current_user in ('anon', 'authenticated') then
+    if tg_op = 'INSERT' then
+      new.human_score := null;
+      new.score_tier  := null;
+      new.verified    := false;
+    else
+      new.human_score := old.human_score;     -- silently ignore attempts to change them
+      new.score_tier  := old.score_tier;
+      new.verified    := old.verified;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists lock_verification_score on public.verifications;
+create trigger lock_verification_score
+  before insert or update on public.verifications
+  for each row execute function public.lock_verification_score();
+
+-- Only the trust-bearing columns are locked. score_features stays client-written
+-- on purpose: it's the cosmetic radar/breakdown the reader panel renders, not the
+-- "verified" claim. The headline (human_score / score_tier) is server-authoritative;
+-- a forged radar can't dress up a piece whose tier the server set to 'Developing'.
+create or replace function public.lock_publication_score()
+returns trigger
+language plpgsql
+as $$
+begin
+  if current_user in ('anon', 'authenticated') then
+    if tg_op = 'INSERT' then
+      new.human_score := null;
+      new.score_tier  := null;
+    else
+      new.human_score := old.human_score;
+      new.score_tier  := old.score_tier;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists lock_publication_score on public.publications;
+create trigger lock_publication_score
+  before insert or update on public.publications
+  for each row execute function public.lock_publication_score();
