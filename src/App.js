@@ -1273,17 +1273,13 @@ function passwordChecks(pw) {
 }
 
 // ─── Google Identity Services (ID-token sign-in) ──────────────────────────────
-// On desktop, when REACT_APP_GOOGLE_CLIENT_ID is set, "continue with Google"
-// uses Google's own button to obtain an ID token in-page, which we hand to
+// When REACT_APP_GOOGLE_CLIENT_ID is set, "continue with Google" uses Google's
+// own button to obtain an ID token in-page, which we hand to
 // supabase.auth.signInWithIdToken. The whole consent flow runs on our own
 // domain (no redirect to <ref>.supabase.co), so Google's screen shows the Inkk
-// app, not the Supabase project URL.
-//
-// On mobile (and whenever the env var is absent) we use the redirect flow
-// (signInWithOAuth) instead. The in-page button relies on a popup/iframe handing
-// the credential back to the page, which routinely fails on mobile browsers and
-// leaves a blank screen; a full-page redirect is the one flow mobile handles
-// reliably. See `useGsi` in AuthModal for where the two paths diverge.
+// app, not the Supabase project URL — on desktop and mobile alike. Without the
+// env var we fall back to the redirect flow (signInWithOAuth) so nothing breaks
+// before it's configured.
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
 
 let gsiScriptPromise = null;
@@ -1333,12 +1329,11 @@ function AuthModal({ onClose, initialMode = "signin" }) {
   const googleBtnRef                = useRef(null);        // host for Google's rendered button
   const acceptedRef                 = useRef(false);       // latest Terms state for the GIS callback
 
-  // Google's in-page button (signInWithIdToken) is reliable on desktop but
-  // routinely white-screens on mobile: after the account chooser, the popup/
-  // iframe that hands the credential back to the page fails to return it, so
-  // sign-in silently dies. On mobile we use the full-page redirect flow
-  // (signInWithOAuth) instead, which every mobile browser handles cleanly.
-  const [useGsi] = useState(() => !!GOOGLE_CLIENT_ID && !isMobile());
+  // Use Google's in-page button (signInWithIdToken) whenever a client ID is
+  // configured, on desktop and mobile alike, so the consent screen always shows
+  // "inkk" and never the Supabase project URL. Falls back to the redirect flow
+  // (signInWithOAuth) only when no client ID is set.
+  const [useGsi] = useState(() => !!GOOGLE_CLIENT_ID);
 
   const switchMode = (m) => {
     setMode(m); setError(""); setMessage(""); setResend(""); setNeedsConfirm(false);
