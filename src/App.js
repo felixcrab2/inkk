@@ -1145,7 +1145,7 @@ function LandingScreen({ onDone }) {
       <div id="landing-inner">
         <div id="landing-headline">{display}<span id="landing-cursor" /></div>
         <p id="landing-subtitle" style={{ opacity: showSubtitle ? 1 : 0 }}>
-          Inkk studies how a piece is really written — the drafts, the pauses, the second thoughts — to understand what makes writing human.
+          Inkk studies how a piece is really written: the drafts, the pauses, the second thoughts that make writing human.
         </p>
       </div>
     </div>
