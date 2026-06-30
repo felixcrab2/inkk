@@ -1860,11 +1860,11 @@ function FeedSkeleton({ count = 4 }) {
   );
 }
 
-function FeedEmpty({ title, sub, action }) {
+function FeedEmpty({ title, sub, action, serif }) {
   return (
     <div className="feed-empty-state">
       <span className="feed-empty-mark" aria-hidden="true">◇</span>
-      <p className="feed-empty-title">{title}</p>
+      <p className={`feed-empty-title${serif ? " feed-empty-title-serif" : ""}`}>{title}</p>
       {sub && <p className="feed-empty-sub">{sub}</p>}
       {action}
     </div>
@@ -1978,7 +1978,7 @@ function Feed({ user, onRead, onAuthorClick, dropCapImages, onRequestAuth }) {
         <div id="feed-list">
           {followingLoading && <FeedSkeleton />}
           {!followingLoading && followingFetched && followingPubs.length === 0 && (
-            <FeedEmpty title="Your feed is quiet" sub="Follow writers and their newest work gathers here." />
+            <FeedEmpty title="Your feed is quiet" sub="Follow writers and their newest work gathers here." serif />
           )}
           {!followingLoading && (
             <FeedList pubs={followingPubs} dropCapImages={dropCapImages}
