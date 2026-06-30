@@ -2828,6 +2828,10 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 #auth-modal input::placeholder { color: #d0ceca; }
 #auth-modal input:focus { border-bottom-color: #888; }
+/* iOS zooms the whole page in when a focused input is under 16px (and never
+   zooms back out on close). Keep auth inputs at 16px on touch devices so opening
+   the sign-in modal — e.g. from Publish — doesn't leave the editor zoomed. */
+body.is-mobile #auth-modal input { font-size: 16px; }
 
 .publish-note-input {
   width: 100%;
