@@ -1114,7 +1114,6 @@ function Toasts({ toasts }) {
 
 function LandingScreen({ onDone }) {
   const FULL1 = "Write Human.";
-  const FULL2 = "Write Simple.";
   const [display, setDisplay] = useState("");
   const [phase, setPhase] = useState(0);
   const [showSubtitle, setShowSubtitle] = useState(false);
@@ -1132,22 +1131,9 @@ function LandingScreen({ onDone }) {
         t = setTimeout(() => setDisplay(FULL1.slice(0, display.length + 1)), 80);
       } else { t = setTimeout(() => setPhase(1), 800); }
     } else if (phase === 1) {
-      t = setTimeout(() => setPhase(2), 700);
-    } else if (phase === 2) {
-      const keep = "Write ";
-      if (display.length > keep.length) {
-        t = setTimeout(() => setDisplay(display.slice(0, -1)), 45);
-      } else { t = setTimeout(() => setPhase(3), 150); }
-    } else if (phase === 3) {
-      if (display.length < FULL2.length) {
-        t = setTimeout(() => setDisplay(FULL2.slice(0, display.length + 1)), 80);
-      } else { t = setTimeout(() => setPhase(4), 800); }
-    } else if (phase === 4) {
-      t = setTimeout(() => setPhase(5), 700);
-    } else if (phase === 5) {
       setShowSubtitle(true);
-      t = setTimeout(() => setPhase(6), 3200);
-    } else if (phase === 6) {
+      t = setTimeout(() => setPhase(2), 3200);
+    } else if (phase === 2) {
       setFading(true);
       t = setTimeout(() => { localStorage.setItem("inkk_visited", "1"); onDone(); }, 600);
     }

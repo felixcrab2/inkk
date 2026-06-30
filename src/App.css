@@ -62,6 +62,7 @@ body {
 #landing-inner {
   max-width: 360px;
   padding: 0 36px;
+  text-align: center;
 }
 
 #landing-headline {
