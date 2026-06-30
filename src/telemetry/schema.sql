@@ -250,7 +250,9 @@ create policy "ver_delete_own" on public.verifications
 -- (readers checking an exported PDF are usually logged out). Exact match only.
 -- publication_id is DERIVED by joining publications on the (current) verify_code,
 -- so a code maps to a live piece only while it's the published version — private
--- and superseded codes resolve with a null publication_id.
+-- and superseded codes resolve with a null publication_id. The join also skips
+-- 'flagged' (held for review) and 'removed' (taken down) pieces, so a pasted
+-- code can never surface a "Read the piece" link to content that isn't public.
 create or replace function public.verify_by_code(p_code text)
 returns table (
   code text, publication_id uuid, title text, author_name text,
@@ -264,7 +266,9 @@ as $$
   select v.code, p.id as publication_id, v.title, v.author_name, v.author_username,
          v.content_hash, v.word_count, v.human_score, v.score_tier, v.verified, v.issued_at
   from public.verifications v
-  left join public.publications p on p.verify_code = v.code
+  left join public.publications p
+    on p.verify_code = v.code
+   and p.moderation_status not in ('flagged','removed')
   where v.code = upper(btrim(p_code))
   limit 1;
 $$;
@@ -276,8 +280,12 @@ grant execute on function public.verify_by_code(text) to anon, authenticated;
 --   (a) Auto-triage: at publish/comment time the client calls /api/moderate
 --       (OpenAI Moderation) and caches the verdict on the content row.
 --   (b) Human reports: signed-in users flag content into the reports table.
--- NOTHING is auto-deleted. An admin reviews and sets moderation_status='removed';
--- the feed then hides it. Auto-flagged content stays visible until reviewed.
+-- NOTHING is auto-deleted. Auto-flagged content is HELD: it lands in the review
+-- queue and is hidden from every public surface (feed, search, profiles, and the
+-- read-by-code path), but the author still sees it on their own page and is not
+-- told it's under review. An admin then either releases it (status='ok') or
+-- takes it down (status='removed'); a removed piece also leaves the author's
+-- page and can't be reached by its inkk code.
 
 -- 11a. Admin flag on profiles (set true by hand for moderators):
 --      update public.profiles set is_admin = true where username = '<you>';
@@ -293,8 +301,9 @@ as $$ select coalesce((select is_admin from public.profiles where id = auth.uid(
 grant execute on function public.is_admin() to authenticated;
 
 -- 11b. Moderation cache on the content rows.
--- Status: 'pending' (never checked) | 'ok' | 'flagged' (auto or reported) |
--- 'removed' (admin-hidden). Existing rows default to 'pending'.
+-- Status: 'pending' (never checked) | 'ok' | 'flagged' (auto-flagged, held for
+-- review — hidden from public surfaces but not from the author) | 'removed'
+-- (admin takedown — hidden from everyone). Existing rows default to 'pending'.
 alter table public.publications
   add column if not exists moderation_status     text not null default 'pending',
   add column if not exists moderation_scores     jsonb,
