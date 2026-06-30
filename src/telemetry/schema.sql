@@ -354,3 +354,34 @@ create policy "reports_select_admin" on public.reports
 drop policy if exists "reports_update_admin" on public.reports;
 create policy "reports_update_admin" on public.reports
   for update using (public.is_admin()) with check (public.is_admin());
+
+-- ── 12. Lock is_admin against privilege escalation ──────────────────────────
+-- is_admin lives on the profiles row, and the "update your own profile" RLS
+-- policy is row-level, not column-level — so without this a signed-in user could
+-- POST is_admin = true on their own row through the public API and become an
+-- admin (which unlocks the admin moderation/report policies above). A
+-- column-level REVOKE can't fix it: a table-level UPDATE grant still covers the
+-- column. So instead we force the value — requests from the public API roles
+-- (anon / authenticated) can never set or change it. The SQL editor (postgres)
+-- and service_role are unaffected, so real admins are still granted by hand:
+--   update public.profiles set is_admin = true where username = '<you>';
+create or replace function public.lock_is_admin()
+returns trigger
+language plpgsql
+as $$
+begin
+  if current_user in ('anon', 'authenticated') then
+    if tg_op = 'INSERT' then
+      new.is_admin := false;
+    elsif new.is_admin is distinct from old.is_admin then
+      new.is_admin := old.is_admin;          -- silently ignore attempts to change it
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists lock_is_admin on public.profiles;
+create trigger lock_is_admin
+  before insert or update on public.profiles
+  for each row execute function public.lock_is_admin();
