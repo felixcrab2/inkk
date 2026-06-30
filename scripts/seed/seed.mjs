@@ -118,11 +118,11 @@ function loadLedger() {
 }
 async function saveLedger(l) { if (!DRY) await writeFile(LEDGER, JSON.stringify(l, null, 2)); }
 
-// ── timestamps: spread over the last ~90 days, biased toward recent ───────────
+// ── timestamps: spread over the last ~7 days, biased toward recent ────────────
 const DAY = 86400_000;
 function spreadTimestamp() {
-  const days = (rand() ** 1.7) * 88 + rand() * 0.4;            // 0..~88, weighted recent
-  const jitter = (rand() * 14 + 7) * 3600_000;                  // land mostly in waking hours
+  const days = (rand() ** 1.3) * 6.6 + 0.15;                   // last ~7 days, weighted recent
+  const jitter = (rand() * 12) * 3600_000;                      // vary the hour of day
   return new Date(Date.now() - days * DAY - jitter).toISOString();
 }
 function afterBy(iso, maxDays) {
@@ -262,7 +262,7 @@ async function main() {
     const likers = sample(ids.filter((x) => x !== pub.userId), n);
     for (const liker of likers) {
       if (DRY) { likes++; continue; }
-      const { error } = await supa.from("likes").insert({ user_id: liker, publication_id: pub.id, created_at: afterBy(pub.ts, 30) });
+      const { error } = await supa.from("likes").insert({ user_id: liker, publication_id: pub.id, created_at: afterBy(pub.ts, 6) });
       if (!error) { ledger.likes.push([liker, pub.id]); likes++; }
     }
   }
@@ -282,7 +282,7 @@ async function main() {
         if (DRY) { comments++; continue; }
         const id = randomUUID();
         const { error } = await supa.from("comments").insert({
-          id, user_id: cid, publication_id: pub.id, body, created_at: afterBy(pub.ts, 25), moderation_status: "ok",
+          id, user_id: cid, publication_id: pub.id, body, created_at: afterBy(pub.ts, 5), moderation_status: "ok",
         });
         if (error && /column/i.test(error.message || "")) {
           const { error: e2 } = await supa.from("comments").insert({ id, user_id: cid, publication_id: pub.id, body, created_at: afterBy(pub.ts, 25) });
