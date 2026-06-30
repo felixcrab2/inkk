@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .glyph { fill: #1a1a1a; }
+    @media (prefers-color-scheme: dark) { .glyph { fill: #f5f4f2; } }
+  </style>
+  <text class="glyph" x="16" y="25" text-anchor="middle"
+        font-family="'EB Garamond', Georgia, 'Times New Roman', Times, serif"
+        font-size="30">i</text>
+</svg>
