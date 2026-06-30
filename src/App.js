@@ -659,6 +659,16 @@ function stripModeration(p) {
   return rest;
 }
 
+// Statuses hidden from every public surface (feed, following feed, search,
+// other people's profiles, and the read-by-code path). 'flagged' is held for
+// review — silently, so the author is never told it's waiting — and 'removed'
+// has been taken down by an admin. The author still sees their own held pieces
+// (so the hold stays invisible); only 'removed' also leaves the author's page.
+const PUBLIC_HIDDEN_STATUSES = ["flagged", "removed"];
+function isPubliclyVisible(p) {
+  return !PUBLIC_HIDDEN_STATUSES.includes(p && p.moderation_status);
+}
+
 // Highest-scoring moderation category, as a human label (for the admin queue).
 function topCategory(scores) {
   if (!scores) return null;
@@ -751,7 +761,7 @@ async function fetchFollowingFeed(userId) {
         .order("published_at", { ascending: false })
         .limit(50),
     );
-    return (data || []).filter(p => p.moderation_status !== "removed");
+    return (data || []).filter(isPubliclyVisible);
   } catch { return []; }
 }
 
@@ -776,7 +786,7 @@ async function fetchFeed() {
       .limit(50),
   );
   if (error || !data) return [];
-  return data.filter(p => p.moderation_status !== "removed");
+  return data.filter(isPubliclyVisible);
 }
 
 async function fetchMyPublications(userId) {
@@ -791,7 +801,9 @@ async function fetchMyPublications(userId) {
       .order("published_at", { ascending: false }),
   );
   if (error || !data) return [];
-  return data;
+  // The author sees their own held (flagged) pieces — the review hold is silent
+  // — but a removed piece drops off their published page entirely.
+  return data.filter(p => p.moderation_status !== "removed");
 }
 
 // Ensure the document's current text has a certificate, minting one if needed.
@@ -1032,7 +1044,7 @@ async function searchPublications(query) {
     .from("publications")
     .select(PUB_SELECT_WITH_COUNTS)
     .or(`title.ilike.%${q}%,author_name.ilike.%${q}%`)
-    .neq("moderation_status", "removed")
+    .not("moderation_status", "in", "(flagged,removed)")
     .order("published_at", { ascending: false })
     .limit(10);
   if (error || !data) return [];
@@ -1050,7 +1062,7 @@ async function fetchUserPublications(userId) {
       .order("published_at", { ascending: false }),
   );
   if (error || !data) return [];
-  return data.filter(p => p.moderation_status !== "removed");
+  return data.filter(isPubliclyVisible);
 }
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
@@ -2642,7 +2654,7 @@ function UserProfileView({ profile, onRead, dropCapImages, user, onRequestAuth }
 
 // ─── ReadingView ──────────────────────────────────────────────────────────────
 
-function ReadingView({ pub, user, dropCapImages, focus, onRequestAuth, onAuthorClick, onVerify }) {
+function ReadingView({ pub, user, isAdmin, dropCapImages, focus, onRequestAuth, onAuthorClick, onVerify }) {
   const containerRef = useRef(null);
   const commentsRef  = useRef(null);
   const [progress, setProgress] = useState(0);
@@ -2762,12 +2774,16 @@ function ReadingView({ pub, user, dropCapImages, focus, onRequestAuth, onAuthorC
     setConfirmDelId(null);
   }, []);
 
-  // A removed piece stays hidden even via direct link, except for its author.
-  if (pub.moderation_status === "removed" && !(user && pub.user_id === user.id)) {
+  // Held (auto-flagged, awaiting review) and removed pieces stay hidden even via
+  // a direct link or a pasted inkk code. Exceptions: the author — who is never
+  // told their piece is held — and admins, who open it to review from the queue.
+  const isHidden  = pub.moderation_status === "flagged" || pub.moderation_status === "removed";
+  const canBypass = user && (pub.user_id === user.id || isAdmin);
+  if (isHidden && !canBypass) {
     return (
       <div id="reading-container">
         <div id="reading-meta" style={{ textAlign: "center", paddingTop: "20vh" }}>
-          <p className="feed-empty">This piece has been removed.</p>
+          <p className="feed-empty">This piece isn’t available.</p>
         </div>
       </div>
     );
@@ -4894,6 +4910,7 @@ export default function App() {
         <ReadingView
           pub={readingPub}
           user={user}
+          isAdmin={!!profile?.is_admin}
           dropCapImages={dropCapImages}
           focus={readingFocus}
           onRequestAuth={() => openAuth()}
