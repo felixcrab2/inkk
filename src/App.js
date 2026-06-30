@@ -3181,6 +3181,7 @@ export default function App() {
   const [publishedDocIds, setPublishedDocIds] = useState(new Set());
   const [certMenuOpen, setCertMenuOpen] = useState(false);
   const [certConfirmOpen, setCertConfirmOpen] = useState(false); // mobile: explain Certify before acting
+  const [publishConfirmOpen, setPublishConfirmOpen] = useState(false); // mobile: explain Publish before acting
   const [certifying, setCertifying]   = useState(false);
   const [verifyCode, setVerifyCode]   = useState(() =>
     window.location.pathname.startsWith("/v/") ? window.location.pathname.slice(3) : "");
@@ -4569,6 +4570,7 @@ export default function App() {
                   const doc = docs.find(d => d.id === activeId);
                   if (!doc) return;
                   if (isPublished) { setConfirmUnpublishOpen(false); setPublishMenuOpen(v => !v); }
+                  else if (isMobileRef.current) setPublishConfirmOpen(v => !v);
                   else openPublishModal(doc);
                 }}
               >
@@ -4577,6 +4579,16 @@ export default function App() {
                   : <><Share2 size={13} /><span className="btn-label">Publish</span></>
                 }
               </button>
+              {!isPublished && publishConfirmOpen && (
+                <div id="publish-menu">
+                  <div className="publish-menu-prompt">Share this piece to the public feed?</div>
+                  <button className="publish-menu-item" onClick={() => {
+                    setPublishConfirmOpen(false);
+                    const doc = docs.find(d => d.id === activeId);
+                    if (doc) openPublishModal(doc);
+                  }}>Publish →</button>
+                </div>
+              )}
               {isPublished && publishMenuOpen && (
                 <div id="publish-menu">
                   {!confirmUnpublishOpen ? (
@@ -5017,6 +5029,7 @@ export default function App() {
       {publishMenuOpen && <div id="publish-menu-backdrop" onClick={() => { setPublishMenuOpen(false); setConfirmUnpublishOpen(false); }} />}
       {certMenuOpen && <div id="publish-menu-backdrop" onClick={() => setCertMenuOpen(false)} />}
       {certConfirmOpen && <div id="publish-menu-backdrop" onClick={() => setCertConfirmOpen(false)} />}
+      {publishConfirmOpen && <div id="publish-menu-backdrop" onClick={() => setPublishConfirmOpen(false)} />}
 
       {/* ── toasts ── */}
       <Toasts toasts={toasts} />
