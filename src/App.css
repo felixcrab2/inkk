@@ -916,6 +916,26 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   color: var(--subtle);
 }
 
+/* Editorial kicker above the lead piece, and the quiet label that opens the
+   rest of the index. Both echo the masthead dateline's small-caps treatment. */
+.feed-lead-kicker {
+  display: block;
+  font-size: 0.6rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--gold);
+  margin: 2px 0 9px;
+}
+.feed-section-label {
+  font-size: 0.6rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--subtle);
+  padding: 24px 0 2px;
+}
+
 /* ── Index entries — illuminated initial + type, hairline divided ──────────── */
 .feed-entry {
   position: relative;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import "@fontsource/eb-garamond/400.css";
 import "@fontsource/eb-garamond/500.css";
@@ -1781,6 +1781,7 @@ function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, 
   if (featured) {
     return (
       <article className="feed-lead" style={{ "--card-index": index }} onClick={() => onRead(pub)}>
+        <span className="feed-lead-kicker">{fresh ? "Today's read" : "Latest"}</span>
         <h2 className="feed-lead-title">{pub.title || "Untitled"}</h2>
         {excerpt && <p className="feed-lead-excerpt">{excerpt}</p>}
         <div className="feed-lead-byline">
@@ -1791,7 +1792,11 @@ function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, 
           )}
           <div className="feed-lead-byline-text">
             {author}
-            <span className="feed-lead-sub">{dateline}</span>
+            <span className="feed-lead-sub">
+              {dateline}
+              <span className="feed-dot">·</span>
+              <span>{readingTime(pub.content)}</span>
+            </span>
           </div>
           <FeedActions pub={pub} sc={sc} likeCount={likeCount} commentCount={commentCount} onRead={onRead} onLike={onLike} />
         </div>
@@ -1817,6 +1822,22 @@ function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, 
         </div>
       </div>
     </article>
+  );
+}
+
+// Renders a feed: the newest piece as the lead, a quiet section label, then the
+// rest as index entries.
+function FeedList({ pubs, onRead, onAuthorClick, onLike, dropCapImages }) {
+  return (
+    <>
+      {pubs.map((pub, i) => (
+        <Fragment key={pub.id}>
+          {i === 1 && <div className="feed-section-label">More to read</div>}
+          <FeedCard pub={pub} index={i} featured={i === 0} dropCapImages={dropCapImages}
+            onRead={onRead} onAuthorClick={onAuthorClick} onLike={onLike} />
+        </Fragment>
+      ))}
+    </>
   );
 }
 
@@ -1959,10 +1980,10 @@ function Feed({ user, onRead, onAuthorClick, dropCapImages, onRequestAuth }) {
           {!followingLoading && followingFetched && followingPubs.length === 0 && (
             <FeedEmpty title="Your feed is quiet" sub="Follow writers and their newest work gathers here." />
           )}
-          {!followingLoading && followingPubs.map((pub, i) => (
-            <FeedCard key={pub.id} pub={pub} index={i} featured={i === 0} dropCapImages={dropCapImages}
+          {!followingLoading && (
+            <FeedList pubs={followingPubs} dropCapImages={dropCapImages}
               onRead={onRead} onAuthorClick={onAuthorClick} onLike={handleFollowingLike} />
-          ))}
+          )}
         </div>
       )}
 
@@ -1994,10 +2015,10 @@ function Feed({ user, onRead, onAuthorClick, dropCapImages, onRequestAuth }) {
           {!loading && pubs.length === 0 && (
             <FeedEmpty title="Nothing published yet" sub="Be the first to share something written by hand." />
           )}
-          {!loading && pubs.map((pub, i) => (
-            <FeedCard key={pub.id} pub={pub} index={i} featured={i === 0} dropCapImages={dropCapImages}
+          {!loading && (
+            <FeedList pubs={pubs} dropCapImages={dropCapImages}
               onRead={onRead} onAuthorClick={onAuthorClick} onLike={handleLike} />
-          ))}
+          )}
         </div>
       )}
 
