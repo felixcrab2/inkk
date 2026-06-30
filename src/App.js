@@ -2448,7 +2448,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
               <div id="contribution-label">events contributed to the inkk writing study</div>
               <div id="contribution-status" className={pendingLocal > 0 ? "syncing" : "synced"}>
                 {pendingLocal > 0
-                  ? <><span className="research-pulse" aria-hidden="true" />{pendingLocal.toLocaleString()} just recorded, uploading…</>
+                  ? <><span className="research-pulse" aria-hidden="true" />{pendingLocal.toLocaleString()} events studied, uploading…</>
                   : "all events uploaded"}
               </div>
               {contribution?.first_t && (
@@ -2502,7 +2502,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
       <div id="account-footer">
         <button className="account-link" onClick={onChangePassword}>Change password</button>
         <span className="account-dot">·</span>
-        <a className="account-link" href="mailto:hello@inkk.example?subject=Hello%20Inkk">Contact</a>
+        <a className="account-link" href="mailto:hello@inkk.site?subject=Hello%20Inkk">Contact</a>
         <span className="account-dot">·</span>
         <button className="account-link account-signout" onClick={onSignOut}>Sign out</button>
       </div>

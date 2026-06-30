@@ -3055,7 +3055,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   position: relative;
   width: 7px; height: 7px;
   border-radius: 50%;
-  background: #a86a4a;
+  background: #5a8a55;
   flex-shrink: 0;
 }
 .research-pulse::after {
@@ -3063,7 +3063,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: #a86a4a;
+  background: #5a8a55;
   opacity: 0.55;
   animation: research-pulse 2.6s ease-out infinite;
   pointer-events: none;
