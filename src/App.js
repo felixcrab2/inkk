@@ -1210,12 +1210,17 @@ function passwordChecks(pw) {
 }
 
 // ─── Google Identity Services (ID-token sign-in) ──────────────────────────────
-// When REACT_APP_GOOGLE_CLIENT_ID is set, "continue with Google" uses Google's
-// own button to obtain an ID token in-page, which we hand to
+// On desktop, when REACT_APP_GOOGLE_CLIENT_ID is set, "continue with Google"
+// uses Google's own button to obtain an ID token in-page, which we hand to
 // supabase.auth.signInWithIdToken. The whole consent flow runs on our own
 // domain (no redirect to <ref>.supabase.co), so Google's screen shows the Inkk
-// app, not the Supabase project URL. Without the env var we fall back to the
-// redirect flow (signInWithOAuth) so nothing breaks before it's configured.
+// app, not the Supabase project URL.
+//
+// On mobile (and whenever the env var is absent) we use the redirect flow
+// (signInWithOAuth) instead. The in-page button relies on a popup/iframe handing
+// the credential back to the page, which routinely fails on mobile browsers and
+// leaves a blank screen; a full-page redirect is the one flow mobile handles
+// reliably. See `useGsi` in AuthModal for where the two paths diverge.
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
 
 let gsiScriptPromise = null;
@@ -1265,6 +1270,13 @@ function AuthModal({ onClose, initialMode = "signin" }) {
   const googleBtnRef                = useRef(null);        // host for Google's rendered button
   const acceptedRef                 = useRef(false);       // latest Terms state for the GIS callback
 
+  // Google's in-page button (signInWithIdToken) is reliable on desktop but
+  // routinely white-screens on mobile: after the account chooser, the popup/
+  // iframe that hands the credential back to the page fails to return it, so
+  // sign-in silently dies. On mobile we use the full-page redirect flow
+  // (signInWithOAuth) instead, which every mobile browser handles cleanly.
+  const [useGsi] = useState(() => !!GOOGLE_CLIENT_ID && !isMobile());
+
   const switchMode = (m) => {
     setMode(m); setError(""); setMessage(""); setResend(""); setNeedsConfirm(false);
     if (m === "reset") setPassword("");
@@ -1288,20 +1300,20 @@ function AuthModal({ onClose, initialMode = "signin" }) {
   // Keep the latest Terms state available to the (long-lived) GIS callback.
   useEffect(() => { acceptedRef.current = accepted; }, [accepted]);
 
-  // Load Google Identity Services once, if a client ID is configured.
+  // Load Google Identity Services once, if we're using the in-page button.
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID) return;
+    if (!useGsi) return;
     let active = true;
     loadGoogleIdentity().then(() => { if (active) setGsiReady(true); }).catch(() => {});
     return () => { active = false; };
-  }, []);
+  }, [useGsi]);
 
   // Render Google's button as soon as the script is ready (so it's never a dead
   // placeholder). Terms are enforced inside the callback, which exchanges the
   // Google ID token for a Supabase session via signInWithIdToken — no redirect
   // ever leaves our own domain.
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID || !gsiReady || mode === "reset") return;
+    if (!useGsi || !gsiReady || mode === "reset") return;
     const el = googleBtnRef.current;
     const gid = window.google?.accounts?.id;
     if (!el || !gid) return;
@@ -1331,7 +1343,7 @@ function AuthModal({ onClose, initialMode = "signin" }) {
       });
     }).catch(() => {});
     return () => { active = false; };
-  }, [gsiReady, mode]);
+  }, [useGsi, gsiReady, mode]);
 
   const pw       = passwordChecks(password);
   const pwOk     = pw.length && pw.letter && pw.number;
@@ -1422,8 +1434,14 @@ function AuthModal({ onClose, initialMode = "signin" }) {
     // Google has no username/Terms step of its own. The agreement is ticked here
     // (the button is disabled until then); stash it across the OAuth redirect so
     // the profile provisioned on return records the Terms acceptance.
+    setError("");
     try { localStorage.setItem("inkk_pending_tos", TOS_VERSION); } catch {}
-    await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin },
+    });
+    // If the redirect can't be started, surface it instead of failing silently.
+    if (error) setError(error.message);
   };
 
   const unameHint = {
@@ -1558,7 +1576,7 @@ function AuthModal({ onClose, initialMode = "signin" }) {
                 </span>
               </label>
             )}
-            {GOOGLE_CLIENT_ID ? (
+            {useGsi ? (
               <div ref={googleBtnRef} style={{ display: "flex", justifyContent: "center" }} />
             ) : (
               <button id="google-btn" onClick={googleSignIn} disabled={!accepted}>continue with Google</button>
