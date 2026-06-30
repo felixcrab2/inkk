@@ -176,17 +176,14 @@ body {
 .focus-btn { margin-left: 2px; }
 
 /* ── Mobile editor top bar: declutter so the wordmark isn't crowded ──
-   On touch devices we drop the secondary actions and keep Certify + Publish,
-   now with room for their words instead of bare icons. */
+   On touch devices we keep the three core actions — Certify, Publish, Download —
+   as compact icons (labels hidden by the ≤600px rule), and drop the rest so the
+   centred wordmark has room. Tapping each icon explains itself: Publish and
+   Download open their modals; Certify shows a confirm popover. */
 body.is-mobile .title-caps-btn,   /* Aa — title caps is forced on, no toggle */
 body.is-mobile .icon-btn-preview, /* Preview */
-body.is-mobile #pdf-btn,          /* Download */
 body.is-mobile .focus-btn {       /* Fullscreen */
   display: none;
-}
-body.is-mobile #cert-btn .btn-label,
-body.is-mobile #publish-btn .btn-label {
-  display: inline;                /* override the ≤600px label hide */
 }
 
 /* ─── Offline banner ──────────────────────────────────────────────────────── */
@@ -507,7 +504,8 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .writing-stats {
   display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  white-space: nowrap;
   justify-content: center;
   gap: 7px;
   padding: 6px 14px;
@@ -518,6 +516,17 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   font-size: 0.72rem;
   letter-spacing: 0.03em;
   color: var(--muted);
+}
+/* On phones, shrink the line so the whole thing stays on one row. */
+@media (max-width: 600px) {
+  #hs-editor-status { max-width: calc(100% - 16px); }
+  .writing-stats {
+    gap: 5px;
+    padding: 5px 11px;
+    letter-spacing: 0.02em;
+    font-size: clamp(0.56rem, 2.5vw, 0.72rem);
+  }
+  .writing-stats .ws-process-btn { padding: 1px 3px; }
 }
 .ws-stat       { color: var(--text); }
 .ws-published  { font-variant: small-caps; letter-spacing: 0.08em; color: #6a5544; }
