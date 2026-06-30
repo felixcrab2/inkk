@@ -175,6 +175,20 @@ body {
 
 .focus-btn { margin-left: 2px; }
 
+/* ── Mobile editor top bar: declutter so the wordmark isn't crowded ──
+   On touch devices we drop the secondary actions and keep Certify + Publish,
+   now with room for their words instead of bare icons. */
+body.is-mobile .title-caps-btn,   /* Aa — title caps is forced on, no toggle */
+body.is-mobile .icon-btn-preview, /* Preview */
+body.is-mobile #pdf-btn,          /* Download */
+body.is-mobile .focus-btn {       /* Fullscreen */
+  display: none;
+}
+body.is-mobile #cert-btn .btn-label,
+body.is-mobile #publish-btn .btn-label {
+  display: inline;                /* override the ≤600px label hide */
+}
+
 /* ─── Offline banner ──────────────────────────────────────────────────────── */
 #offline-banner {
   position: fixed;
@@ -914,6 +928,26 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   gap: 5px;
   font-size: 0.73rem;
   color: var(--subtle);
+}
+
+/* Editorial kicker above the lead piece, and the quiet label that opens the
+   rest of the index. Both echo the masthead dateline's small-caps treatment. */
+.feed-lead-kicker {
+  display: block;
+  font-size: 0.6rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--gold);
+  margin: 2px 0 9px;
+}
+.feed-section-label {
+  font-size: 0.6rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--subtle);
+  padding: 24px 0 2px;
 }
 
 /* ── Index entries — illuminated initial + type, hairline divided ──────────── */
@@ -3121,7 +3155,8 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   #title-input {
     width: calc(100% - 88px);
     max-width: none;
-    font-size: clamp(0.98rem, 3.2vw, 1.14rem);
+    /* min 1rem (16px) so iOS Safari doesn't zoom the page when the title is focused */
+    font-size: clamp(1rem, 3.2vw, 1.14rem);
   }
   #text {
     width: 100%;
