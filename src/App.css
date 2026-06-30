@@ -84,11 +84,23 @@ body {
 }
 
 #landing-subtitle {
-  font-size: 0.9rem;
+  font-family: "EB Garamond", Georgia, serif;
+  font-style: italic;
+  font-size: 1.05rem;
   color: var(--muted);
-  line-height: 1.7;
-  margin: 22px 0 0;
+  line-height: 1.65;
+  margin: 26px 0 0;
   transition: opacity 0.9s ease;
+}
+/* Editorial hairline (same gold rule as the email templates) above the line. */
+#landing-subtitle::before {
+  content: "";
+  display: block;
+  width: 24px;
+  height: 1px;
+  background: var(--gold);
+  opacity: 0.85;
+  margin: 0 auto 22px;
 }
 
 /* ─── Top bar ─────────────────────────────────────────────────────────────── */
