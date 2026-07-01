@@ -372,10 +372,21 @@ function setTitleCaret(el, offset) {
 }
 
 function isMobile() {
-  return (
-    typeof navigator !== "undefined" &&
-    (navigator.maxTouchPoints > 0 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent))
-  );
+  if (typeof navigator === "undefined") return false;
+  // Direct signals.
+  if (navigator.maxTouchPoints > 0) return true;
+  if (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "")) return true;
+  // A phone with "Request Desktop Site" on sends a desktop user-agent and can
+  // report maxTouchPoints as 0 — but its primary pointer is still a finger and
+  // the physical screen stays small. Without catching this it would wrongly get
+  // the in-page Google button, which dead-ends on mobile (gsi/transform), so we
+  // treat a coarse-pointer or small-screen device as mobile too.
+  try {
+    if (window.matchMedia && window.matchMedia("(pointer: coarse)").matches) return true;
+    const w = window.screen && window.screen.width;
+    if (w && w <= 820) return true;
+  } catch {}
+  return false;
 }
 
 function dropCapSrc(letter, images) {
