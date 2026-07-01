@@ -3092,6 +3092,12 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 @media (max-width: 480px) {
   #research-strip { font-size: 0.66rem; right: 10px; padding: 4px 8px 4px 7px; }
 }
+/* On phones the centred writing-stats / human-score bar (#hs-editor-status)
+   shares this bottom offset and is wide enough to sit on top of the studying
+   indicator, so lift the indicator clear of it. */
+@media (max-width: 600px) {
+  #research-strip { bottom: calc(var(--bottom-nav) + 50px); }
+}
 
 /* ─── Toasts ──────────────────────────────────────────────────────────────── */
 #toast-stack {

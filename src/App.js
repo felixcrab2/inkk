@@ -1504,10 +1504,17 @@ function AuthModal({ onClose, initialMode = "signin" }) {
   };
 
   const googleSignIn = async () => {
-    // Google has no username/Terms step of its own. The agreement is ticked here
-    // (the button is disabled until then); stash it across the OAuth redirect so
-    // the profile provisioned on return records the Terms acceptance.
+    // Google has no username/Terms step of its own, so the agreement is ticked
+    // in the modal first. The button stays tappable even when it isn't, so the
+    // tap can explain why nothing happens (a disabled button is silent, which
+    // reads as broken — especially on mobile).
+    if (!accepted) {
+      setError("Please accept the Terms & Privacy Policy to continue with Google.");
+      return;
+    }
     setError("");
+    // Stash the acceptance across the OAuth redirect so the profile provisioned
+    // on return records the Terms acceptance.
     try { localStorage.setItem("inkk_pending_tos", TOS_VERSION); } catch {}
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -1655,7 +1662,7 @@ function AuthModal({ onClose, initialMode = "signin" }) {
             {useGsi ? (
               <div ref={googleBtnRef} style={{ display: "flex", justifyContent: "center" }} />
             ) : (
-              <button id="google-btn" onClick={googleSignIn} disabled={!accepted}>continue with Google</button>
+              <button id="google-btn" onClick={googleSignIn}>continue with Google</button>
             )}
           </>
         )}
