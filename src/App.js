@@ -1535,7 +1535,7 @@ function AuthModal({ onClose, initialMode = "signin" }) {
             </div>
             <p className="auth-blurb">Enter the email you signed up with and we'll send you a link to set a new password.</p>
             <form onSubmit={submit}>
-              <input type="email" placeholder="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus />
+              <input type="email" placeholder="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus={!isMobile()} />
               {error && <p className="auth-error">{error}</p>}
               <button id="auth-submit" type="submit" disabled={loading}>
                 {loading ? "…" : "Send reset link"}
@@ -1550,7 +1550,10 @@ function AuthModal({ onClose, initialMode = "signin" }) {
               <button className={mode === "signup" ? "active" : ""} onClick={() => switchMode("signup")}>create account</button>
             </div>
             <form onSubmit={submit}>
-              <input type="email" placeholder="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus autoComplete="email" />
+              {/* Don't autofocus on mobile: it pops the keyboard the moment the
+                  modal opens, covering the "continue with Google" button. The
+                  keyboard should only appear when a field is actually tapped. */}
+              <input type="email" placeholder="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus={!isMobile()} autoComplete="email" />
 
               {mode === "signup" && (
                 <>
