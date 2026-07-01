@@ -1273,13 +1273,18 @@ function passwordChecks(pw) {
 }
 
 // ─── Google Identity Services (ID-token sign-in) ──────────────────────────────
-// When REACT_APP_GOOGLE_CLIENT_ID is set, "continue with Google" uses Google's
-// own button to obtain an ID token in-page, which we hand to
+// On DESKTOP, when REACT_APP_GOOGLE_CLIENT_ID is set, "continue with Google"
+// uses Google's own button to obtain an ID token in-page, which we hand to
 // supabase.auth.signInWithIdToken. The whole consent flow runs on our own
-// domain (no redirect to <ref>.supabase.co), so Google's screen shows the Inkk
-// app, not the Supabase project URL — on desktop and mobile alike. Without the
-// env var we fall back to the redirect flow (signInWithOAuth) so nothing breaks
-// before it's configured.
+// domain (no redirect), so Google's screen shows the Inkk app.
+//
+// On MOBILE that in-page flow is unusable: Google's popup/transform step loses
+// its opener and dead-ends on a blank accounts.google.com/gsi/transform page,
+// so sign-in never returns. Mobile therefore uses the full-page redirect flow
+// (signInWithOAuth). Google's consent screen still shows "inkk" (set via the
+// OAuth consent screen's App name), so branding holds; the only cosmetic cost
+// is a brief <ref>.supabase.co in the address bar mid-redirect. Without the env
+// var, everything falls back to the redirect flow.
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
 
 let gsiScriptPromise = null;
@@ -1329,11 +1334,10 @@ function AuthModal({ onClose, initialMode = "signin" }) {
   const googleBtnRef                = useRef(null);        // host for Google's rendered button
   const acceptedRef                 = useRef(false);       // latest Terms state for the GIS callback
 
-  // Use Google's in-page button (signInWithIdToken) whenever a client ID is
-  // configured, on desktop and mobile alike, so the consent screen always shows
-  // "inkk" and never the Supabase project URL. Falls back to the redirect flow
-  // (signInWithOAuth) only when no client ID is set.
-  const [useGsi] = useState(() => !!GOOGLE_CLIENT_ID);
+  // In-page Google button on desktop only. On mobile it dead-ends on Google's
+  // blank /gsi/transform page, so mobile (and the no-client-id fallback) uses
+  // the redirect flow instead. See the GOOGLE_CLIENT_ID note above.
+  const [useGsi] = useState(() => !!GOOGLE_CLIENT_ID && !isMobile());
 
   const switchMode = (m) => {
     setMode(m); setError(""); setMessage(""); setResend(""); setNeedsConfirm(false);
