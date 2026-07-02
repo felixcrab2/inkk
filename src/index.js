@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { Analytics } from "@vercel/analytics/react";
 import "./index.css";
 import App from "./App";
 
@@ -57,5 +58,9 @@ const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
   <ErrorBoundary>
     <App />
+    {/* Vercel Web Analytics — privacy-friendly, cookieless traffic monitoring.
+        Only collects data once Web Analytics is enabled for the project in the
+        Vercel dashboard; the beacon is same-origin (/_vercel/insights/*). */}
+    <Analytics />
   </ErrorBoundary>
 );
