@@ -65,44 +65,6 @@ body {
   text-align: center;
 }
 
-/* Minimalist writing-process signal: thin factors fanning from one origin,
-   each drifting a different way. Hairline strokes, no axes/labels/fills — the
-   lines draw themselves in from the origin outward before the headline types. */
-#landing-graph {
-  display: block;
-  width: 172px;
-  height: 72px;
-  margin: 0 auto 30px;
-  overflow: visible;
-}
-#landing-graph path {
-  fill: none;
-  stroke: var(--text);
-  stroke-width: 1.1;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-dasharray: 420;
-  stroke-dashoffset: 420;
-  animation: landing-draw 1.5s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
-}
-#landing-graph path:nth-of-type(1) { opacity: 0.85; animation-delay: 0.05s; }
-#landing-graph path:nth-of-type(2) { opacity: 0.55; animation-delay: 0.18s; }
-#landing-graph path:nth-of-type(3) { opacity: 0.4;  animation-delay: 0.31s; }
-#landing-graph path:nth-of-type(4) { opacity: 0.55; animation-delay: 0.44s; }
-#landing-graph path:nth-of-type(5) { opacity: 0.85; animation-delay: 0.57s; }
-#landing-graph .lg-origin {
-  fill: var(--text);
-  stroke: none;
-  opacity: 0;
-  animation: landing-dot 0.5s ease 0.15s forwards;
-}
-@keyframes landing-draw { to { stroke-dashoffset: 0; } }
-@keyframes landing-dot  { to { opacity: 0.9; } }
-@media (prefers-reduced-motion: reduce) {
-  #landing-graph path { animation: none; stroke-dashoffset: 0; }
-  #landing-graph .lg-origin { animation: none; opacity: 0.9; }
-}
-
 #landing-headline {
   font-family: var(--font-serif);
   font-size: 2.2rem;
