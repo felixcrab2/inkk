@@ -1217,6 +1217,17 @@ function LandingScreen({ onDone }) {
   return (
     <div id="landing" className={fading ? "fading" : ""} onClick={skip}>
       <div id="landing-inner">
+        {/* Minimalist "human signal": thin factors of the writing process
+            fanning out from a single origin (the writer), each drifting a
+            different way. Draws itself in on mount, then the headline types. */}
+        <svg id="landing-graph" viewBox="0 0 240 100" aria-hidden="true">
+          <path d="M10 50 L68 40 L128 33 L188 16 L230 9" />
+          <path d="M10 50 L70 47 L132 41 L190 33 L230 29" />
+          <path d="M10 50 L66 53 L126 46 L186 54 L230 49" />
+          <path d="M10 50 L72 54 L130 63 L192 66 L230 73" />
+          <path d="M10 50 L68 60 L128 70 L188 84 L230 91" />
+          <circle className="lg-origin" cx="10" cy="50" r="2.1" />
+        </svg>
         <div id="landing-headline">{display}<span id="landing-cursor" /></div>
         <p id="landing-subtitle" style={{ opacity: showSubtitle ? 1 : 0 }}>
           Inkk studies how a piece is really written: the drafts, the pauses, the second thoughts that make writing human.
