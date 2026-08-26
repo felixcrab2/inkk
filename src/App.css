@@ -33,8 +33,12 @@ html, body, #root {
   overflow: hidden;
 }
 
+/* The page colour lives on <html> so the engraving backdrop (z-index: -1)
+   can sit between it and the app's content. body must stay transparent. */
+html { background: var(--bg); }
+
 body {
-  background: var(--bg);
+  background: transparent;
   font-family: var(--font-ui);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -44,6 +48,26 @@ body {
 /* ─── Shared visibility ───────────────────────────────────────────────────── */
 .menu-visible { opacity: 1; pointer-events: auto; transition: opacity 0.5s ease; }
 .menu-hidden  { opacity: 0; pointer-events: none; transition: opacity 0.5s ease; }
+
+/* ─── Engraving backdrop ──────────────────────────────────────────────────────
+   Faded public-domain plates (Dürer, Flammarion, Merian…) ghosted into the
+   paper. multiply drops the plate's paper whites into --bg so only the ink
+   lines remain; the low opacity turns them into a pressed-in watermark.
+   Sits at z-index -1: above the <html> page colour, below all content.
+   In the editor it fades with the chrome while typing (same idle rhythm). */
+#backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: cover;
+  mix-blend-mode: multiply;
+  filter: grayscale(1) contrast(1.05);
+  opacity: 0;
+  transition: opacity 1.6s ease;
+}
+#backdrop.bd-on { opacity: var(--backdrop-alpha, 0.055); }
 
 /* ─── Landing ─────────────────────────────────────────────────────────────── */
 #landing {
@@ -59,7 +83,24 @@ body {
 }
 #landing.fading { opacity: 0; pointer-events: none; }
 
+/* The landing gets its own copy of the backdrop (the overlay is opaque),
+   a touch stronger than the in-app one so the first impression registers. */
+#landing-backdrop {
+  position: absolute;
+  inset: 0;
+  /* background-image set inline in LandingScreen (CRA css-loader would try
+     to bundle a url() pointing at public/) */
+  background-position: center 30%;
+  background-size: cover;
+  background-repeat: no-repeat;
+  mix-blend-mode: multiply;
+  filter: grayscale(1) contrast(1.05);
+  opacity: 0.075;
+  pointer-events: none;
+}
+
 #landing-inner {
+  position: relative;
   max-width: 360px;
   padding: 0 36px;
   text-align: center;
