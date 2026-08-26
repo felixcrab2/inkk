@@ -1239,9 +1239,7 @@ function Backdrop({ view, hidden, override }) {
   return (
     <div
       id="backdrop"
-      className={(hidden ? "" : "bd-on")
-        + (view === "feed" ? " bd-feed" : "")
-        + (view === "reading" ? " bd-read" : "")}
+      className={hidden ? "" : "bd-on"}
       style={{
         backgroundImage: `url(/backdrops/${a.img}.webp)`,
         backgroundPosition: a.pos,

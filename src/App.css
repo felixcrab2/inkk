@@ -65,36 +65,21 @@ body {
   background-size: cover;
   /* slight zoom so plate edges / paper margins never reach the viewport */
   transform: scale(1.1);
+  /* The plate lives on the flanks, everywhere: fully cleared behind the
+     central content column (every view's column fits within 780px — feed
+     600, reading pages 700, editor 560, profiles/verify narrower), ramping
+     to full strength by ±700px. The centre of every page stays clean
+     paper; only the perimeter carries the artwork. */
+  -webkit-mask-image: linear-gradient(to right,
+      #000 calc(50% - 700px), transparent calc(50% - 390px),
+      transparent calc(50% + 390px), #000 calc(50% + 700px));
+  mask-image: linear-gradient(to right,
+      #000 calc(50% - 700px), transparent calc(50% - 390px),
+      transparent calc(50% + 390px), #000 calc(50% + 700px));
   opacity: 0;
   transition: opacity 1.6s ease;
 }
-#backdrop.bd-on { opacity: var(--backdrop-alpha, 0.09); }
-
-/* Feed: the plate holds the perimeter and clears out entirely behind the
-   600px feed column, so the ink never sits under the text. Slightly
-   stronger than elsewhere since only the flanks carry it. */
-#backdrop.bd-feed.bd-on { opacity: var(--backdrop-feed-alpha, 0.16); }
-#backdrop.bd-feed {
-  -webkit-mask-image: linear-gradient(to right,
-      #000 calc(50% - 640px), transparent calc(50% - 340px),
-      transparent calc(50% + 340px), #000 calc(50% + 640px));
-  mask-image: linear-gradient(to right,
-      #000 calc(50% - 640px), transparent calc(50% - 340px),
-      transparent calc(50% + 340px), #000 calc(50% + 640px));
-}
-
-/* Reading: the piece's own plate frames the rendered pages — strong on the
-   flanks, cleared behind the 700px page column so nothing sits under the
-   pages, the meta line or the comments. */
-#backdrop.bd-read.bd-on { opacity: var(--backdrop-read-alpha, 0.16); }
-#backdrop.bd-read {
-  -webkit-mask-image: linear-gradient(to right,
-      #000 calc(50% - 700px), transparent calc(50% - 390px),
-      transparent calc(50% + 390px), #000 calc(50% + 700px));
-  mask-image: linear-gradient(to right,
-      #000 calc(50% - 700px), transparent calc(50% - 390px),
-      transparent calc(50% + 390px), #000 calc(50% + 700px));
-}
+#backdrop.bd-on { opacity: var(--backdrop-alpha, 0.16); }
 
 /* ─── Landing ─────────────────────────────────────────────────────────────── */
 #landing {
