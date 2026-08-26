@@ -84,6 +84,18 @@ body {
    Duration must match BACKDROP_VEIL_MS in App.js. */
 #backdrop.bd-veil { transition-duration: 0.7s; }
 
+/* Verify, before a certificate is shown: the intro box only occupies the top
+   of the screen, so instead of the vertical band the plate circles the box —
+   clear inside an ellipse around the masthead + form, fading in on all sides
+   (including below). Once a certificate expands the page, the class drops
+   and the standard band returns. */
+#backdrop.bd-ring {
+  -webkit-mask-image: radial-gradient(ellipse 620px 480px at 50% 300px,
+      transparent 52%, #000 88%);
+  mask-image: radial-gradient(ellipse 620px 480px at 50% 300px,
+      transparent 52%, #000 88%);
+}
+
 /* ─── Landing ─────────────────────────────────────────────────────────────── */
 #landing {
   position: fixed;
@@ -3379,7 +3391,8 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   top: var(--top-bar);
   left: 0; right: 0; bottom: var(--bottom-nav);
   overflow-y: auto;
-  background: var(--bg);
+  /* transparent so the engraving backdrop can circle the verify box */
+  background: transparent;
 }
 #verify-inner {
   max-width: 560px;

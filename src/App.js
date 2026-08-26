@@ -1223,7 +1223,7 @@ function imgForPub(id) {
 // view change. Must match the .bd-veil transition-duration in App.css.
 const BACKDROP_VEIL_MS = 700;
 
-function Backdrop({ view, hidden, override }) {
+function Backdrop({ view, hidden, override, ringed }) {
   const [shown, setShown]   = useState(() => BACKDROP_PLATES[Math.floor(Math.random() * BACKDROP_PLATES.length)]);
   const [veiled, setVeiled] = useState(false);
   const prevRef  = useRef({ view, hidden: true });
@@ -1264,7 +1264,7 @@ function Backdrop({ view, hidden, override }) {
   return (
     <div
       id="backdrop"
-      className={(hidden || veiled ? "" : "bd-on") + (veiled ? " bd-veil" : "")}
+      className={(hidden || veiled ? "" : "bd-on") + (veiled ? " bd-veil" : "") + (ringed ? " bd-ring" : "")}
       style={{
         backgroundImage: `url(/backdrops/${shown.img}.webp)`,
         backgroundPosition: shown.pos,
@@ -3334,6 +3334,7 @@ export default function App() {
   const [docs, setDocs]               = useState(initDocs);
   const [activeId, setActiveId]       = useState(initActiveId);
   const [menuVisible, setMenuVisible] = useState(true);
+  const [verifyStatus, setVerifyStatus] = useState("idle"); // mirrors VerifyView (backdrop ring vs band)
   const [panelOpen, setPanelOpen]     = useState(false);
   const [saveStatus, setSaveStatus]   = useState("saved");
   const [online, setOnline]           = useState(() =>
@@ -4698,6 +4699,7 @@ export default function App() {
         view={view}
         hidden={showLanding || (isEditor && (hasContent || !menuVisible))}
         override={view === "reading" && readingPub ? { img: imgForPub(readingPub.id), pos: "center 30%" } : null}
+        ringed={view === "verify" && verifyStatus !== "found"}
       />
 
       {/* ── landing overlay ── */}
@@ -5179,6 +5181,7 @@ export default function App() {
         <VerifyView
           initialCode={verifyCode}
           onOpenPiece={openPieceById}
+          onStatus={setVerifyStatus}
         />
       )}
 
