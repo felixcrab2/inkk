@@ -66,7 +66,7 @@ body {
   opacity: 0;
   transition: opacity 1.6s ease;
 }
-#backdrop.bd-on { opacity: var(--backdrop-alpha, 0.07); }
+#backdrop.bd-on { opacity: var(--backdrop-alpha, 0.12); }
 
 /* ─── Landing ─────────────────────────────────────────────────────────────── */
 #landing {
@@ -92,7 +92,7 @@ body {
   background-position: center 30%;
   background-size: cover;
   background-repeat: no-repeat;
-  opacity: 0.095;
+  opacity: 0.15;
   pointer-events: none;
 }
 

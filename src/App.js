@@ -1187,30 +1187,42 @@ function Toasts({ toasts }) {
 // ─── LandingScreen ────────────────────────────────────────────────────────────
 
 // ─── Engraving backdrop ───────────────────────────────────────────────────────
-// One faded public-domain plate per view, framed differently for variation.
-// All render at cover size; only the focal point moves between views.
-const BACKDROP_ART = {
-  editor:      { img: "jerome",      pos: "70% 25%" },   // Dürer, St Jerome writing at his desk
-  feed:        { img: "cosmos",      pos: "center 18%" },// Merian, Basilica Philosophica sunrise
-  reading:     { img: "melencolia",  pos: "center 22%" },// Dürer, Melencolia I
-  search:      { img: "rhinoceros",  pos: "center 42%" },// Dürer, Rhinoceros
-  userProfile: { img: "rhinoceros",  pos: "82% center" },
-  profile:     { img: "melencolia",  pos: "28% 32%" },
-  verify:      { img: "destillatio", pos: "center 32%" },// van der Straet, the distillation workshop
-};
+// A pool of faded public-domain plates, some at more than one framing. The
+// plate advances (randomly, never repeating itself) each time the backdrop
+// reappears or the view changes, so the site never shows the same wall twice
+// in a row.
+const BACKDROP_PLATES = [
+  { img: "jerome",      pos: "70% 25%" },    // Dürer, St Jerome writing at his desk
+  { img: "flammarion",  pos: "center 30%" }, // the Flammarion engraving
+  { img: "flammarion",  pos: "24% 22%" },
+  { img: "melencolia",  pos: "center 22%" }, // Dürer, Melencolia I
+  { img: "cosmos",      pos: "center 18%" }, // Merian, Basilica Philosophica
+  { img: "rhinoceros",  pos: "center 42%" }, // Dürer, Rhinoceros
+  { img: "rhinoceros",  pos: "82% center" },
+  { img: "destillatio", pos: "center 32%" }, // van der Straet, the distillation workshop
+];
 
 function Backdrop({ view, hidden }) {
-  const art = BACKDROP_ART[view];
-  // Keep the last plate while fading out on views without one, so the image
-  // never swaps mid-fade.
-  const lastRef = useRef(art);
-  if (art) lastRef.current = art;
-  const a = art || lastRef.current;
-  if (!a) return null;
+  const [idx, setIdx] = useState(() => Math.floor(Math.random() * BACKDROP_PLATES.length));
+  const prevRef = useRef({ view, hidden: true });
+  useEffect(() => {
+    const prev = prevRef.current;
+    const appearing = !hidden && prev.hidden;
+    const switched  = !hidden && view !== prev.view;
+    if (appearing || switched) {
+      setIdx(i => {
+        let n = Math.floor(Math.random() * BACKDROP_PLATES.length);
+        if (n === i) n = (n + 1) % BACKDROP_PLATES.length;
+        return n;
+      });
+    }
+    prevRef.current = { view, hidden };
+  }, [view, hidden]);
+  const a = BACKDROP_PLATES[idx];
   return (
     <div
       id="backdrop"
-      className={art && !hidden ? "bd-on" : ""}
+      className={hidden ? "" : "bd-on"}
       style={{
         backgroundImage: `url(/backdrops/${a.img}.webp)`,
         backgroundPosition: a.pos,
@@ -4642,8 +4654,11 @@ export default function App() {
 
   return (
     <>
-      {/* ── engraving backdrop (fades with the chrome while typing) ── */}
-      <Backdrop view={view} hidden={showLanding || (isEditor && !menuVisible)} />
+      {/* ── engraving backdrop ──
+          In the editor the plate belongs to the blank page: it fades while the
+          title is being typed and leaves for good once the piece has words.
+          A fresh blank document brings a fresh plate. */}
+      <Backdrop view={view} hidden={showLanding || (isEditor && (hasContent || !menuVisible))} />
 
       {/* ── landing overlay ── */}
       {showLanding && <LandingScreen onDone={() => setShowLanding(false)} />}
