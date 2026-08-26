@@ -98,10 +98,14 @@ function Certificate({ cert, onOpenPiece }) {
   );
 }
 
-export function VerifyView({ initialCode = "", onOpenPiece }) {
+export function VerifyView({ initialCode = "", onOpenPiece, onStatus }) {
   const [input, setInput]   = useState(initialCode);
   const [status, setStatus] = useState("idle"); // idle|loading|found|notfound|invalid|offline|error
   const [cert, setCert]     = useState(null);
+
+  // Let the shell react to the view's state (the backdrop wraps the intro
+  // box in a ring until a certificate expands the page).
+  useEffect(() => { onStatus?.(status); }, [status, onStatus]);
 
   const lookup = useCallback(async (raw) => {
     const code = parseVerifyCode(raw);
