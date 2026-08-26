@@ -4692,13 +4692,19 @@ export default function App() {
     <>
       {/* ── engraving backdrop ──
           In the editor the plate belongs to the blank page: it fades while the
-          title is being typed and leaves for good once the piece has words.
-          A fresh blank document brings a fresh plate. When reading, the frame
-          around the pages always shows the piece's own plate. */}
+          title is being typed and leaves for good once the piece has words —
+          except in preview, where the draft's own plate returns to frame the
+          rendered pages (as reading frames a published piece) and fades away
+          when the preview closes. A fresh blank document brings a fresh
+          plate. When reading, the frame is always the piece's own plate. */}
       <Backdrop
         view={view}
-        hidden={showLanding || (isEditor && (hasContent || !menuVisible))}
-        override={view === "reading" && readingPub ? { img: imgForPub(readingPub.id), pos: "center 30%" } : null}
+        hidden={showLanding || (isEditor && !previewMode && (hasContent || !menuVisible))}
+        override={
+          view === "reading" && readingPub ? { img: imgForPub(readingPub.id), pos: "center 30%" }
+          : isEditor && previewMode        ? { img: imgForPub(activeId), pos: "center 30%" }
+          : null
+        }
         ringed={view === "verify" && verifyStatus !== "found"}
       />
 
