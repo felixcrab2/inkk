@@ -4797,7 +4797,7 @@ export default function App() {
         // Hand the blinking caret to the body: the landing's deleted headline
         // resolves into the cursor waiting on the first line.
         setTimeout(() => { if (view === "editor") editorRef.current?.focus(); }, 120);
-      }} />
+      }} />}
 
       {/* ── top bar ── */}
       {/* ── offline banner ── */}
