@@ -77,12 +77,12 @@ body {
       #000 calc(50% - 700px), transparent calc(50% - 390px),
       transparent calc(50% + 390px), #000 calc(50% + 700px));
   opacity: 0;
-  transition: opacity 2.4s ease;
+  transition: opacity 1.8s ease;
 }
 #backdrop.bd-on { opacity: var(--backdrop-alpha, 0.16); }
 /* Quick exhale while a view change swaps the plate (fade-in stays slow).
    Duration must match BACKDROP_VEIL_MS in App.js. */
-#backdrop.bd-veil { transition-duration: 0.9s; }
+#backdrop.bd-veil { transition-duration: 0.7s; }
 
 /* ─── Landing ─────────────────────────────────────────────────────────────── */
 #landing {
@@ -99,13 +99,15 @@ body {
 #landing.fading { opacity: 0; pointer-events: none; }
 
 /* The landing gets its own copy of the backdrop (the overlay is opaque),
-   a touch stronger than the in-app one so the first impression registers. */
+   a touch stronger than the in-app one so the first impression registers.
+   The plate is Dürer's St Jerome writing at his desk; the position centres
+   the desk scene behind the headline. */
 #landing-backdrop {
   position: absolute;
   inset: 0;
   /* background-image set inline in LandingScreen (CRA css-loader would try
      to bundle a url() pointing at public/) */
-  background-position: center 30%;
+  background-position: center 42%;
   background-size: cover;
   background-repeat: no-repeat;
   transform: scale(1.1);
@@ -136,16 +138,6 @@ body {
   vertical-align: -0.12em;
   margin-left: 2px;
   animation: blink 1s steps(2, start) infinite;
-}
-
-#landing-subtitle {
-  font-family: "EB Garamond", Georgia, serif;
-  font-style: normal;
-  font-size: 1.05rem;
-  color: var(--text);
-  line-height: 1.65;
-  margin: 26px 0 0;
-  transition: opacity 0.9s ease;
 }
 
 /* ─── Top bar ─────────────────────────────────────────────────────────────── */

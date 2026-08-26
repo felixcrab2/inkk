@@ -34,10 +34,11 @@ SOURCES = {
     "prodigal-son":  os.path.join(DURER, "prodigal-son.jpg"),
     "st-eustace":    os.path.join(DURER, "st-eustace.jpg"),
     "whore-babylon": os.path.join(DURER, "whore-babylon.jpg"),
-    # the wider esoteric set
+    # the Flammarion engraving (high-res scan; also the landing plate)
     "flammarion":    os.path.join(DESKTOP, "Flammarion.jpg"),
-    "cosmos":        os.path.join(DESKTOP, "Alchemy-picture-M.-Merian-for-website.jpg"),
-    "destillatio":   os.path.join(DESKTOP, "3_van-der-straet_destillatio-web.jpg"),
+    # cut for quality (softer sources read muddy next to the Christie's set):
+    # "cosmos":      os.path.join(DESKTOP, "Alchemy-picture-M.-Merian-for-website.jpg"),
+    # "destillatio": os.path.join(DESKTOP, "3_van-der-straet_destillatio-web.jpg"),
 }
 
 MAX   = 2600   # longest side
