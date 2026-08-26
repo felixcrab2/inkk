@@ -1221,7 +1221,7 @@ function imgForPub(id) {
 
 // How long the backdrop takes to clear before the plate is swapped on a
 // view change. Must match the .bd-veil transition-duration in App.css.
-const BACKDROP_VEIL_MS = 900;
+const BACKDROP_VEIL_MS = 700;
 
 function Backdrop({ view, hidden, override }) {
   const [shown, setShown]   = useState(() => BACKDROP_PLATES[Math.floor(Math.random() * BACKDROP_PLATES.length)]);
