@@ -1219,30 +1219,55 @@ function imgForPub(id) {
   return BACKDROP_IMGS[h % BACKDROP_IMGS.length];
 }
 
+// How long the backdrop takes to clear before the plate is swapped on a
+// view change. Must match the .bd-veil transition-duration in App.css.
+const BACKDROP_VEIL_MS = 900;
+
 function Backdrop({ view, hidden, override }) {
-  const [idx, setIdx] = useState(() => Math.floor(Math.random() * BACKDROP_PLATES.length));
-  const prevRef = useRef({ view, hidden: true });
+  const [shown, setShown]   = useState(() => BACKDROP_PLATES[Math.floor(Math.random() * BACKDROP_PLATES.length)]);
+  const [veiled, setVeiled] = useState(false);
+  const prevRef  = useRef({ view, hidden: true });
+  const timerRef = useRef(null);
+  const oimg = override ? override.img : null;
+
   useEffect(() => {
     const prev = prevRef.current;
     const appearing = !hidden && prev.hidden;
-    const switched  = !hidden && view !== prev.view;
-    if (appearing || switched) {
-      setIdx(i => {
-        let n = Math.floor(Math.random() * BACKDROP_PLATES.length);
-        if (n === i) n = (n + 1) % BACKDROP_PLATES.length;
-        return n;
-      });
-    }
+    const switched  = !hidden && !prev.hidden && view !== prev.view;
     prevRef.current = { view, hidden };
-  }, [view, hidden]);
-  const a = override || BACKDROP_PLATES[idx];
+
+    const applyNext = () => setShown(cur => {
+      if (oimg) return { img: oimg, pos: "center 30%" };
+      let p = BACKDROP_PLATES[Math.floor(Math.random() * BACKDROP_PLATES.length)];
+      if (p === cur) p = BACKDROP_PLATES[(BACKDROP_PLATES.indexOf(p) + 1) % BACKDROP_PLATES.length];
+      return p;
+    });
+
+    if (appearing) {
+      // Invisible right now: swap silently, then the CSS fade brings it in.
+      clearTimeout(timerRef.current);
+      setVeiled(false);
+      applyNext();
+    } else if (switched) {
+      // Visible during a view change: never swap in place (it reads as a
+      // flash). Exhale quickly, swap while clear, inhale slowly.
+      setVeiled(true);
+      clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        applyNext();
+        setVeiled(false);
+      }, BACKDROP_VEIL_MS);
+    }
+  }, [view, hidden, oimg]);
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
   return (
     <div
       id="backdrop"
-      className={hidden ? "" : "bd-on"}
+      className={(hidden || veiled ? "" : "bd-on") + (veiled ? " bd-veil" : "")}
       style={{
-        backgroundImage: `url(/backdrops/${a.img}.webp)`,
-        backgroundPosition: a.pos,
+        backgroundImage: `url(/backdrops/${shown.img}.webp)`,
+        backgroundPosition: shown.pos,
       }}
     />
   );
