@@ -1210,7 +1210,16 @@ const BACKDROP_PLATES = [
   { img: "destillatio",   pos: "center 32%" }, // van der Straet, the distillation workshop
 ];
 
-function Backdrop({ view, hidden }) {
+// A published piece keeps one plate for life: hash its id into the pool, so
+// the reading view always frames a piece with the same engraving.
+const BACKDROP_IMGS = [...new Set(BACKDROP_PLATES.map(p => p.img))];
+function imgForPub(id) {
+  let h = 0;
+  for (const c of String(id || "")) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return BACKDROP_IMGS[h % BACKDROP_IMGS.length];
+}
+
+function Backdrop({ view, hidden, override }) {
   const [idx, setIdx] = useState(() => Math.floor(Math.random() * BACKDROP_PLATES.length));
   const prevRef = useRef({ view, hidden: true });
   useEffect(() => {
@@ -1226,11 +1235,13 @@ function Backdrop({ view, hidden }) {
     }
     prevRef.current = { view, hidden };
   }, [view, hidden]);
-  const a = BACKDROP_PLATES[idx];
+  const a = override || BACKDROP_PLATES[idx];
   return (
     <div
       id="backdrop"
-      className={(hidden ? "" : "bd-on") + (view === "feed" ? " bd-feed" : "")}
+      className={(hidden ? "" : "bd-on")
+        + (view === "feed" ? " bd-feed" : "")
+        + (view === "reading" ? " bd-read" : "")}
       style={{
         backgroundImage: `url(/backdrops/${a.img}.webp)`,
         backgroundPosition: a.pos,
@@ -4665,8 +4676,13 @@ export default function App() {
       {/* ── engraving backdrop ──
           In the editor the plate belongs to the blank page: it fades while the
           title is being typed and leaves for good once the piece has words.
-          A fresh blank document brings a fresh plate. */}
-      <Backdrop view={view} hidden={showLanding || (isEditor && (hasContent || !menuVisible))} />
+          A fresh blank document brings a fresh plate. When reading, the frame
+          around the pages always shows the piece's own plate. */}
+      <Backdrop
+        view={view}
+        hidden={showLanding || (isEditor && (hasContent || !menuVisible))}
+        override={view === "reading" && readingPub ? { img: imgForPub(readingPub.id), pos: "center 30%" } : null}
+      />
 
       {/* ── landing overlay ── */}
       {showLanding && <LandingScreen onDone={() => setShowLanding(false)} />}

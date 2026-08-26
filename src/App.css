@@ -83,6 +83,19 @@ body {
       transparent calc(50% + 340px), #000 calc(50% + 640px));
 }
 
+/* Reading: the piece's own plate frames the rendered pages — strong on the
+   flanks, cleared behind the 700px page column so nothing sits under the
+   pages, the meta line or the comments. */
+#backdrop.bd-read.bd-on { opacity: var(--backdrop-read-alpha, 0.16); }
+#backdrop.bd-read {
+  -webkit-mask-image: linear-gradient(to right,
+      #000 calc(50% - 700px), transparent calc(50% - 390px),
+      transparent calc(50% + 390px), #000 calc(50% + 700px));
+  mask-image: linear-gradient(to right,
+      #000 calc(50% - 700px), transparent calc(50% - 390px),
+      transparent calc(50% + 390px), #000 calc(50% + 700px));
+}
+
 /* ─── Landing ─────────────────────────────────────────────────────────────── */
 #landing {
   position: fixed;
@@ -2568,7 +2581,9 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   right: 0;
   overflow: auto;
   animation: viewIn 0.2s ease forwards;
-  background: var(--bg);
+  /* transparent so the engraving backdrop frames the pages (the pages
+     themselves are opaque rendered paper) */
+  background: transparent;
 }
 
 #reading-inner {
