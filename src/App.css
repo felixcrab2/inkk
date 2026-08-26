@@ -106,9 +106,12 @@ body {
   align-items: center;
   justify-content: center;
   cursor: default;
-  transition: opacity 0.6s ease;
+  transition: opacity 0.6s ease, background-color 0.9s ease;
 }
 #landing.fading { opacity: 0; pointer-events: none; }
+/* Handoff: the overlay clears so the editor appears around the headline as
+   it glides up onto the title line. */
+#landing.handoff { background-color: transparent; }
 
 /* The landing gets its own copy of the backdrop (the overlay is opaque),
    a touch stronger than the in-app one so the first impression registers.
@@ -143,7 +146,14 @@ body {
   color: var(--text);
   letter-spacing: -0.01em;
   line-height: 1.2;
+  /* the glide up onto the title line (transform set inline once measured) */
+  transition: transform 1s cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: transform;
 }
+
+/* While the headline occupies the title line, the real title's placeholder
+   underneath stays out of sight; it returns when the overlay unmounts. */
+body.landing-handoff #title-input:empty::before { color: transparent; }
 
 #landing-cursor {
   display: inline-block;
