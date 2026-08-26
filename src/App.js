@@ -1186,6 +1186,39 @@ function Toasts({ toasts }) {
 
 // ─── LandingScreen ────────────────────────────────────────────────────────────
 
+// ─── Engraving backdrop ───────────────────────────────────────────────────────
+// One faded public-domain plate per view, framed differently for variation.
+// All render at cover size; only the focal point moves between views.
+const BACKDROP_ART = {
+  editor:      { img: "jerome",      pos: "70% 25%" },   // Dürer, St Jerome writing at his desk
+  feed:        { img: "cosmos",      pos: "center 18%" },// Merian, Basilica Philosophica sunrise
+  reading:     { img: "melencolia",  pos: "center 22%" },// Dürer, Melencolia I
+  search:      { img: "rhinoceros",  pos: "center 42%" },// Dürer, Rhinoceros
+  userProfile: { img: "rhinoceros",  pos: "82% center" },
+  profile:     { img: "melencolia",  pos: "28% 32%" },
+  verify:      { img: "destillatio", pos: "center 32%" },// van der Straet, the distillation workshop
+};
+
+function Backdrop({ view, hidden }) {
+  const art = BACKDROP_ART[view];
+  // Keep the last plate while fading out on views without one, so the image
+  // never swaps mid-fade.
+  const lastRef = useRef(art);
+  if (art) lastRef.current = art;
+  const a = art || lastRef.current;
+  if (!a) return null;
+  return (
+    <div
+      id="backdrop"
+      className={art && !hidden ? "bd-on" : ""}
+      style={{
+        backgroundImage: `url(/backdrops/${a.img}.webp)`,
+        backgroundPosition: a.pos,
+      }}
+    />
+  );
+}
+
 function LandingScreen({ onDone }) {
   const FULL1 = "Write Human.";
   const [display, setDisplay] = useState("");
@@ -1216,6 +1249,7 @@ function LandingScreen({ onDone }) {
 
   return (
     <div id="landing" className={fading ? "fading" : ""} onClick={skip}>
+      <div id="landing-backdrop" style={{ backgroundImage: "url(/backdrops/flammarion.webp)" }} />
       <div id="landing-inner">
         <div id="landing-headline">{display}<span id="landing-cursor" /></div>
         <p id="landing-subtitle" style={{ opacity: showSubtitle ? 1 : 0 }}>
@@ -4608,6 +4642,9 @@ export default function App() {
 
   return (
     <>
+      {/* ── engraving backdrop (fades with the chrome while typing) ── */}
+      <Backdrop view={view} hidden={showLanding || (isEditor && !menuVisible)} />
+
       {/* ── landing overlay ── */}
       {showLanding && <LandingScreen onDone={() => setShowLanding(false)} />}
 
