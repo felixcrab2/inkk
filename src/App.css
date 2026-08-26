@@ -51,8 +51,9 @@ body {
 
 /* ─── Engraving backdrop ──────────────────────────────────────────────────────
    Faded public-domain plates (Dürer, Flammarion, Merian…) ghosted into the
-   paper. multiply drops the plate's paper whites into --bg so only the ink
-   lines remain; the low opacity turns them into a pressed-in watermark.
+   paper. The files are alpha-keyed at export: the scan's paper is fully
+   transparent and only the ink lines carry alpha, so the page never picks up
+   a grey veil — opacity here scales the lines alone.
    Sits at z-index -1: above the <html> page colour, below all content.
    In the editor it fades with the chrome while typing (same idle rhythm). */
 #backdrop {
@@ -62,12 +63,10 @@ body {
   pointer-events: none;
   background-repeat: no-repeat;
   background-size: cover;
-  mix-blend-mode: multiply;
-  filter: grayscale(1) contrast(1.05);
   opacity: 0;
   transition: opacity 1.6s ease;
 }
-#backdrop.bd-on { opacity: var(--backdrop-alpha, 0.055); }
+#backdrop.bd-on { opacity: var(--backdrop-alpha, 0.07); }
 
 /* ─── Landing ─────────────────────────────────────────────────────────────── */
 #landing {
@@ -93,9 +92,7 @@ body {
   background-position: center 30%;
   background-size: cover;
   background-repeat: no-repeat;
-  mix-blend-mode: multiply;
-  filter: grayscale(1) contrast(1.05);
-  opacity: 0.075;
+  opacity: 0.095;
   pointer-events: none;
 }
 
