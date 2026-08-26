@@ -1192,14 +1192,22 @@ function Toasts({ toasts }) {
 // reappears or the view changes, so the site never shows the same wall twice
 // in a row.
 const BACKDROP_PLATES = [
-  { img: "jerome",      pos: "70% 25%" },    // Dürer, St Jerome writing at his desk
-  { img: "flammarion",  pos: "center 30%" }, // the Flammarion engraving
-  { img: "flammarion",  pos: "24% 22%" },
-  { img: "melencolia",  pos: "center 22%" }, // Dürer, Melencolia I
-  { img: "cosmos",      pos: "center 18%" }, // Merian, Basilica Philosophica
-  { img: "rhinoceros",  pos: "center 42%" }, // Dürer, Rhinoceros
-  { img: "rhinoceros",  pos: "82% center" },
-  { img: "destillatio", pos: "center 32%" }, // van der Straet, the distillation workshop
+  // Dürer (Christie's photographs of the plates)
+  { img: "jerome",        pos: "center 28%" }, // St Jerome writing in his study
+  { img: "jerome",        pos: "center 68%" }, // …the lion at his feet
+  { img: "melencolia",    pos: "center 24%" }, // Melencolia I
+  { img: "four-horsemen", pos: "center 35%" }, // The Four Horsemen of the Apocalypse
+  { img: "four-horsemen", pos: "28% center" },
+  { img: "prodigal-son",  pos: "center 42%" }, // The Prodigal Son
+  { img: "st-eustace",    pos: "center 45%" }, // Saint Eustace, the knight and his horse
+  { img: "whore-babylon", pos: "center 38%" }, // The Whore of Babylon
+  { img: "rhinoceros",    pos: "center 45%" }, // The Rhinoceros
+  { img: "rhinoceros",    pos: "80% center" },
+  // the wider esoteric set
+  { img: "flammarion",    pos: "center 30%" }, // the Flammarion engraving
+  { img: "flammarion",    pos: "24% 22%" },
+  { img: "cosmos",        pos: "center 18%" }, // Merian, Basilica Philosophica
+  { img: "destillatio",   pos: "center 32%" }, // van der Straet, the distillation workshop
 ];
 
 function Backdrop({ view, hidden }) {
