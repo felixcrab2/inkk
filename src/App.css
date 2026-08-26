@@ -51,8 +51,9 @@ body {
 
 /* ─── Engraving backdrop ──────────────────────────────────────────────────────
    Faded public-domain plates (Dürer, Flammarion, Merian…) ghosted into the
-   paper. multiply drops the plate's paper whites into --bg so only the ink
-   lines remain; the low opacity turns them into a pressed-in watermark.
+   paper. The files are alpha-keyed at export: the scan's paper is fully
+   transparent and only the ink lines carry alpha, so the page never picks up
+   a grey veil — opacity here scales the lines alone.
    Sits at z-index -1: above the <html> page colour, below all content.
    In the editor it fades with the chrome while typing (same idle rhythm). */
 #backdrop {
@@ -62,12 +63,23 @@ body {
   pointer-events: none;
   background-repeat: no-repeat;
   background-size: cover;
-  mix-blend-mode: multiply;
-  filter: grayscale(1) contrast(1.05);
+  /* slight zoom so plate edges / paper margins never reach the viewport */
+  transform: scale(1.1);
+  /* The plate lives on the flanks, everywhere: fully cleared behind the
+     central content column (every view's column fits within 780px — feed
+     600, reading pages 700, editor 560, profiles/verify narrower), ramping
+     to full strength by ±700px. The centre of every page stays clean
+     paper; only the perimeter carries the artwork. */
+  -webkit-mask-image: linear-gradient(to right,
+      #000 calc(50% - 700px), transparent calc(50% - 390px),
+      transparent calc(50% + 390px), #000 calc(50% + 700px));
+  mask-image: linear-gradient(to right,
+      #000 calc(50% - 700px), transparent calc(50% - 390px),
+      transparent calc(50% + 390px), #000 calc(50% + 700px));
   opacity: 0;
   transition: opacity 1.6s ease;
 }
-#backdrop.bd-on { opacity: var(--backdrop-alpha, 0.055); }
+#backdrop.bd-on { opacity: var(--backdrop-alpha, 0.16); }
 
 /* ─── Landing ─────────────────────────────────────────────────────────────── */
 #landing {
@@ -93,9 +105,8 @@ body {
   background-position: center 30%;
   background-size: cover;
   background-repeat: no-repeat;
-  mix-blend-mode: multiply;
-  filter: grayscale(1) contrast(1.05);
-  opacity: 0.075;
+  transform: scale(1.1);
+  opacity: 0.12;
   pointer-events: none;
 }
 
@@ -2555,7 +2566,9 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   right: 0;
   overflow: auto;
   animation: viewIn 0.2s ease forwards;
-  background: var(--bg);
+  /* transparent so the engraving backdrop frames the pages (the pages
+     themselves are opaque rendered paper) */
+  background: transparent;
 }
 
 #reading-inner {
