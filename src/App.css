@@ -63,10 +63,25 @@ body {
   pointer-events: none;
   background-repeat: no-repeat;
   background-size: cover;
+  /* slight zoom so plate edges / paper margins never reach the viewport */
+  transform: scale(1.1);
   opacity: 0;
   transition: opacity 1.6s ease;
 }
-#backdrop.bd-on { opacity: var(--backdrop-alpha, 0.12); }
+#backdrop.bd-on { opacity: var(--backdrop-alpha, 0.09); }
+
+/* Feed: the plate holds the perimeter and clears out entirely behind the
+   600px feed column, so the ink never sits under the text. Slightly
+   stronger than elsewhere since only the flanks carry it. */
+#backdrop.bd-feed.bd-on { opacity: var(--backdrop-feed-alpha, 0.16); }
+#backdrop.bd-feed {
+  -webkit-mask-image: linear-gradient(to right,
+      #000 calc(50% - 640px), transparent calc(50% - 340px),
+      transparent calc(50% + 340px), #000 calc(50% + 640px));
+  mask-image: linear-gradient(to right,
+      #000 calc(50% - 640px), transparent calc(50% - 340px),
+      transparent calc(50% + 340px), #000 calc(50% + 640px));
+}
 
 /* ─── Landing ─────────────────────────────────────────────────────────────── */
 #landing {
@@ -92,7 +107,8 @@ body {
   background-position: center 30%;
   background-size: cover;
   background-repeat: no-repeat;
-  opacity: 0.15;
+  transform: scale(1.1);
+  opacity: 0.12;
   pointer-events: none;
 }
 

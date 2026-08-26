@@ -1230,7 +1230,7 @@ function Backdrop({ view, hidden }) {
   return (
     <div
       id="backdrop"
-      className={hidden ? "" : "bd-on"}
+      className={(hidden ? "" : "bd-on") + (view === "feed" ? " bd-feed" : "")}
       style={{
         backgroundImage: `url(/backdrops/${a.img}.webp)`,
         backgroundPosition: a.pos,
