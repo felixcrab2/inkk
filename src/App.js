@@ -1203,7 +1203,7 @@ const BACKDROP_PLATES = [
   { img: "whore-babylon", pos: "center 38%" }, // The Whore of Babylon
   { img: "rhinoceros",    pos: "center 45%" }, // The Rhinoceros
   { img: "rhinoceros",    pos: "80% center" },
-  // the Flammarion engraving (high-res scan; also the landing plate)
+  // the Flammarion engraving (high-res scan)
   { img: "flammarion",    pos: "center 30%" },
   { img: "flammarion",    pos: "24% 22%" },
   // cosmos (Merian) and destillatio (van der Straet) are cut: their source
@@ -1299,7 +1299,7 @@ function LandingScreen({ onDone }) {
 
   return (
     <div id="landing" className={fading ? "fading" : ""} onClick={skip}>
-      <div id="landing-backdrop" style={{ backgroundImage: "url(/backdrops/flammarion.webp)" }} />
+      <div id="landing-backdrop" style={{ backgroundImage: "url(/backdrops/jerome.webp)" }} />
       <div id="landing-inner">
         <div id="landing-headline">{display}<span id="landing-cursor" /></div>
       </div>
