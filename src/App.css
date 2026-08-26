@@ -77,9 +77,12 @@ body {
       #000 calc(50% - 700px), transparent calc(50% - 390px),
       transparent calc(50% + 390px), #000 calc(50% + 700px));
   opacity: 0;
-  transition: opacity 1.6s ease;
+  transition: opacity 2.4s ease;
 }
 #backdrop.bd-on { opacity: var(--backdrop-alpha, 0.16); }
+/* Quick exhale while a view change swaps the plate (fade-in stays slow).
+   Duration must match BACKDROP_VEIL_MS in App.js. */
+#backdrop.bd-veil { transition-duration: 0.9s; }
 
 /* ─── Landing ─────────────────────────────────────────────────────────────── */
 #landing {
