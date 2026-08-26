@@ -473,7 +473,7 @@ function paginate(items, firstPageHeight, otherPageHeight, fullWidth) {
 
 // ── page rendering ────────────────────────────────────────────────────────
 
-async function renderOnePage({ texture, drawInk, cw, ch, paperTexture }) {
+async function renderOnePage({ texture, drawInk, cw, ch, paperTexture, plate, plateAlpha = 0.07 }) {
   const canvas = document.createElement("canvas");
   canvas.width  = cw;
   canvas.height = ch;
@@ -500,6 +500,21 @@ async function renderOnePage({ texture, drawInk, cw, ch, paperTexture }) {
   } else {
     ctx.fillStyle = "#f3f2ef";
     ctx.fillRect(0, 0, cw, ch);
+  }
+
+  // 1.5 Engraving plate, ghosted into the paper before any ink. The plate
+  //     files are pure black on transparency, so this lays faint linework
+  //     into the page; the later grain + soft-light passes bake it into the
+  //     paper so it reads as printed, not overlaid. Cover-fit with a slight
+  //     zoom so plate edges never show; biased toward the upper half where
+  //     the compositions live.
+  if (plate) {
+    const scale = Math.max(cw / plate.width, ch / plate.height) * 1.1;
+    const w = plate.width * scale, h = plate.height * scale;
+    ctx.save();
+    ctx.globalAlpha = plateAlpha;
+    ctx.drawImage(plate, (cw - w) / 2, (ch - h) * 0.35, w, h);
+    ctx.restore();
   }
 
   // 2. All ink (text + images) drawn under multiply blend, slightly
@@ -556,9 +571,12 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
     justify          = false,
     paragraphIndent  = false,
     paperTexture     = true,
+    backdropPlate    = null,   // url of an alpha-keyed engraving for the page background
+    backdropAlpha    = 0.07,
   } = options;
 
   const texture = paperTexture ? await loadTexture() : null;
+  const plate   = backdropPlate ? await loadImg(backdropPlate) : null;
   const cw = pageW * PX;
   const ch = pageH * PX;
   // Proportional margins so non-default aspects still look book-like.
@@ -647,6 +665,7 @@ export async function renderBookPdfPages({ title, byline, html, onPage, options 
     const canvas = await renderOnePage({
       texture,
       cw, ch, paperTexture,
+      plate, plateAlpha: backdropAlpha,
       drawInk(ctx) {
         ctx.textBaseline = "alphabetic";
         let y = bodyTop;

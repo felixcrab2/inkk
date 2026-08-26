@@ -1210,6 +1210,15 @@ const BACKDROP_PLATES = [
   { img: "destillatio",   pos: "center 32%" }, // van der Straet, the distillation workshop
 ];
 
+// A published piece keeps one plate for life: hash its id into the pool, so
+// the reading pages always open on the same engraving.
+const BACKDROP_IMGS = [...new Set(BACKDROP_PLATES.map(p => p.img))];
+function plateForPub(id) {
+  let h = 0;
+  for (const c of String(id || "")) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return `/backdrops/${BACKDROP_IMGS[h % BACKDROP_IMGS.length]}.webp`;
+}
+
 function Backdrop({ view, hidden }) {
   const [idx, setIdx] = useState(() => Math.floor(Math.random() * BACKDROP_PLATES.length));
   const prevRef = useRef({ view, hidden: true });
@@ -2820,7 +2829,7 @@ function ReadingView({ pub, user, isAdmin, dropCapImages, focus, onRequestAuth, 
       title: pub.title || "",
       byline: pub.author_name || "",
       html: pub.content || "",
-      options: { justify: !!pub.render_justify, paragraphIndent: !!pub.render_indent, paperTexture: true },
+      options: { justify: !!pub.render_justify, paragraphIndent: !!pub.render_indent, paperTexture: true, backdropPlate: plateForPub(pub.id) },
       async onPage(canvas) {
         const url = canvas.toDataURL("image/jpeg", 0.95);
         setPages(prev => [...prev, url]);
