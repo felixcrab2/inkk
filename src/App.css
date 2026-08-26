@@ -123,9 +123,12 @@ body {
   background-size: cover;
   background-repeat: no-repeat;
   transform: scale(1.1);
-  opacity: 0.12;
+  /* held clear until the plate has decoded (.on from LandingScreen) */
+  opacity: 0;
+  transition: opacity 1.8s ease;
   pointer-events: none;
 }
+#landing-backdrop.on { opacity: 0.12; }
 
 #landing-inner {
   position: relative;
@@ -2687,7 +2690,9 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   left: 0;
   right: 0;
   overflow-y: auto;
-  background: var(--bg);
+  /* transparent so the engraving backdrop frames the previewed pages,
+     exactly as it frames a piece opened from the feed */
+  background: transparent;
   z-index: 10;
   animation: viewIn 0.2s ease forwards;
   padding: 20px 16px 40px;

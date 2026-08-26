@@ -1225,46 +1225,61 @@ const BACKDROP_VEIL_MS = 700;
 
 function Backdrop({ view, hidden, override, ringed }) {
   const [shown, setShown]   = useState(() => BACKDROP_PLATES[Math.floor(Math.random() * BACKDROP_PLATES.length)]);
+  const [ready, setReady]   = useState(false);  // first plate decoded — nothing shows before this
   const [veiled, setVeiled] = useState(false);
   const prevRef  = useRef({ view, hidden: true });
+  const shownRef = useRef(shown);
+  const genRef   = useRef(0);
   const timerRef = useRef(null);
   const oimg = override ? override.img : null;
+  shownRef.current = shown;
 
   useEffect(() => {
     const prev = prevRef.current;
     const appearing = !hidden && prev.hidden;
     const switched  = !hidden && !prev.hidden && view !== prev.view;
     prevRef.current = { view, hidden };
+    if (!appearing && !switched) return;
 
-    const applyNext = () => setShown(cur => {
-      if (oimg) return { img: oimg, pos: "center 30%" };
-      let p = BACKDROP_PLATES[Math.floor(Math.random() * BACKDROP_PLATES.length)];
-      if (p === cur) p = BACKDROP_PLATES[(BACKDROP_PLATES.indexOf(p) + 1) % BACKDROP_PLATES.length];
-      return p;
-    });
-
-    if (appearing) {
-      // Invisible right now: swap silently, then the CSS fade brings it in.
-      clearTimeout(timerRef.current);
-      setVeiled(false);
-      applyNext();
-    } else if (switched) {
-      // Visible during a view change: never swap in place (it reads as a
-      // flash). Exhale quickly, swap while clear, inhale slowly.
-      setVeiled(true);
-      clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
-        applyNext();
-        setVeiled(false);
-      }, BACKDROP_VEIL_MS);
+    // Pick the next plate: the override wins; otherwise random, no repeat.
+    let next;
+    if (oimg) {
+      next = { img: oimg, pos: "center 30%" };
+    } else {
+      next = BACKDROP_PLATES[Math.floor(Math.random() * BACKDROP_PLATES.length)];
+      if (next === shownRef.current) next = BACKDROP_PLATES[(BACKDROP_PLATES.indexOf(next) + 1) % BACKDROP_PLATES.length];
     }
+
+    // Never point the layer at an image that isn't ready: a plate whose data
+    // arrives mid-transition pops in at the layer's current opacity instead
+    // of fading from clear. Preload and decode first — the swap waits for
+    // BOTH the pixels and (on view changes) the exhale, so a slow network
+    // just means the wall stays clear a moment longer, never a pop.
+    const gen = ++genRef.current;
+    const img = new Image();
+    img.src = `/backdrops/${next.img}.webp`;
+    const decoded = (img.decode ? img.decode() : Promise.resolve()).catch(() => {});
+    let waited = Promise.resolve();
+    if (switched) {
+      setVeiled(true);
+      waited = new Promise(res => {
+        clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(res, BACKDROP_VEIL_MS);
+      });
+    }
+    Promise.all([decoded, waited]).then(() => {
+      if (genRef.current !== gen) return;   // a newer change took over
+      setShown(next);
+      setVeiled(false);
+      setReady(true);
+    });
   }, [view, hidden, oimg]);
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
   return (
     <div
       id="backdrop"
-      className={(hidden || veiled ? "" : "bd-on") + (veiled ? " bd-veil" : "") + (ringed ? " bd-ring" : "")}
+      className={(hidden || veiled || !ready ? "" : "bd-on") + (veiled ? " bd-veil" : "") + (ringed ? " bd-ring" : "")}
       style={{
         backgroundImage: `url(/backdrops/${shown.img}.webp)`,
         backgroundPosition: shown.pos,
@@ -1278,6 +1293,19 @@ function LandingScreen({ onDone }) {
   const [display, setDisplay] = useState("");
   const [phase, setPhase] = useState(0);
   const [fading, setFading] = useState(false);
+  const [bgReady, setBgReady] = useState(false);
+
+  // Same rule as the main backdrop: the plate only fades in once its pixels
+  // are decoded, so a slow first load can never pop.
+  useEffect(() => {
+    let live = true;
+    const img = new Image();
+    img.src = "/backdrops/jerome.webp";
+    (img.decode ? img.decode() : Promise.resolve())
+      .catch(() => {})
+      .then(() => { if (live) setBgReady(true); });
+    return () => { live = false; };
+  }, []);
 
   const skip = useCallback(() => {
     localStorage.setItem("inkk_visited", "1");
@@ -1299,7 +1327,7 @@ function LandingScreen({ onDone }) {
 
   return (
     <div id="landing" className={fading ? "fading" : ""} onClick={skip}>
-      <div id="landing-backdrop" style={{ backgroundImage: "url(/backdrops/jerome.webp)" }} />
+      <div id="landing-backdrop" className={bgReady ? "on" : ""} style={{ backgroundImage: "url(/backdrops/jerome.webp)" }} />
       <div id="landing-inner">
         <div id="landing-headline">{display}<span id="landing-cursor" /></div>
       </div>
@@ -4692,13 +4720,19 @@ export default function App() {
     <>
       {/* ── engraving backdrop ──
           In the editor the plate belongs to the blank page: it fades while the
-          title is being typed and leaves for good once the piece has words.
-          A fresh blank document brings a fresh plate. When reading, the frame
-          around the pages always shows the piece's own plate. */}
+          title is being typed and leaves for good once the piece has words —
+          except in preview, where the draft's own plate returns to frame the
+          rendered pages (as reading frames a published piece) and fades away
+          when the preview closes. A fresh blank document brings a fresh
+          plate. When reading, the frame is always the piece's own plate. */}
       <Backdrop
         view={view}
-        hidden={showLanding || (isEditor && (hasContent || !menuVisible))}
-        override={view === "reading" && readingPub ? { img: imgForPub(readingPub.id), pos: "center 30%" } : null}
+        hidden={showLanding || (isEditor && !previewMode && (hasContent || !menuVisible))}
+        override={
+          view === "reading" && readingPub ? { img: imgForPub(readingPub.id), pos: "center 30%" }
+          : isEditor && previewMode        ? { img: imgForPub(activeId), pos: "center 30%" }
+          : null
+        }
         ringed={view === "verify" && verifyStatus !== "found"}
       />
 
