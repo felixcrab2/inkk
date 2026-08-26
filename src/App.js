@@ -1203,11 +1203,11 @@ const BACKDROP_PLATES = [
   { img: "whore-babylon", pos: "center 38%" }, // The Whore of Babylon
   { img: "rhinoceros",    pos: "center 45%" }, // The Rhinoceros
   { img: "rhinoceros",    pos: "80% center" },
-  // the wider esoteric set
-  { img: "flammarion",    pos: "center 30%" }, // the Flammarion engraving
+  // the Flammarion engraving (high-res scan; also the landing plate)
+  { img: "flammarion",    pos: "center 30%" },
   { img: "flammarion",    pos: "24% 22%" },
-  { img: "cosmos",        pos: "center 18%" }, // Merian, Basilica Philosophica
-  { img: "destillatio",   pos: "center 32%" }, // van der Straet, the distillation workshop
+  // cosmos (Merian) and destillatio (van der Straet) are cut: their source
+  // scans are softer than the Christie's photographs and read muddy keyed.
 ];
 
 // A published piece keeps one plate for life: hash its id into the pool, so
@@ -1277,7 +1277,6 @@ function LandingScreen({ onDone }) {
   const FULL1 = "Write Human.";
   const [display, setDisplay] = useState("");
   const [phase, setPhase] = useState(0);
-  const [showSubtitle, setShowSubtitle] = useState(false);
   const [fading, setFading] = useState(false);
 
   const skip = useCallback(() => {
@@ -1290,11 +1289,8 @@ function LandingScreen({ onDone }) {
     if (phase === 0) {
       if (display.length < FULL1.length) {
         t = setTimeout(() => setDisplay(FULL1.slice(0, display.length + 1)), 80);
-      } else { t = setTimeout(() => setPhase(1), 800); }
+      } else { t = setTimeout(() => setPhase(1), 1200); }
     } else if (phase === 1) {
-      setShowSubtitle(true);
-      t = setTimeout(() => setPhase(2), 3200);
-    } else if (phase === 2) {
       setFading(true);
       t = setTimeout(() => { localStorage.setItem("inkk_visited", "1"); onDone(); }, 600);
     }
@@ -1306,9 +1302,6 @@ function LandingScreen({ onDone }) {
       <div id="landing-backdrop" style={{ backgroundImage: "url(/backdrops/flammarion.webp)" }} />
       <div id="landing-inner">
         <div id="landing-headline">{display}<span id="landing-cursor" /></div>
-        <p id="landing-subtitle" style={{ opacity: showSubtitle ? 1 : 0 }}>
-          Inkk studies how a piece is really written: the drafts, the pauses, the second thoughts that make writing human.
-        </p>
       </div>
     </div>
   );

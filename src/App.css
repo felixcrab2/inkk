@@ -138,16 +138,6 @@ body {
   animation: blink 1s steps(2, start) infinite;
 }
 
-#landing-subtitle {
-  font-family: "EB Garamond", Georgia, serif;
-  font-style: normal;
-  font-size: 1.05rem;
-  color: var(--text);
-  line-height: 1.65;
-  margin: 26px 0 0;
-  transition: opacity 0.9s ease;
-}
-
 /* ─── Top bar ─────────────────────────────────────────────────────────────── */
 #top-bar {
   position: fixed;
