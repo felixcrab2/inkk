@@ -66,20 +66,27 @@ Flow: sign in → *Start a writing session* → type in any app → *Finish & ce
 npm test          # node --test capture.test.js
 ```
 
-## Ship a signed DMG (later — needs the Apple Developer Program, $99/yr)
+## Ship a signed DMG
+
+Requires the **Apple Developer Program** ($99/yr) — a stable Developer ID is
+what makes the macOS permission grants *persist* (ad-hoc rebuilds get a new
+signature each time, so macOS resets Accessibility/Input Monitoring on every
+build) and removes the Gatekeeper "malware" warnings.
 
 ```bash
-export CSC_LINK=...            # Developer ID Application cert (.p12)
-export CSC_KEY_PASSWORD=...
-export APPLE_ID=... APPLE_APP_SPECIFIC_PASSWORD=... APPLE_TEAM_ID=...
-npm run dist                  # → dist/inkk-0.1.0.dmg, signed + notarized
+# once, after Apple issues the certificate:
+#   developer.apple.com → Certificates → + → Developer ID Application
+#   upload ~/.inkk-signing/devid.csr, download the .cer, then:
+npm run install-cert                      # pairs the .cer with the local key
+
+cp .env.signing.example .env.signing      # Team ID, Apple ID, app-specific pw
+npm run release                           # → dist/inkk-0.1.0.dmg, signed + notarized
 ```
 
-`build/entitlements.mac.plist` already carries what the hardened runtime and the
-native module need. There is **no App Store review** — notarization is Apple's
-automated malware scan (minutes). The App Store is not an option anyway: its
-sandbox forbids the global input monitoring this depends on (same reason
-Grammarly Desktop ships outside the store).
+There is **no App Store review** — notarization is Apple's automated malware
+scan (minutes). The App Store is not an option anyway: its sandbox forbids the
+global input monitoring this depends on (same reason Grammarly Desktop ships
+outside the store).
 
 ## Status
 

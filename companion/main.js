@@ -12,7 +12,7 @@
 
 "use strict";
 
-const { app, Tray, BrowserWindow, ipcMain, clipboard, nativeImage, screen, Notification } = require("electron");
+const { app, Tray, BrowserWindow, ipcMain, clipboard, nativeImage, screen, Notification, systemPreferences } = require("electron");
 const path = require("node:path");
 const { execFile } = require("node:child_process");
 const { randomUUID } = require("node:crypto");
@@ -22,12 +22,6 @@ const { createCapture } = require("./capture");
 let uIOhook = null, UiohookKey = null;
 try { ({ uIOhook, UiohookKey } = require("uiohook-napi")); }
 catch (e) { console.warn("[companion] uiohook-napi unavailable:", e.message); }
-
-// Temporary file log so we can diagnose detection/permissions regardless of how
-// the app was launched (console isn't visible when launched via `open`).
-const fs = require("node:fs");
-const DBG = "/tmp/inkk-detect.log";
-function dbg(...a) { try { fs.appendFileSync(DBG, a.join(" ") + "\n"); } catch {} }
 
 let tray = null;
 let win = null;
@@ -116,7 +110,6 @@ function pollContext() {
   detectContext((ctx) => {
     frontApp = ctx.label;
     frontWriting = ctx.writing;
-    dbg(new Date().toISOString(), "front=", JSON.stringify(ctx), "user=", !!currentUser, "cap=", !!cap);
     if (ctx.writing && currentUser && !cap) autoArm(ctx.label);
     win?.webContents.send("companion:state", stateSnapshot());
   });
@@ -203,7 +196,11 @@ function toggleWindow() {
   let x = Math.round(tb.x + tb.width / 2 - wb.width / 2);
   x = Math.min(Math.max(x, dsp.x + 8), dsp.x + dsp.width - wb.width - 8);
   win.setPosition(x, Math.round(tb.y + tb.height + 4), false);
-  win.show();
+  // Show, then explicitly claim focus for THIS app. Without the steal an
+  // accessory app's popover can leave macOS to activate whichever app was
+  // previously frontmost, yanking the user into an unrelated window.
+  win.showInactive();
+  app.focus({ steal: true });
   win.focus();
 }
 
@@ -237,7 +234,7 @@ app.whenReady().then(() => {
 
   // The renderer tells us who's signed in (restored on launch), which is what
   // enables auto-arm without a manual start.
-  ipcMain.handle("companion:auth", (_e, userId) => { currentUser = userId || null; dbg(new Date().toISOString(), "auth userId=", userId || "(none)"); if (!currentUser) endSession(); return true; });
+  ipcMain.handle("companion:auth", (_e, userId) => { currentUser = userId || null; if (!currentUser) endSession(); return true; });
   ipcMain.handle("companion:end", () => { endSession(); return true; });
   ipcMain.handle("companion:state", () => stateSnapshot());
   ipcMain.handle("companion:version", () => app.getVersion());

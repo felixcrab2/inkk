@@ -2,14 +2,16 @@
   "name": "inkk-companion",
   "version": "0.1.0",
   "private": true,
-  "description": "inkk desktop companion — records writing rhythm system-wide and issues a verification code.",
+  "description": "inkk desktop companion \u2014 records writing rhythm system-wide and issues a verification code.",
   "main": "main.js",
   "scripts": {
     "build:renderer": "node build-renderer.js",
     "start": "npm run build:renderer && electron .",
     "dev": "npm run build:renderer && electron . --inspect",
     "test": "node --test capture.test.js",
-    "dist": "npm run build:renderer && electron-builder --mac dmg"
+    "dist": "npm run build:renderer && electron-builder --mac dmg",
+    "release": "./scripts/release.sh",
+    "install-cert": "./scripts/install-cert.sh"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
@@ -45,7 +47,8 @@
       "extendInfo": {
         "LSUIElement": true,
         "NSAppleEventsUsageDescription": "inkk checks which app is in front so it can show where you're writing."
-      }
+      },
+      "notarize": true
     },
     "dmg": {
       "title": "inkk"
