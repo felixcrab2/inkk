@@ -42,12 +42,16 @@ around a thin signal, so this needs no change to the algorithm.
 ```bash
 cd companion
 npm install
-# point it at the same Supabase project as the website:
-export REACT_APP_SUPABASE_URL=...            # your project URL
-export REACT_APP_SUPABASE_ANON_KEY=...       # anon key
-export INKK_API_BASE=https://inkk.site       # where /api/certify lives (default)
+cp .env.local.example .env.local     # then edit .env.local with your values
 npm start
 ```
+
+`.env.local` (gitignored) holds the config, set once:
+
+- `REACT_APP_SUPABASE_URL` — Supabase ▸ Settings ▸ API ▸ Project URL
+- `REACT_APP_SUPABASE_ANON_KEY` — the **publishable** (`sb_publishable_…`) key.
+  NOT the secret key — this is a client app.
+- `INKK_API_BASE` — defaults to `https://inkk.site` (where `/api/certify` lives).
 
 macOS will prompt for **Accessibility** and **Input Monitoring** the first time
 a session starts (System Settings ▸ Privacy & Security). Grant both to the dev

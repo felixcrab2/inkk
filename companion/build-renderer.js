@@ -6,7 +6,24 @@
 
 "use strict";
 const esbuild = require("esbuild");
+const fs = require("node:fs");
 const path = require("node:path");
+
+// Load companion/.env.local (gitignored) into process.env so keys are set once
+// in a file, not re-pasted into the shell each run. Simple KEY=VALUE parser.
+(() => {
+  const p = path.join(__dirname, ".env.local");
+  if (!fs.existsSync(p)) return;
+  for (const line of fs.readFileSync(p, "utf8").split("\n")) {
+    const s = line.trim();
+    if (!s || s.startsWith("#")) continue;
+    const i = s.indexOf("=");
+    if (i === -1) continue;
+    const k = s.slice(0, i).trim();
+    let v = s.slice(i + 1).trim().replace(/^["']|["']$/g, "");
+    if (!(k in process.env)) process.env[k] = v;
+  }
+})();
 
 const define = {
   __SUPA_URL__: JSON.stringify(process.env.REACT_APP_SUPABASE_URL || process.env.SUPABASE_URL || ""),
