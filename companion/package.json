@@ -25,6 +25,7 @@
     "productName": "inkk",
     "files": [
       "main.js",
+      "capture.js",
       "preload.js",
       "renderer/index.html",
       "renderer/styles.css",

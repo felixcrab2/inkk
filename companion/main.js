@@ -23,6 +23,12 @@ let uIOhook = null, UiohookKey = null;
 try { ({ uIOhook, UiohookKey } = require("uiohook-napi")); }
 catch (e) { console.warn("[companion] uiohook-napi unavailable:", e.message); }
 
+// Temporary file log so we can diagnose detection/permissions regardless of how
+// the app was launched (console isn't visible when launched via `open`).
+const fs = require("node:fs");
+const DBG = "/tmp/inkk-detect.log";
+function dbg(...a) { try { fs.appendFileSync(DBG, a.join(" ") + "\n"); } catch {} }
+
 let tray = null;
 let win = null;
 let cap = null;
@@ -110,6 +116,7 @@ function pollContext() {
   detectContext((ctx) => {
     frontApp = ctx.label;
     frontWriting = ctx.writing;
+    dbg(new Date().toISOString(), "front=", JSON.stringify(ctx), "user=", !!currentUser, "cap=", !!cap);
     if (ctx.writing && currentUser && !cap) autoArm(ctx.label);
     win?.webContents.send("companion:state", stateSnapshot());
   });
@@ -230,7 +237,7 @@ app.whenReady().then(() => {
 
   // The renderer tells us who's signed in (restored on launch), which is what
   // enables auto-arm without a manual start.
-  ipcMain.handle("companion:auth", (_e, userId) => { currentUser = userId || null; if (!currentUser) endSession(); return true; });
+  ipcMain.handle("companion:auth", (_e, userId) => { currentUser = userId || null; dbg(new Date().toISOString(), "auth userId=", userId || "(none)"); if (!currentUser) endSession(); return true; });
   ipcMain.handle("companion:end", () => { endSession(); return true; });
   ipcMain.handle("companion:state", () => stateSnapshot());
   ipcMain.handle("companion:version", () => app.getVersion());
