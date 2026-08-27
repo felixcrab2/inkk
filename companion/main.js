@@ -171,6 +171,8 @@ function createWindow() {
   win.on("blur", () => { if (!win.webContents.isDevToolsOpened()) win.hide(); });
 }
 
+process.on("uncaughtException", (e) => { console.error("[companion] uncaught:", e); });
+
 app.whenReady().then(() => {
   if (process.platform === "darwin") app.dock?.hide();  // menu-bar app, no dock icon
   createWindow();

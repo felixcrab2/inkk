@@ -16,7 +16,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FONT_DIR = "/Library/Fonts/MMP-Freefonts/EB_Garamond/static"
 FONT = os.path.join(FONT_DIR, "EBGaramond-SemiBold.ttf")   # matches the brand wordmark
 TEXT = "inkk."
-H1 = 18   # 1x target height (px); menu bar is ~22px tall
+H1 = 15   # 1x target height (px); menu bar is ~22px tall — kept a touch small
 
 def render(scale):
     # Render large, then crop to ink and downscale for crisp edges.
