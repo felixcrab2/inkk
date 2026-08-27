@@ -24,28 +24,33 @@
     <p id="signin-err" class="err-line"></p>
   </section>
 
-  <!-- idle -->
-  <section id="phase-idle" class="phase" style="display:none">
+  <!-- watching (signed in, auto-detecting) -->
+  <section id="phase-watching" class="phase" style="display:none">
     <p class="who-line">Signed in as <span id="who"></span></p>
-    <p class="lead">Write anywhere — Word, Notes, Substack. inkk records only the
-      rhythm of your typing, never the words.</p>
-    <input id="title" type="text" placeholder="What are you writing? (optional title)" />
-    <button id="arm-btn" class="primary">Start a writing session</button>
+    <p class="lead">Just write. inkk notices when you're in a writing app —
+      Notes, Word, Substack — and certifies it automatically. Only the rhythm of
+      your typing is recorded, never the words.</p>
+    <div class="watch">
+      <span class="watch-label">Front app</span>
+      <span id="watch-app">…</span>
+      <span id="watch-status" class="watch-status off"></span>
+    </div>
   </section>
 
-  <!-- recording -->
+  <!-- recording (auto-armed) -->
   <section id="phase-recording" class="phase" style="display:none">
-    <div class="rec"><span class="rec-dot"></span> Recording</div>
+    <div class="rec"><span class="rec-dot"></span> Certifying your writing</div>
     <p class="who-line">in <span id="recording-app">…</span></p>
     <p class="stat"><span id="keystrokes">0</span> keystrokes</p>
-    <p class="hint">Only timing is captured. Switch to your editor and write.</p>
-    <button id="stop-btn" class="primary">Finish &amp; certify</button>
+    <p class="hint">Keep writing. When you're done, finish to get your code.</p>
+    <button id="finish-btn" class="primary">Finish &amp; certify</button>
   </section>
 
   <!-- certify -->
   <section id="phase-certify" class="phase" style="display:none">
     <p class="lead">Paste your finished text. It's hashed on this device to bind
       the certificate to the words — the text is never uploaded.</p>
+    <input id="title" type="text" placeholder="Title (optional)" />
     <textarea id="final-text" rows="6" placeholder="Paste the finished piece…"></textarea>
     <button id="certify-btn" class="primary">Get my code</button>
     <p id="certify-err" class="err-line" style="display:none"></p>

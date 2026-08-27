@@ -12,7 +12,7 @@
 
 "use strict";
 
-const { app, Tray, BrowserWindow, ipcMain, clipboard, nativeImage, screen } = require("electron");
+const { app, Tray, BrowserWindow, ipcMain, clipboard, nativeImage, screen, Notification } = require("electron");
 const path = require("node:path");
 const { execFile } = require("node:child_process");
 const { randomUUID } = require("node:crypto");
@@ -28,7 +28,9 @@ let win = null;
 let cap = null;
 let hooked = false;
 let frontApp = "";
-let frontAppTimer = null;
+let frontWriting = false;      // is the front context a writing app/site?
+let currentUser = null;        // set by the renderer once signed in (enables auto-arm)
+let noticed = false;           // "certifying…" notice shown for the current session
 
 // ── uiohook keycode → DOM-style key name ─────────────────────────────────────
 // Built from UiohookKey so it tracks the library's numeric constants. The names
@@ -57,53 +59,92 @@ function modString(e) {
   return [e.shiftKey && "S", e.ctrlKey && "C", e.altKey && "A", e.metaKey && "M"].filter(Boolean).join("");
 }
 
-// ── front-most app (for the "recording in …" label; needs Accessibility) ─────
-function pollFrontApp() {
-  execFile("osascript", ["-e", 'tell application "System Events" to name of first application process whose frontmost is true'],
-    { timeout: 1500 }, (err, stdout) => {
-      if (!err) {
-        const name = (stdout || "").trim();
-        if (name && name !== frontApp) {
-          frontApp = name;
-          win?.webContents.send("companion:frontapp", frontApp);
-        }
-      }
-    });
+// ── writing-context detection ────────────────────────────────────────────────
+// Native writing apps by process name, plus browser tabs on known writing
+// sites. When the front context is "writing" AND the user is signed in, a
+// session auto-arms — no manual start, no naming the piece. Capture is gated to
+// writing contexts, so nothing typed elsewhere is ever recorded.
+const WRITING_APPS = new Set([
+  "Notes", "Microsoft Word", "Pages", "TextEdit", "Scrivener", "Ulysses",
+  "iA Writer", "Bear", "Obsidian", "Craft", "Notion",
+]);
+const BROWSERS = new Set(["Safari", "Google Chrome", "Arc", "Microsoft Edge", "Brave Browser"]);
+const WRITING_SITES = ["substack.com", "docs.google.com", "medium.com", "notion.so", "ghost.io", "wordpress.com"];
+// Never treat the companion or its dev launcher as a writing context.
+const IGNORE_APPS = new Set(["Electron", "Conductor", "inkk", "Terminal", "iTerm2"]);
+
+function osa(script, cb) {
+  execFile("osascript", ["-e", script], { timeout: 1400 }, (err, out) => cb(err ? "" : (out || "").trim()));
 }
 
-// ── session control ──────────────────────────────────────────────────────────
-function startSession(ctx) {
+function browserTabURL(browser, cb) {
+  const q = browser === "Safari"
+    ? 'tell application "Safari" to get URL of current tab of front window'
+    : `tell application "${browser}" to get URL of active tab of front window`;
+  osa(q, cb);
+}
+
+// Resolve the current front context → { app, writing, label }.
+function detectContext(cb) {
+  osa('tell application "System Events" to name of first application process whose frontmost is true', (name) => {
+    if (!name || IGNORE_APPS.has(name)) return cb({ app: name, writing: false, label: name || "…" });
+    if (WRITING_APPS.has(name)) return cb({ app: name, writing: true, label: name });
+    if (BROWSERS.has(name)) {
+      return browserTabURL(name, (url) => {
+        const site = WRITING_SITES.find(s => url.includes(s));
+        cb({ app: name, writing: !!site, label: site ? site.replace(/\.(com|org|io|so)$/, "") : name });
+      });
+    }
+    cb({ app: name, writing: false, label: name });
+  });
+}
+
+function stateSnapshot() {
+  return { signedIn: !!currentUser, armed: !!cap, writing: frontWriting, app: frontApp };
+}
+
+// Poll the front context ~every 1.5s. Auto-arms on entering a writing context;
+// the session persists across app switches (so tabbing away and back is one
+// piece) and capture simply pauses when the front app isn't a writing one.
+function pollContext() {
+  detectContext((ctx) => {
+    frontApp = ctx.label;
+    frontWriting = ctx.writing;
+    if (ctx.writing && currentUser && !cap) autoArm(ctx.label);
+    win?.webContents.send("companion:state", stateSnapshot());
+  });
+}
+
+function autoArm(label) {
   if (!uIOhook) { win?.webContents.send("companion:error", "Keyboard capture unavailable. Reinstall the app."); return; }
   cap = createCapture({
-    userId: ctx.userId,
-    docId: ctx.docId,
-    sessionId: randomUUID(),
-    genId: randomUUID,
-    now: Date.now,
-    hrnow: () => performance.now(),
+    userId: currentUser, docId: randomUUID(), sessionId: randomUUID(),
+    genId: randomUUID, now: Date.now, hrnow: () => performance.now(),
   });
-  pollFrontApp();
-  cap.start({ platform: process.platform, app: frontApp, companion: app.getVersion() });
+  cap.start({ platform: process.platform, app: label, companion: app.getVersion() });
   flush();
-
   if (!hooked) {
     uIOhook.on("keydown", onDown);
     uIOhook.on("keyup", onUp);
     uIOhook.start();
     hooked = true;
   }
-  frontAppTimer = setInterval(pollFrontApp, 2000);
-  win?.webContents.send("companion:state", { armed: true, app: frontApp });
+  if (!noticed) {
+    noticed = true;
+    try { new Notification({ title: "inkk", body: `Certifying your writing in ${label}…`, silent: true }).show(); } catch {}
+  }
 }
 
-function stopSession() {
+// Called by the renderer when the user hits "Finish & certify" — ends the
+// current session (the hook stays alive so the next writing context auto-arms
+// a fresh one).
+function endSession() {
   if (!cap) return;
   cap.stop();
   flush();
-  if (hooked) { uIOhook.stop(); uIOhook.removeAllListeners("keydown"); uIOhook.removeAllListeners("keyup"); hooked = false; }
-  clearInterval(frontAppTimer); frontAppTimer = null;
   cap = null;
-  win?.webContents.send("companion:state", { armed: false });
+  noticed = false;
+  win?.webContents.send("companion:state", stateSnapshot());
 }
 
 function flush() {
@@ -113,12 +154,10 @@ function flush() {
 }
 
 function onDown(e) {
-  if (!cap) return;
+  if (!cap || !frontWriting) return;        // gated: only record inside writing contexts
   const name = NAME_BY_CODE.get(e.keycode);
-  if (!name) return;                       // unmapped key: ignore
+  if (!name) return;
   const mods = modString(e);
-  // ⌘V / Ctrl+V: a paste. Read the clipboard LENGTH only — the text never
-  // enters an event.
   if ((e.metaKey || e.ctrlKey) && name === "v") {
     cap.keydown(name, mods);
     let len = 0;
@@ -131,7 +170,7 @@ function onDown(e) {
 }
 
 function onUp(e) {
-  if (!cap) return;
+  if (!cap || !frontWriting) return;
   const name = NAME_BY_CODE.get(e.keycode);
   if (!name) return;
   cap.keyup(name);
@@ -174,16 +213,28 @@ function createWindow() {
 process.on("uncaughtException", (e) => { console.error("[companion] uncaught:", e); });
 
 app.whenReady().then(() => {
-  if (process.platform === "darwin") app.dock?.hide();  // menu-bar app, no dock icon
+  // Accessory policy = a true menu-bar-only agent: no dock icon, not in
+  // Cmd-Tab, and showing the popover doesn't activate/steal focus to another
+  // app (this is what stops the "pulled back to the launcher" behaviour).
+  if (process.platform === "darwin") app.setActivationPolicy("accessory");
+  app.dock?.hide();
+
   createWindow();
   tray = new Tray(trayIcon());
   tray.setToolTip("inkk — verify your writing");
   tray.on("click", toggleWindow);
 
-  ipcMain.handle("companion:start", (_e, ctx) => { startSession(ctx); return true; });
-  ipcMain.handle("companion:stop", () => { stopSession(); return true; });
+  // Watch the front context continuously (drives auto-arm).
+  pollContext();
+  setInterval(pollContext, 1500);
+
+  // The renderer tells us who's signed in (restored on launch), which is what
+  // enables auto-arm without a manual start.
+  ipcMain.handle("companion:auth", (_e, userId) => { currentUser = userId || null; if (!currentUser) endSession(); return true; });
+  ipcMain.handle("companion:end", () => { endSession(); return true; });
+  ipcMain.handle("companion:state", () => stateSnapshot());
   ipcMain.handle("companion:version", () => app.getVersion());
 });
 
 app.on("window-all-closed", (e) => e.preventDefault()); // stay alive in the tray
-app.on("before-quit", stopSession);
+app.on("before-quit", endSession);

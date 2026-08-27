@@ -5,11 +5,11 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("companion", {
-  start: (ctx) => ipcRenderer.invoke("companion:start", ctx),
-  stop: () => ipcRenderer.invoke("companion:stop"),
+  auth: (userId) => ipcRenderer.invoke("companion:auth", userId),  // enable/disable auto-arm
+  end: () => ipcRenderer.invoke("companion:end"),                  // finish the current session
+  state: () => ipcRenderer.invoke("companion:state"),
   version: () => ipcRenderer.invoke("companion:version"),
   onEvents: (cb) => ipcRenderer.on("companion:events", (_e, evs) => cb(evs)),
   onState: (cb) => ipcRenderer.on("companion:state", (_e, s) => cb(s)),
-  onFrontApp: (cb) => ipcRenderer.on("companion:frontapp", (_e, a) => cb(a)),
   onError: (cb) => ipcRenderer.on("companion:error", (_e, m) => cb(m)),
 });

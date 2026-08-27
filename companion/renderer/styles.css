@@ -51,6 +51,17 @@ button { font-family: inherit; cursor: pointer; border-radius: 8px; }
 .ghost:hover { color: var(--text); border-color: var(--subtle); }
 .row { display: flex; gap: 8px; }
 
+.watch {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 12px 14px; background: #fff; border: 1px solid var(--border);
+  border-radius: 8px; font-size: 0.85rem;
+}
+.watch-label { color: var(--subtle); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.12em; }
+#watch-app { color: var(--text); font-weight: 500; }
+.watch-status { margin-left: auto; font-size: 0.76rem; }
+.watch-status.on { color: #2e7d32; }
+.watch-status.off { color: var(--subtle); }
+
 .rec { display: flex; align-items: center; gap: 8px; font-size: 1rem; font-weight: 500; }
 .rec-dot {
   width: 9px; height: 9px; border-radius: 50%; background: #c0392b;
