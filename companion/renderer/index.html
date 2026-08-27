@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src https://*.supabase.co https://inkk.site https://www.inkk.site; img-src 'self' data:;" />
+  <title>inkk</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header id="bar">
+    <span id="brand">inkk<span class="dot">.</span></span>
+    <span id="version"></span>
+  </header>
+
+  <div id="err" class="banner" style="display:none"></div>
+
+  <!-- sign in -->
+  <section id="phase-signin" class="phase">
+    <p class="lead">Sign in to your inkk account.</p>
+    <input id="email" type="email" placeholder="Email" autocomplete="username" />
+    <input id="password" type="password" placeholder="Password" autocomplete="current-password" />
+    <button id="signin-btn" class="primary">Sign in</button>
+    <p id="signin-err" class="err-line"></p>
+  </section>
+
+  <!-- idle -->
+  <section id="phase-idle" class="phase" style="display:none">
+    <p class="who-line">Signed in as <span id="who"></span></p>
+    <p class="lead">Write anywhere — Word, Notes, Substack. inkk records only the
+      rhythm of your typing, never the words.</p>
+    <input id="title" type="text" placeholder="What are you writing? (optional title)" />
+    <button id="arm-btn" class="primary">Start a writing session</button>
+  </section>
+
+  <!-- recording -->
+  <section id="phase-recording" class="phase" style="display:none">
+    <div class="rec"><span class="rec-dot"></span> Recording</div>
+    <p class="who-line">in <span id="recording-app">…</span></p>
+    <p class="stat"><span id="keystrokes">0</span> keystrokes</p>
+    <p class="hint">Only timing is captured. Switch to your editor and write.</p>
+    <button id="stop-btn" class="primary">Finish &amp; certify</button>
+  </section>
+
+  <!-- certify -->
+  <section id="phase-certify" class="phase" style="display:none">
+    <p class="lead">Paste your finished text. It's hashed on this device to bind
+      the certificate to the words — the text is never uploaded.</p>
+    <textarea id="final-text" rows="6" placeholder="Paste the finished piece…"></textarea>
+    <button id="certify-btn" class="primary">Get my code</button>
+    <p id="certify-err" class="err-line" style="display:none"></p>
+  </section>
+
+  <!-- result -->
+  <section id="phase-result" class="phase" style="display:none">
+    <p class="lead">Your verification code</p>
+    <div id="result-code" class="code"></div>
+    <p id="result-tier" class="tier"></p>
+    <div class="row">
+      <button id="copy-btn" class="ghost">Copy</button>
+      <button id="again-btn" class="ghost">New session</button>
+    </div>
+    <p class="hint">Paste the code wherever your piece goes. Readers confirm it at
+      inkk.site/verify.</p>
+  </section>
+
+  <script src="bundle.js"></script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+{
+  "name": "inkk-companion",
+  "version": "0.1.0",
+  "private": true,
+  "description": "inkk desktop companion — records writing rhythm system-wide and issues a verification code.",
+  "main": "main.js",
+  "scripts": {
+    "build:renderer": "node build-renderer.js",
+    "start": "npm run build:renderer && electron .",
+    "dev": "npm run build:renderer && electron . --inspect",
+    "test": "node --test capture.test.js",
+    "dist": "npm run build:renderer && electron-builder --mac dmg"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "uiohook-napi": "^1.5.4"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "esbuild": "^0.23.0"
+  },
+  "build": {
+    "appId": "site.inkk.companion",
+    "productName": "inkk",
+    "files": ["main.js", "preload.js", "renderer/index.html", "renderer/styles.css", "renderer/bundle.js"],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": ["dmg"],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "LSUIElement": true,
+        "NSAppleEventsUsageDescription": "inkk checks which app is in front so it can show where you're writing."
+      }
+    },
+    "dmg": {
+      "title": "inkk"
+    }
+  }
+}
