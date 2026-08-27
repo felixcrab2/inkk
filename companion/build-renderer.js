@@ -40,7 +40,6 @@ esbuild.build({
   outfile: path.join(__dirname, "renderer", "bundle.js"),
   define,
   logLevel: "info",
-  watch: process.argv.includes("--watch"),
 }).then(() => {
   if (!process.env.REACT_APP_SUPABASE_URL && !process.env.SUPABASE_URL) {
     console.warn("[companion] No Supabase env set — the app will show 'not configured'. See companion/README.md.");

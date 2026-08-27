@@ -16,17 +16,27 @@
     "uiohook-napi": "^1.5.4"
   },
   "devDependencies": {
-    "electron": "^31.0.0",
+    "electron": "^31.7.7",
     "electron-builder": "^24.13.3",
     "esbuild": "^0.23.0"
   },
   "build": {
     "appId": "site.inkk.companion",
     "productName": "inkk",
-    "files": ["main.js", "preload.js", "renderer/index.html", "renderer/styles.css", "renderer/bundle.js"],
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/index.html",
+      "renderer/styles.css",
+      "renderer/bundle.js",
+      "assets/iconTemplate.png",
+      "assets/iconTemplate@2x.png"
+    ],
     "mac": {
       "category": "public.app-category.productivity",
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",

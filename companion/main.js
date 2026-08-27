@@ -140,12 +140,12 @@ function onUp(e) {
 
 // ── tray + popover window ────────────────────────────────────────────────────
 function trayIcon() {
-  // A simple template dot; replaced by a real asset before shipping.
-  const img = nativeImage.createFromDataURL(
-    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAAAWklEQVR4nO3QMQ0AIAwEwYf/oiEBQ8IEd8pXt2Zmdj3Y5oB7wLcAAAAASUVORK5CYII="
-  );
+  // "inkk." in EB Garamond as a macOS template image — macOS recolours it to
+  // match the menu bar (white on dark), like the native icons. Electron loads
+  // the @2x variant automatically on Retina.
+  const img = nativeImage.createFromPath(path.join(__dirname, "assets", "iconTemplate.png"));
   img.setTemplateImage(true);
-  return img;
+  return img.isEmpty() ? nativeImage.createFromNamedImage("NSApplicationIcon") : img;
 }
 
 function toggleWindow() {
