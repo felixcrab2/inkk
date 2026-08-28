@@ -676,7 +676,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   font-style: normal;
   pointer-events: none;
 }
-#title-input.font-arial { font-family: Arial, sans-serif; font-weight: 600; letter-spacing: -0.02em; }
+#title-input.font-sans { font-family: "Switzer", -apple-system, sans-serif; font-weight: 600; letter-spacing: -0.02em; }
 
 #format-toolbar {
   position: fixed;
@@ -747,7 +747,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   min-height: 2em;
 }
 
-#text.font-arial { font-family: Arial, sans-serif; }
+#text.font-sans, #text.font-sans * { font-family: "Switzer", -apple-system, sans-serif; }
 
 /* List items: indent the whole line including bullet/number */
 #text > div[data-list], #text > p[data-list] {
@@ -4548,4 +4548,52 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   /* the column ran almost to the edges, which is what made it feel wide */
   #feed-list, #feed-header, #feed-masthead { padding-left: 22px !important; padding-right: 22px !important; }
   .feed-lead, .feed-entry { padding-left: 0 !important; padding-right: 0 !important; }
+}
+
+/* ─── Phone: the editor keeps its face ───────────────────────────────────────
+   The global interface rule names `div` and `p` directly, so it beat the
+   Garamond that #text passes down to its paragraphs: the first text node
+   stayed serif and every paragraph after it flipped to the sans. That is the
+   font change mid-piece. Editor descendants inherit now, and the choice moves
+   to the toggle, where it belongs. */
+@media (max-width: 600px) {
+  #text, #text *, #title-input, #title-input * { font-family: inherit; }
+  #text.font-sans, #text.font-sans *,
+  #title-input.font-sans, #title-input.font-sans * {
+    font-family: var(--font-ui) !important;
+  }
+  #title-input.font-sans { font-weight: 600; letter-spacing: -0.02em; }
+
+  /* the toggle was buried in the drawer footer; give it a real target */
+  #panel-footer { padding: 14px 22px calc(18px + var(--sab)) !important; }
+  #font-toggle {
+    width: 100%;
+    justify-content: center;
+    padding: 13px !important;
+    border-radius: 14px;
+    background: rgba(62, 50, 36, 0.05);
+    font-size: 0.92rem;
+  }
+}
+
+/* ─── Phone: a detail, not a picture on every piece ──────────────────────────
+   Art on every card was too much and turned the feed into a catalogue. What
+   the feed wants is atmosphere: one plate held far off-scale so only a few
+   engraved lines cross the screen, faint enough to read straight through.
+   Zoomed this far the line frequency is low, which is why it no longer fights
+   the text the way a whole plate did. */
+@media (max-width: 600px) {
+  .feed-plate, .feed-plate-lead, .feed-plate-entry { display: none !important; }
+  .feed-entry .feed-mark { display: flex !important; }
+
+  #backdrop.bd-on:not([data-view="editor"]) { opacity: 0.045; }
+  #backdrop:not([data-view="editor"]) {
+    background-size: 260% auto;
+    background-position: 22% 18%;
+  }
+  /* clear of the column where the eye actually reads */
+  #backdrop:not([data-view="editor"]) {
+    -webkit-mask-image: radial-gradient(ellipse 120% 60% at 50% 42%, transparent 30%, #000 100%);
+    mask-image: radial-gradient(ellipse 120% 60% at 50% 42%, transparent 30%, #000 100%);
+  }
 }

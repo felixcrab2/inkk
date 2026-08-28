@@ -11,10 +11,9 @@ import { jsPDF } from "jspdf";
 import { supabase } from "./supabase";
 import { renderBookPdfPages, PAGE_PRESETS } from "./pdf/bookPage";
 import {
-  Menu, ArrowLeft, PenLine, Globe, User,
-  Share2, Check, Download, Maximize2, Minimize2,
+  Menu, ArrowLeft, Share2, Check, Download, Maximize2, Minimize2,
   Copy, CheckCheck, Plus, Trash2, Type, Search,
-  Heart, MessageCircle, Eye, EyeOff,
+  Heart, Eye, EyeOff,
   AlignLeft, AlignCenter, AlignRight,
 } from "lucide-react";
 import { createRecorder } from "./telemetry/recorder";
@@ -27,6 +26,11 @@ import {
   flushNow as syncFlushNow,
 } from "./telemetry/sync";
 import { claimAnonymous as claimAnonymousEvents, clearForUser as clearLocalForUser, countForUser as countLocalEvents, dumpForUser as dumpLocalForUser } from "./telemetry/store";
+import {
+  Heart as PHeart, ChatCircle as PChat, Export as PShare,
+  PenNib as PPen,
+  Globe as PGlobe, UserCircle as PUser,
+} from "@phosphor-icons/react";
 import { HumanSignalBadge, HumanSignalPanel } from "./components/HumanSignal";
 import { PrivacyModal, TermsModal, TOS_VERSION } from "./components/Legal";
 import { VerifyView } from "./components/Verify";
@@ -2070,11 +2074,11 @@ function FeedActions({ pub, sc, likeCount, commentCount, onRead, onLike }) {
     <div className="feed-entry-actions">
       {sc && <HumanSignalBadge score={sc} />}
       <button className="feed-engage" onClick={e => { e.stopPropagation(); onLike(pub); }} aria-label="Like">
-        <Heart size={13} strokeWidth={1.5} fill="none" />
+        <PHeart size={15} weight="light" />
         <span>{likeCount}</span>
       </button>
       <button className="feed-engage" onClick={e => { e.stopPropagation(); onRead(pub, { focus: "comments" }); }} aria-label="Comments">
-        <MessageCircle size={13} strokeWidth={1.5} />
+        <PChat size={15} weight="light" />
         <span>{commentCount}</span>
       </button>
     </div>
@@ -2109,9 +2113,6 @@ function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, 
     return (
       <article className="feed-lead" style={{ "--card-index": index }} onClick={() => onRead(pub)}>
         <span className="feed-lead-kicker">{fresh ? "Today's read" : "Latest"}</span>
-        {/* every piece carries its own plate for life; here it is the card's art */}
-        <div className="feed-plate feed-plate-lead" aria-hidden="true"
-             style={{ backgroundImage: `url(/backdrops/${imgForPub(pub.id)}.webp)` }} />
         <h2 className="feed-lead-title">{pub.title || "Untitled"}</h2>
         {excerpt && <p className="feed-lead-excerpt">{excerpt}</p>}
         <div className="feed-lead-byline">
@@ -2141,8 +2142,6 @@ function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, 
           <DropCapAvatar letter={initial} avatarData={pub.avatar_data} dropCapImages={dropCapImages} size={34} />
         </span>
       )}
-      <div className="feed-plate feed-plate-entry" aria-hidden="true"
-           style={{ backgroundImage: `url(/backdrops/${imgForPub(pub.id)}.webp)` }} />
       <div className="feed-entry-body">
         <h2 className="feed-entry-title">{pub.title || "Untitled"}</h2>
         {excerpt && <p className="feed-entry-excerpt">{excerpt}</p>}
@@ -5047,7 +5046,7 @@ export default function App() {
               >
                 {isPublished
                   ? <><Check size={13} /><span className="btn-label">Published</span></>
-                  : <><Share2 size={13} /><span className="btn-label">Publish</span></>
+                  : <><PShare size={15} weight="light" /><span className="btn-label">Publish</span></>
                 }
               </button>
               {!isPublished && publishConfirmOpen && (
@@ -5192,9 +5191,9 @@ export default function App() {
             ))}
           </div>
           <div id="panel-footer">
-            <button id="font-toggle" onClick={() => setFont(f => f === "garamond" ? "arial" : "garamond")}>
+            <button id="font-toggle" onClick={() => setFont(f => f === "garamond" ? "sans" : "garamond")}>
               <Type size={13} />
-              {font === "garamond" ? "Garamond" : "Arial"}
+              {font === "garamond" ? "Garamond" : "Switzer"}
             </button>
           </div>
         </div>
@@ -5289,7 +5288,7 @@ export default function App() {
           suppressContentEditableWarning
           spellCheck={false}
           data-placeholder="Title"
-          className={font === "arial" ? "font-arial" : ""}
+          className={font === "garamond" ? "" : "font-sans"}
           onInput={onTitleInput}
           onBlur={finalizeTitle}
           onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); finalizeTitle(); editorRef.current?.focus(); } }}
@@ -5299,7 +5298,7 @@ export default function App() {
           <div
             id="text"
             ref={editorRef}
-            className={font === "arial" ? "font-arial" : ""}
+            className={font === "garamond" ? "" : "font-sans"}
             contentEditable
             suppressContentEditableWarning
             spellCheck={false}
@@ -5431,11 +5430,11 @@ export default function App() {
       {view !== "reading" && view !== "userProfile" && (
         <nav id="bottom-nav" className={isEditor ? menuClass : ""}>
           <button className={`nav-tab ${isEditor ? "active" : ""}`} onClick={() => navigate("editor")}>
-            <PenLine size={18} strokeWidth={1.75} />
+            <PPen size={19} weight="light" />
             <span className="nav-label">Write</span>
           </button>
           <button className={`nav-tab ${view === "feed" ? "active" : ""}`} onClick={() => navigate("feed")}>
-            <Globe size={18} strokeWidth={1.75} />
+            <PGlobe size={19} weight="light" />
             <span className="nav-label">Feed</span>
           </button>
           <button className={`nav-tab ${view === "verify" ? "active" : ""}`} onClick={() => navigate("verify")}>
@@ -5460,7 +5459,7 @@ export default function App() {
                 size={22}
               />
             ) : (
-              <User size={18} strokeWidth={1.75} />
+              <PUser size={19} weight="light" />
             )}
             <span className="nav-label">{user ? "Profile" : "Sign in"}</span>
             {streak > 1 && <span className="nav-streak">{streak}</span>}
