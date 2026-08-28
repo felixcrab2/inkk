@@ -4701,3 +4701,102 @@ body.is-mobile #auth-modal input { font-size: 16px; }
     color: var(--subtle) !important;
   }
 }
+
+/* ─── Phone: the bar when signed in ──────────────────────────────────────────
+   Signed out there are four tabs; signed in there are five, and the profile
+   tab carries an avatar the others do not, so it sat taller than its
+   neighbours and pushed its own label out of line. Every tab is a word, and
+   the words size themselves to fit however many there are. */
+@media (max-width: 600px) {
+  #bottom-nav .nav-tab > .dropcap-avatar,
+  #bottom-nav .nav-tab img,
+  #bottom-nav .nav-tab .avatar { display: none !important; }
+
+  #bottom-nav { padding-left: 4px; padding-right: 4px; gap: 0; }
+  #bottom-nav .nav-tab { min-width: 0; padding: 0 2px !important; }
+  #bottom-nav .nav-label {
+    font-size: clamp(0.78rem, 3.4vw, 0.98rem) !important;
+    white-space: nowrap;
+    margin-top: 0 !important;
+    line-height: 1;
+  }
+}
+
+/* ─── Phone: a system, rather than 54 decisions ──────────────────────────────
+   "One default is harmless, but ten defaults together create the vibe-coded
+   look." Measured against that, three faults were mine:
+
+   • 54 distinct type sizes where the guidance is five or six. Everything was
+     sized ad hoc, so nothing related to anything else.
+   • Uniform padding everywhere, which reads as mechanical. Real work is tight
+     within a group, generous between sections.
+   • The floating bar had rounding AND a shadow AND a border. The rule is
+     rounding with no shadow, or a shadow with sharp corners — not both, and
+     certainly not all three.
+
+   Palette follows the warm-neutral ramp: a base quiet enough that one accent
+   reads as intentional rather than noisy. */
+@media (max-width: 600px) {
+  :root {
+    /* ink ramp — warm throughout, never neutral grey */
+    --paper:   #faf8f4;
+    --paper-2: #f3efe7;
+    --ink:     #1a1613;
+    --ink-2:   #4c443b;
+    --ink-3:   #857a6b;
+    --ink-4:   #b5aa9a;
+    --line:    rgba(62, 50, 36, 0.11);
+    /* the one accent, earned */
+    --rubric:  #9e3b28;
+
+    /* type scale */
+    --t-xs:  0.78rem;
+    --t-sm:  0.92rem;
+    --t-md:  1.06rem;
+    --t-lg:  1.22rem;
+    --t-xl:  1.5rem;
+    --t-2xl: 2.3rem;
+
+    /* spacing — tight inside a group, generous between sections */
+    --s-1: 6px;
+    --s-2: 12px;
+    --s-3: 22px;
+    --s-4: 40px;
+    --s-5: 64px;
+
+    --bg: var(--paper);
+    --surface: var(--paper-2);
+    --text: var(--ink);
+    --muted: var(--ink-2);
+    --subtle: var(--ink-3);
+    --border: var(--line);
+  }
+
+  /* type onto the scale */
+  .feed-lead-title   { font-size: var(--t-2xl) !important; }
+  .feed-entry-title  { font-size: var(--t-xl)  !important; }
+  .feed-quote-text   { font-size: var(--t-xl)  !important; }
+  .verify-title      { font-size: var(--t-2xl) !important; }
+  .reading-reflow-title { font-size: var(--t-2xl) !important; }
+  .feed-lead-excerpt, .feed-entry-excerpt,
+  .reading-reflow-body, .reading-reflow-body p { font-size: var(--t-lg) !important; }
+  .verify-sub, .doc-item-title, .new-doc-btn   { font-size: var(--t-md) !important; }
+  #bottom-nav .nav-label, .feed-tab, button,
+  .primary, .ghost, .profile-cta               { font-size: var(--t-sm) !important; }
+  .feed-dateline, .feed-entry-date, .feed-entry-meta,
+  .feed-quote-attr, .doc-item-meta, .rv-copy   { font-size: var(--t-xs) !important; }
+
+  /* rhythm: close within a piece, open between them */
+  .feed-entry-title   { margin-bottom: var(--s-1) !important; }
+  .feed-entry-excerpt { margin-bottom: var(--s-2) !important; }
+  .feed-entry         { padding: var(--s-3) 0 !important; }
+  .feed-lead          { padding-bottom: var(--s-4) !important; }
+  .feed-section-label { margin-top: var(--s-4) !important; margin-bottom: var(--s-3) !important; }
+  .feed-quote         { margin: var(--s-4) 0 !important; padding: 0 !important; }
+
+  /* one treatment, not three: the bar floats on a shadow alone */
+  #bottom-nav {
+    border: none !important;
+    box-shadow: 0 8px 30px rgba(62, 50, 36, 0.13) !important;
+  }
+}
