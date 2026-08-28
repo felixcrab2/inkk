@@ -4655,3 +4655,49 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   }
   .feed-quote-attr::before { content: "— "; }
 }
+
+/* ─── Phone: ink, not grey ───────────────────────────────────────────────────
+   Two findings. First, greys should never be neutral: "tint that dark gray
+   ever so slightly with your brand colour", and digital work is moving off
+   cool greys toward earthy ones. Second, and the real problem here, hierarchy
+   was being carried by greyness alone across 170-odd rules — but it should
+   come from weight, size and position, with colour doing far less. So the
+   secondary tones move much closer to ink and warm considerably; the
+   difference between levels is now mostly weight.
+
+   Then the one colour. In a manuscript the scribe reserved red for what
+   mattered: the initial, the heading, the passage worth finding again. The
+   word rubric is simply Latin for red. So inkk gets a single accent, used
+   only where something has been verified or is new — never decoration. */
+@media (max-width: 600px) {
+  :root {
+    --text:   #1a1613;    /* warm near-black */
+    --muted:  #4c443b;    /* was #6b6259 — secondary text is ink, not grey */
+    --subtle: #857a6b;    /* was #a09689 — still quiet, no longer washed out */
+    --rubric: #9e3b28;    /* red lead, as a scribe would use it */
+    --gold:   #9a7b3f;
+  }
+
+  /* the stray hardcoded greys that were never in the palette */
+  [style*="color: #aaa"], .feed-dot { color: var(--subtle) !important; }
+
+  /* hierarchy by weight rather than by fading things out */
+  .feed-entry-excerpt, .feed-lead-excerpt { color: var(--muted) !important; }
+  .feed-entry-author, .feed-lead-author { color: var(--text) !important; font-weight: 500; }
+  .feed-entry-date, .feed-dateline { color: var(--subtle) !important; }
+
+  /* ── rubrication: the only colour in the app ── */
+  .feed-fresh-dot { background: var(--rubric) !important; }
+  .rv-status, .verify-cert-status,
+  .reading-verify.is-verified .rv-status,
+  .verify-cert-mark.is-verified .verify-cert-status { color: var(--rubric) !important; }
+  .hs-badge.is-verified, .feed-mark.is-verified { color: var(--rubric) !important; }
+}
+
+/* ─── Phone: the last washed-out greys ───────────────────────────────────── */
+@media (max-width: 600px) {
+  .rv-copy, .reading-dot, .comment-meta, .feed-tab-count,
+  .doc-item-meta, .verify-cert-score-denom {
+    color: var(--subtle) !important;
+  }
+}
