@@ -1,3 +1,8 @@
+@font-face{font-family:"Switzer";src:url("./assets/fonts/Switzer-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:swap;}
+@font-face{font-family:"Switzer";src:url("./assets/fonts/Switzer-500.woff2") format("woff2");font-weight:500;font-style:normal;font-display:swap;}
+@font-face{font-family:"Switzer";src:url("./assets/fonts/Switzer-600.woff2") format("woff2");font-weight:600;font-style:normal;font-display:swap;}
+@font-face{font-family:"Switzer";src:url("./assets/fonts/Switzer-700.woff2") format("woff2");font-weight:700;font-style:normal;font-display:swap;}
+
 /* ─── Design tokens ───────────────────────────────────────────────────────── */
 :root {
   --bg:          #f6f6f6;
@@ -4186,4 +4191,135 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   /* The strip has to clear the floating bar rather than a flush one. */
   #text-container { bottom: calc(64px + var(--sab) + var(--kb-inset, 0px)); }
   body.keyboard-open #bottom-nav { transform: translateY(120%); opacity: 0; }
+}
+
+/* ─── Phone: the research pass ───────────────────────────────────────────────
+   Four findings drove this, and each one names something that was wrong:
+
+   1. "Most dividers are apologies — the border under every list row, the box
+      around every form section, the hairline between every card. Each one is
+      spacing that gave up." There were 57 hairline rules. Space separates
+      here instead, on the Gestalt rule that the gap between groups must
+      exceed the gap within them.
+   2. Stacked eyebrow labels above every block is the most recognisable
+      generated-UI habit. They are gone.
+   3. Garamond sets old-style figures, whose digits ride at different heights
+      by design. Correct in prose, wrong in an interface: UI wants lining and
+      tabular so numerals sit level and align in columns.
+   4. Templated work keeps every text size similar. Designed work is built on
+      a scale with real contrast. */
+@media (max-width: 600px) {
+  :root { --font-ui: "Switzer", -apple-system, BlinkMacSystemFont, sans-serif; }
+
+  html, body, button, input, textarea, select, a, span, div, p,
+  h1, h2, h3, h4, li, time, label, small { font-family: var(--font-ui); }
+
+  /* Garamond is whitelisted onto writing, and nowhere else. */
+  #text, #title-input, #brand,
+  .feed-lead-title, .feed-lead-excerpt,
+  .feed-entry-title, .feed-entry-excerpt,
+  .pub-card-title, .pub-card-excerpt, #reading-text {
+    font-family: var(--font-serif) !important;
+  }
+  #bottom-nav .nav-label, #bottom-nav .nav-tab,
+  .verify-title, .feed-section-label, .verify-sub {
+    font-family: var(--font-ui) !important;
+  }
+
+  /* Figures sit level everywhere except running prose, where old-style is
+     the correct setting. */
+  *, *::before, *::after { font-variant-numeric: lining-nums tabular-nums; }
+  .feed-lead-excerpt, .feed-entry-excerpt, #text, #reading-text { font-variant-numeric: normal; }
+
+  /* ── the hairlines go ── */
+  #top-bar, #feed-header, .feed-tabs, .feed-entry, .pub-card,
+  .pub-card:first-of-type, .feed-lead, .verify-cert, .doc-item,
+  .new-doc-btn, #reading-meta, .feed-masthead {
+    border: none !important;
+  }
+  /* …and space does their work */
+  .feed-entry { padding: 30px 0 !important; }
+  .feed-lead  { padding-bottom: 34px !important; }
+  #feed-header { padding-bottom: 18px !important; }
+
+  /* Boxes soften into fields: a quiet fill instead of a hard rectangle. */
+  input, textarea, .verify-input {
+    border: none !important;
+    background: rgba(62, 50, 36, 0.05) !important;
+    border-radius: 14px !important;
+    padding: 15px 18px !important;
+  }
+  .primary, .verify-submit, .auth-btn, button.primary {
+    border: none !important;
+    border-radius: 999px !important;
+    letter-spacing: 0 !important;
+    font-weight: 500 !important;
+  }
+  .ghost, .profile-cta-ghost {
+    border: none !important;
+    background: rgba(62, 50, 36, 0.05) !important;
+    border-radius: 999px !important;
+  }
+
+  /* ── scale with real contrast ── */
+  .feed-lead-title  { font-size: 2.35rem !important; font-weight: 600 !important;
+                      letter-spacing: -0.02em !important; line-height: 1.06 !important; }
+  .feed-entry-title { font-size: 1.42rem !important; font-weight: 600 !important;
+                      letter-spacing: -0.012em !important; line-height: 1.16 !important; }
+  .verify-title     { font-size: 1.9rem !important; font-weight: 600 !important;
+                      letter-spacing: -0.02em !important; }
+  .feed-dateline, .feed-section-label, .feed-entry-date, .feed-entry-meta {
+    font-size: 0.73rem !important; font-weight: 500 !important;
+    letter-spacing: 0 !important; text-transform: none !important;
+  }
+
+  /* ── Dürer, doing a job ──────────────────────────────────────────────────
+     Melencolia's magic square (1514) is a grid whose every row and column
+     sums to 34: a verification device, four centuries early. It marks the
+     verify page. The sleeping hound keeps an empty feed company. */
+  .verify-masthead::before {
+    content: "";
+    display: block;
+    width: 84px; height: 78px;
+    margin: 0 auto 22px;
+    opacity: 0.42;
+    background: url("./assets/durer/magic-square.webp") center / contain no-repeat;
+  }
+  .feed-empty-state::before {
+    content: "";
+    display: block;
+    width: 190px; height: 138px;
+    margin: 0 auto 18px;
+    opacity: 0.3;
+    background: url("./assets/durer/sleeping-dog.webp") center / contain no-repeat;
+  }
+}
+
+/* ─── Phone: the last of the lines ───────────────────────────────────────── */
+@media (max-width: 600px) {
+  /* #feed-tabs is an id, so the earlier class selector never matched it. */
+  #feed-tabs { border-bottom: none !important; margin-bottom: 4px; }
+
+  /* The section tabs now speak the same language as the bottom bar: a filled
+     pill marks the active one, so no underline rule is needed. */
+  .feed-tab {
+    border: none !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    font-size: 0.95rem !important;
+    font-weight: 500 !important;
+    padding: 8px 14px !important;
+    margin-right: 6px !important;
+    border-radius: 999px;
+    color: var(--subtle);
+  }
+  .feed-tab.active {
+    background: rgba(62, 50, 36, 0.07);
+    color: var(--text);
+    font-weight: 600 !important;
+  }
+
+  /* Eyebrows: the position already says "latest", and a page titled "Verify a
+     piece" does not need "Authenticity" stacked above it. */
+  .feed-lead-kicker, .verify-eyebrow { display: none !important; }
 }
