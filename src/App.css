@@ -4037,3 +4037,73 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   body.keyboard-open #hs-editor-status,
   body.keyboard-open .writing-stats { opacity: 0; pointer-events: none; }
 }
+
+/* ─── Phone: editorial, not dev-tool ──────────────────────────────────────────
+   A Garamond wordmark sitting above geometric-sans headings and line icons is
+   the look of a developer tool, not of inkk. On the phone the whole interface
+   is set in the serif and the icon set is retired in favour of words. Desktop
+   is untouched. */
+@media (max-width: 600px) {
+  /* The one lever: --font-ui drives every non-editor surface. */
+  :root { --font-ui: var(--font-serif); }
+  body { font-family: var(--font-serif); }
+
+  /* Headings lose the geometric-sans weight and read as type, not UI. */
+  h1, h2, h3, .auth-title, #auth-title, .verify-title, .profile-name {
+    font-family: var(--font-serif);
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+
+  /* Words, not glyphs. Uppercase Garamond with generous tracking is the
+     classical inscription, and it is unmistakably not a SaaS tab bar. */
+  #bottom-nav .nav-tab > svg,
+  #bottom-nav .nav-diamond { display: none; }
+  #bottom-nav .nav-label {
+    font-family: var(--font-serif);
+    font-size: 0.82rem;
+    letter-spacing: 0.14em;
+    font-weight: 500;
+    margin-top: 0;
+    text-transform: uppercase;
+  }
+  #bottom-nav .nav-tab.active .nav-label { font-weight: 600; }
+
+  /* Buttons as set type rather than shipping-label sans. */
+  button, .primary, .ghost, .auth-btn, .verify-submit, .profile-cta {
+    font-family: var(--font-serif);
+    letter-spacing: 0.1em;
+  }
+
+  /* The drafts drawer was a desktop sidebar leaving a strip of editor showing
+     down the side. On a phone a drawer is the screen. */
+  #doc-panel {
+    width: 100%;
+    max-width: none;
+    padding-top: calc(var(--top-bar) + var(--sat));
+  }
+  .new-doc-btn { font-size: 0.95rem; padding: 16px 22px; }
+  .new-doc-btn svg { display: none; }
+  .new-doc-btn::before { content: "＋"; font-size: 1rem; opacity: 0.55; }
+  .doc-item { padding: 14px 22px; }
+
+  /* Dürer, put to work: the foliate band from the Flammarion border becomes
+     the rule between sections of the feed. */
+  .feed-section-label {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-family: var(--font-serif);
+    letter-spacing: 0.18em;
+  }
+  /* A single centred device rather than a repeating band: tiling shows its
+     seam, and one ornament between sections is the classical setting anyway. */
+  .feed-section-label::after {
+    content: "";
+    display: block;
+    width: 170px;
+    height: 9px;
+    opacity: 0.3;
+    background: url("./assets/ornament-rule.webp") center / contain no-repeat;
+  }
+}
