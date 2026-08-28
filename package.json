@@ -27,7 +27,8 @@
     "seed:build": "node scripts/seed/build-content.mjs",
     "seed:dry": "node scripts/seed/seed.mjs --dry-run",
     "seed": "node scripts/seed/seed.mjs",
-    "seed:undo": "node scripts/seed/unseed.mjs"
+    "seed:undo": "node scripts/seed/unseed.mjs",
+    "test:token": "node --test src/verify/token.test.mjs"
   },
   "eslintConfig": {
     "extends": [
