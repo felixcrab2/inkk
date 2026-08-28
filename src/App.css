@@ -3922,3 +3922,57 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   line-height: 1;
   letter-spacing: -0.01em;
 }
+
+/* ─── Phone: writing surface ──────────────────────────────────────────────────
+   Everything here is mobile-only. The desktop editor is untouched.
+
+   The keyboard eats ~40% of a phone screen, so the answer is not a smaller
+   toolbar but no toolbar: paper, your sentence, and nothing else. --kb-inset is
+   published by the visualViewport effect in App.js and is 0 on desktop. */
+@media (max-width: 600px) {
+  /* Sit the writing strip on top of the keyboard rather than behind it. */
+  #text-container {
+    bottom: calc(var(--bottom-nav) + 60px + var(--kb-inset, 0px));
+    transition: padding-top 0.55s cubic-bezier(0.32, 0.72, 0, 1),
+                bottom 0.25s ease;
+  }
+
+  /* While the keyboard is up the nav is behind it anyway, and the writing
+     wants the whole strip. Reclaim it and drop the top padding so the first
+     line starts near the top instead of halfway down a short window. */
+  body.keyboard-open #text-container {
+    bottom: var(--kb-inset, 0px);
+    padding-top: 7vh;
+  }
+  body.keyboard-open #text-container.writing-started { padding-top: 4vh; }
+  body.keyboard-open #bottom-nav,
+  body.keyboard-open #research-strip { opacity: 0; pointer-events: none; }
+
+  /* Notch and home indicator. */
+  #top-bar {
+    height: calc(var(--top-bar) + env(safe-area-inset-top, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  #text-container, #reading-container, #verify-view, #editor-preview-container {
+    top: calc(var(--top-bar) + env(safe-area-inset-top, 0px));
+  }
+
+  /* The flank mask has nowhere to live on a phone — there are no flanks — so
+     the plate goes full bleed and quiet. In the editor it still greets the
+     blank page and leaves once the piece has words, which is the whole ritual
+     and reads more strongly on a small screen, not less. */
+  #backdrop {
+    -webkit-mask-image: none;
+    mask-image: none;
+    /* `cover` crops a plate so hard on a phone that it reads as texture rather
+       than as a picture. `contain` keeps the whole engraving legible as art. */
+    background-size: contain;
+    transform: none;
+  }
+  #backdrop.bd-on { opacity: 0.1; }
+  #backdrop.bd-ring { -webkit-mask-image: none; mask-image: none; }
+
+  /* Nothing but the page while writing. */
+  body.keyboard-open #hs-editor-status,
+  body.keyboard-open .writing-stats { opacity: 0; pointer-events: none; }
+}

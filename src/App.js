@@ -3524,6 +3524,36 @@ export default function App() {
     };
   }, []);
 
+  // ── on-screen keyboard (phones) ──────────────────────────────────────────
+  // visualViewport is the only reliable way to know how much of the window the
+  // keyboard is covering. Publish it as --kb-inset so the editor can sit above
+  // the keyboard, and flag body.keyboard-open for the typewriter scroll rule.
+  // No-ops on desktop: the inset stays 0 and the class is never added.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    // Phones only. On desktop, browser zoom also shrinks the visual viewport,
+    // which would otherwise look exactly like a keyboard appearing.
+    if (!vv || !window.matchMedia("(pointer: coarse)").matches) return;
+    let raf = 0;
+    const apply = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+        document.documentElement.style.setProperty("--kb-inset", `${Math.round(inset)}px`);
+        document.body.classList.toggle("keyboard-open", inset > 80);
+      });
+    };
+    apply();
+    vv.addEventListener("resize", apply);
+    vv.addEventListener("scroll", apply);
+    return () => {
+      cancelAnimationFrame(raf);
+      vv.removeEventListener("resize", apply);
+      vv.removeEventListener("scroll", apply);
+      document.body.classList.remove("keyboard-open");
+    };
+  }, []);
+
   useEffect(() => {
     if (focusMode) document.body.classList.add("focus-mode");
     else document.body.classList.remove("focus-mode");
@@ -3826,6 +3856,9 @@ export default function App() {
   }, []);
 
   const IDLE_MS = 1200;
+  // Where the caret sits on screen while typing on a phone (fraction of the
+  // visible editor strip). ~0.4 keeps it above the thumb and below the eyeline.
+  const TYPEWRITER_ANCHOR = 0.4;
 
   // ─ load doc into DOM ────────────────────────────────────────────────────────
 
@@ -4240,7 +4273,17 @@ export default function App() {
       const rect = sel.getRangeAt(0).getBoundingClientRect();
       const container = containerRef.current;
       if (!container) return;
-      const cb = container.getBoundingClientRect().bottom;
+      const cr = container.getBoundingClientRect();
+      // Phone with the keyboard up: typewriter scrolling. Hold the caret at a
+      // fixed height in the visible strip rather than letting it drift toward
+      // the bottom edge, so the line you are writing stays where your eyes
+      // already are. Desktop keeps the original catch-it-near-the-bottom rule.
+      if (document.body.classList.contains("keyboard-open")) {
+        const delta = rect.top - (cr.top + cr.height * TYPEWRITER_ANCHOR);
+        if (Math.abs(delta) > 12) container.scrollTop += delta;
+        return;
+      }
+      const cb = cr.bottom;
       if (rect.bottom > cb - 80) container.scrollTop += rect.bottom - cb + 100;
     });
   }, []);
