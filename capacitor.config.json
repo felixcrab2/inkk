@@ -1,0 +1,20 @@
+{
+  "appId": "site.inkk.app",
+  "appName": "inkk",
+  "webDir": "build",
+  "ios": {
+    "backgroundColor": "#faf8f4",
+    "scrollEnabled": false
+  },
+  "plugins": {
+    "SafeArea": {
+      "enabled": true,
+      "customColorsForSystemBars": false,
+      "offset": 0
+    },
+    "Keyboard": {
+      "resize": "none",
+      "resizeOnFullScreen": false
+    }
+  }
+}

@@ -17,3 +17,10 @@ scripts/seed/content.json
 
 # local font comparison screenshots (not for commit)
 font-previews/
+
+# Capacitor iOS: the project is committed, its build output is not
+/ios/App/App/public
+/ios/App/build
+/ios/App/Pods
+/ios/DerivedData
+/ios/App/App/capacitor.config.json

@@ -34,10 +34,22 @@ import { makeVerifyCode, hashContent, isVerifiedTier } from "./verify/code";
 
 // ─── local storage ────────────────────────────────────────────────────────────
 
+// crypto.randomUUID only exists in a secure context, so it is missing whenever
+// the app is served over plain http — a LAN address during device testing, for
+// instance. Falling back keeps documents creatable there instead of taking the
+// whole editor down with a TypeError.
+export function uid() {
+  try {
+    if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+  } catch { /* fall through */ }
+  const r = (n) => Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+  return `${r(8)}-${r(4)}-4${r(3)}-${((Math.random() * 4) | 8).toString(16)}${r(3)}-${r(12)}`;
+}
+
 function createDoc() {
   const now = Date.now();
   return {
-    id: crypto.randomUUID(), title: "", content: "",
+    id: uid(), title: "", content: "",
     updatedAt: now, createdAt: now,
     writingTimeSecs: 0, revisionCount: 0,
     keystrokes: 0, deletions: 0, pastes: 0,
@@ -3522,6 +3534,24 @@ export default function App() {
       window.removeEventListener("online",  on);
       window.removeEventListener("offline", off);
     };
+  }, []);
+
+  // ── native safe areas ────────────────────────────────────────────────────
+  // Capacitor's webview reports env(safe-area-inset-*) as 0, so the notch and
+  // home indicator would sit on top of the UI. The plugin reads the real insets
+  // natively and publishes them as --safe-area-inset-* for the CSS to use. On
+  // the web this import resolves to a no-op implementation.
+  useEffect(() => {
+    let cancelled = false;
+    import("@capacitor-community/safe-area")
+      .then(({ SafeArea }) => { if (!cancelled) SafeArea?.enable?.({ config: {} }); })
+      .catch(() => { /* web build, or plugin unavailable */ });
+    // iOS puts a prev/next/Done bar above the keyboard. On a page that is just
+    // paper and a sentence it is the only piece of furniture left, so remove it.
+    import("@capacitor/keyboard")
+      .then(({ Keyboard }) => { if (!cancelled) Keyboard?.setAccessoryBarVisible?.({ isVisible: false }); })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, []);
 
   // ── on-screen keyboard (phones) ──────────────────────────────────────────

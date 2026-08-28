@@ -3246,7 +3246,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   }
   #text-container.writing-started { padding-top: 6vh; }
   #writing-area {
-    width: calc(100% - 56px);
+    width: calc(100% - 44px);
     max-width: none;
     min-width: 0;
   }
@@ -3259,7 +3259,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   #text {
     width: 100%;
     max-width: none;
-    font-size: 1.12rem;
+    font-size: 1.05rem;
     line-height: 1.65;
     padding: 0 0 8px;
   }
@@ -3930,6 +3930,19 @@ body.is-mobile #auth-modal input { font-size: 16px; }
    toolbar but no toolbar: paper, your sentence, and nothing else. --kb-inset is
    published by the visualViewport effect in App.js and is 0 on desktop. */
 @media (max-width: 600px) {
+  :root {
+    --sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+    --sab: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  }
+
+  /* An SVG in a column flex container is shrinkable, so a short nav collapses
+     the icons to zero height while the text-glyph tab keeps its mark. Pin them. */
+  #bottom-nav .nav-tab > svg { flex: 0 0 auto; width: 18px; height: 18px; }
+  #bottom-nav {
+    height: calc(var(--bottom-nav) + var(--sab));
+    padding-bottom: var(--sab);
+  }
+
   /* Sit the writing strip on top of the keyboard rather than behind it. */
   #text-container {
     bottom: calc(var(--bottom-nav) + 60px + var(--kb-inset, 0px));
@@ -3949,12 +3962,15 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   body.keyboard-open #research-strip { opacity: 0; pointer-events: none; }
 
   /* Notch and home indicator. */
+  /* Capacitor's webview reports env(safe-area-inset-*) as 0, so the native
+     values are injected as --safe-area-inset-* by the SafeArea plugin. Prefer
+     those, fall back to env() on the web, then to 0. */
   #top-bar {
-    height: calc(var(--top-bar) + env(safe-area-inset-top, 0px));
-    padding-top: env(safe-area-inset-top, 0px);
+    height: calc(var(--top-bar) + var(--sat));
+    padding-top: var(--sat);
   }
   #text-container, #reading-container, #verify-view, #editor-preview-container {
-    top: calc(var(--top-bar) + env(safe-area-inset-top, 0px));
+    top: calc(var(--top-bar) + var(--sat));
   }
 
   /* The flank mask has nowhere to live on a phone — there are no flanks — so
