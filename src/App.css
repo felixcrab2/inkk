@@ -4335,3 +4335,40 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   .feed-section-label::after { display: none !important; }
   .feed-section-label { gap: 0 !important; }
 }
+
+/* ─── Phone: iteration 4 — the drawer, and time ──────────────────────────── */
+@media (max-width: 600px) {
+  /* The drawer sat on --surface, a flat grey, with the active draft marked by
+     a full-bleed grey band: the hard rectangle again. Paper ground, and the
+     selection becomes an inset rounded field like everything else. */
+  #doc-panel { background: var(--bg) !important; }
+  #doc-list { padding: 6px 12px !important; }
+  .doc-item {
+    border-radius: 14px !important;
+    padding: 15px 16px !important;
+    margin-bottom: 2px;
+  }
+  .doc-item.active { background: rgba(62, 50, 36, 0.06) !important; }
+  .doc-item-meta { font-size: 0.76rem !important; color: var(--subtle) !important; }
+  .new-doc-btn {
+    margin: 10px 12px 4px;
+    width: calc(100% - 24px) !important;
+    border-radius: 14px !important;
+    background: rgba(62, 50, 36, 0.05) !important;
+    color: var(--text) !important;
+    justify-content: flex-start;
+  }
+
+  /* An engraving needs room. The hourglass was tried on the status strip and
+     came out as an 11px smudge, so Dürer is kept to places with the space to
+     read him: the blank page, the verify mark, the section rule, empty states. */
+
+  /* Glassmorphism is itself on the generated-UI list, so the bar keeps the
+     float but loses most of the frost. */
+  #bottom-nav {
+    background: rgba(250, 248, 244, 0.93);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border-color: rgba(62, 50, 36, 0.09);
+  }
+}
