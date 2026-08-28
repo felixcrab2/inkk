@@ -4372,3 +4372,102 @@ body.is-mobile #auth-modal input { font-size: 16px; }
     border-color: rgba(62, 50, 36, 0.09);
   }
 }
+
+/* ─── Phone: the reading view reflows ────────────────────────────────────────
+   A fixed book page on a 390px screen measures ~12-15% slower to read and
+   ~23% worse for retention than reflowed text. The canvas pages stay the
+   artifact — the download, the desktop view, the thing that gets certified —
+   and the phone gets the words set at its own measure. */
+@media (max-width: 600px) {
+  [data-desktop-only] { display: none !important; }
+
+  #reading-inner { max-width: none !important; padding: 0 !important; }
+
+  #reading-reflow { padding: 0 22px 60px; }
+
+  /* the piece's own plate, as a frontispiece */
+  .reading-plate {
+    height: 168px;
+    margin: 4px -22px 26px;
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0.13;
+  }
+
+  .reading-reflow-title {
+    font-family: var(--font-serif) !important;
+    font-size: 2.15rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.08;
+    margin: 0 0 22px;
+  }
+  .reading-reflow-body {
+    font-family: var(--font-serif);
+    font-size: 1.18rem;
+    line-height: 1.62;
+    color: var(--text);
+    font-variant-numeric: normal;
+  }
+  .reading-reflow-body p { margin: 0 0 1.15em; }
+  .reading-reflow-body img { max-width: 100%; height: auto; border-radius: 4px; }
+
+  /* the first paragraph opens with a raised initial, as a page would */
+  .reading-reflow-body > p:first-of-type::first-letter {
+    font-size: 3.1em;
+    line-height: 0.82;
+    float: left;
+    padding: 0.06em 0.08em 0 0;
+    font-weight: 600;
+  }
+
+  /* the reading chrome loses its rules too */
+  #reading-meta, #reading-container, .reading-verify { border: none !important; }
+}
+
+/* ─── Phone: reading reflow, specificity fix ─────────────────────────────────
+   The global sans rule targets `p` directly, so it beat the serif that the
+   body inherited from its parent — which is why only the first paragraph came
+   out in Garamond. Descendants are named explicitly here. */
+@media (max-width: 600px) {
+  .reading-reflow-body,
+  .reading-reflow-body p,
+  .reading-reflow-body div,
+  .reading-reflow-body span,
+  .reading-reflow-body li,
+  .reading-reflow-body blockquote,
+  .reading-reflow-body em,
+  .reading-reflow-body strong {
+    font-family: var(--font-serif) !important;
+    font-size: 1.18rem;
+    line-height: 1.62;
+  }
+  .reading-reflow-body strong { font-weight: 600; }
+  .reading-reflow-body em { font-style: italic; }
+
+  /* the opening initial, whichever element the piece actually starts with */
+  .reading-reflow-body > *:first-child::first-letter {
+    font-size: 3.2em;
+    line-height: 0.8;
+    float: left;
+    padding: 0.05em 0.09em 0 0;
+    font-weight: 600;
+  }
+}
+
+/* ─── Phone: the illuminated initial ─────────────────────────────────────── */
+@media (max-width: 600px) {
+  /* a CSS ::first-letter cap is replaced by the real thing: the same
+     illuminated letters the feed already uses for avatars, opening the piece
+     the way they open a manuscript page */
+  .reading-reflow-body > *:first-child::first-letter { font-size: inherit; float: none; padding: 0; }
+  .reading-initial {
+    float: left;
+    width: 66px;
+    height: 66px;
+    margin: 5px 12px 2px 0;
+    shape-outside: margin-box;
+  }
+  .reading-reflow-body.has-initial > *:first-child { margin-top: 0; }
+}

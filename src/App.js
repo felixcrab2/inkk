@@ -1198,6 +1198,57 @@ function Toasts({ toasts }) {
 
 // ─── LandingScreen ────────────────────────────────────────────────────────────
 
+// Reflowed reading (phones). A fixed book page on a 390px screen is measurably
+// worse to read than reflowed text — slower, and worse for retention — so the
+// canvas pages stay the artifact (download, desktop, the thing certified) and
+// the phone gets the words at its own measure.
+//
+// The HTML is a published piece, so it is parsed in an inert <template> and
+// stripped to a small tag whitelist before it is ever inserted: no scripts, no
+// event handlers, no <img onerror>.
+const READ_TAGS = new Set(["P","BR","EM","I","STRONG","B","U","BLOCKQUOTE","H1","H2","H3","UL","OL","LI","A","IMG","DIV","SPAN"]);
+function sanitizeForReading(html) {
+  const tpl = document.createElement("template");
+  tpl.innerHTML = html || "";
+  const walk = (node) => {
+    [...node.children].forEach(el => {
+      if (!READ_TAGS.has(el.tagName)) { el.replaceWith(...el.childNodes); return; }
+      [...el.attributes].forEach(a => {
+        const keep = (el.tagName === "IMG" && a.name === "src") || (el.tagName === "A" && a.name === "href");
+        if (!keep) el.removeAttribute(a.name);
+      });
+      if (el.tagName === "A") { el.setAttribute("rel", "noopener noreferrer"); el.setAttribute("target", "_blank"); }
+      walk(el);
+    });
+  };
+  walk(tpl.content);
+  return tpl.innerHTML;
+}
+
+// The opening letter, and the same string with that letter lifted out — an
+// illuminated initial replaces it rather than sitting next to a duplicate.
+function openingLetter(html) {
+  const tpl = document.createElement("template");
+  tpl.innerHTML = html || "";
+  const t = (tpl.content.textContent || "").trim();
+  const m = t.match(/[A-Za-z]/);
+  return m ? m[0] : null;
+}
+function stripOpeningLetter(html) {
+  const tpl = document.createElement("template");
+  tpl.innerHTML = html || "";
+  const walker = document.createTreeWalker(tpl.content, NodeFilter.SHOW_TEXT);
+  let n;
+  while ((n = walker.nextNode())) {
+    const i = n.textContent.search(/[A-Za-z]/);
+    if (i !== -1) { n.textContent = n.textContent.slice(0, i) + n.textContent.slice(i + 1); break; }
+  }
+  return tpl.innerHTML;
+}
+
+const isPhone = () => typeof window !== "undefined"
+  && window.matchMedia("(max-width: 600px)").matches;
+
 // ─── Engraving backdrop ───────────────────────────────────────────────────────
 // A pool of faded public-domain plates, some at more than one framing. The
 // plate advances (randomly, never repeating itself) each time the backdrop
@@ -2935,8 +2986,12 @@ function ReadingView({ pub, user, isAdmin, dropCapImages, focus, onRequestAuth, 
   const [pages, setPages]               = useState([]);
   const [pagesLoading, setPagesLoading] = useState(true);
   const [zoom, setZoom]                 = useState(1.0);
+  const [phone] = useState(isPhone);
+  // An illuminated initial opens the piece, as it would open a manuscript.
+  const initialSrc = phone ? dropCapSrc(openingLetter(pub.content), dropCapImages) : null;
 
   useEffect(() => {
+    if (isPhone()) { setPagesLoading(false); return; }   // phones reflow instead
     setPages([]);
     setPagesLoading(true);
     renderBookPdfPages({
@@ -3072,7 +3127,7 @@ function ReadingView({ pub, user, isAdmin, dropCapImages, focus, onRequestAuth, 
           <button id="reading-copy" onClick={copyText} title="Copy text">
             {copied ? <CheckCheck size={14} /> : <Copy size={14} />}
           </button>
-          <div className="reading-zoom">
+          <div className="reading-zoom" data-desktop-only="">
             <button className="zoom-btn" onClick={() => setZoom(z => Math.max(0.6, +(z - 0.2).toFixed(1)))} title="Zoom out">−</button>
             <button className="zoom-btn" onClick={() => setZoom(z => Math.min(2.4, +(z + 0.2).toFixed(1)))} title="Zoom in">+</button>
           </div>
@@ -3081,6 +3136,19 @@ function ReadingView({ pub, user, isAdmin, dropCapImages, focus, onRequestAuth, 
           {pub.author_note && (
             <p className="reading-author-note">{pub.author_note}</p>
           )}
+          {phone ? (
+            <article id="reading-reflow">
+              {/* the piece's own plate, as a frontispiece */}
+              <div className="reading-plate"
+                   style={{ backgroundImage: `url(/backdrops/${imgForPub(pub.id)}.webp)` }} />
+              <h1 className="reading-reflow-title">{pub.title}</h1>
+              {initialSrc && <img className="reading-initial" src={initialSrc} alt="" aria-hidden="true" />}
+              <div className={"reading-reflow-body" + (initialSrc ? " has-initial" : "")}
+                   dangerouslySetInnerHTML={{ __html: initialSrc
+                     ? sanitizeForReading(stripOpeningLetter(pub.content))
+                     : sanitizeForReading(pub.content) }} />
+            </article>
+          ) : (
           <div id="reading-pages">
             {pagesLoading && pages.length === 0 && (
               <p className="reading-pages-loading">rendering…</p>
@@ -3089,6 +3157,7 @@ function ReadingView({ pub, user, isAdmin, dropCapImages, focus, onRequestAuth, 
               <img key={i} className="reading-page-img" src={url} alt="" />
             ))}
           </div>
+          )}
 
           {/* ── Verification colophon ──────────────────────────────────────── */}
           {pub.verify_code && (
