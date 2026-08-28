@@ -4043,42 +4043,14 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   body.keyboard-open .writing-stats { opacity: 0; pointer-events: none; }
 }
 
-/* ─── Phone: editorial, not dev-tool ──────────────────────────────────────────
-   A Garamond wordmark sitting above geometric-sans headings and line icons is
-   the look of a developer tool, not of inkk. On the phone the whole interface
-   is set in the serif and the icon set is retired in favour of words. Desktop
-   is untouched. */
+/* ─── Phone: drawer + section ornament ───────────────────────────────────────
+   What survives of the earlier all-Garamond experiment. The type rules it
+   carried are gone: they set buttons, headings and the nav in the serif and
+   went on overriding the later passes, which is why buttons stayed Garamond
+   long after the interface moved to a grotesque. */
 @media (max-width: 600px) {
-  /* The one lever: --font-ui drives every non-editor surface. */
-  :root { --font-ui: var(--font-serif); }
-  body { font-family: var(--font-serif); }
-
-  /* Headings lose the geometric-sans weight and read as type, not UI. */
-  h1, h2, h3, .auth-title, #auth-title, .verify-title, .profile-name {
-    font-family: var(--font-serif);
-    font-weight: 500;
-    letter-spacing: 0.01em;
-  }
-
-  /* Words, not glyphs. Uppercase Garamond with generous tracking is the
-     classical inscription, and it is unmistakably not a SaaS tab bar. */
   #bottom-nav .nav-tab > svg,
   #bottom-nav .nav-diamond { display: none; }
-  #bottom-nav .nav-label {
-    font-family: var(--font-serif);
-    font-size: 0.82rem;
-    letter-spacing: 0.14em;
-    font-weight: 500;
-    margin-top: 0;
-    text-transform: uppercase;
-  }
-  #bottom-nav .nav-tab.active .nav-label { font-weight: 600; }
-
-  /* Buttons as set type rather than shipping-label sans. */
-  button, .primary, .ghost, .auth-btn, .verify-submit, .profile-cta {
-    font-family: var(--font-serif);
-    letter-spacing: 0.1em;
-  }
 
   /* The drafts drawer was a desktop sidebar leaving a strip of editor showing
      down the side. On a phone a drawer is the screen. */
@@ -4089,26 +4061,17 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   }
   .new-doc-btn { font-size: 0.95rem; padding: 16px 22px; }
   .new-doc-btn svg { display: none; }
-  .new-doc-btn::before { content: "＋"; font-size: 1rem; opacity: 0.55; }
-  .doc-item { padding: 14px 22px; }
+  .doc-item { padding: 16px 22px; }
 
-  /* Dürer, put to work: the foliate band from the Flammarion border becomes
-     the rule between sections of the feed. */
-  .feed-section-label {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    font-family: var(--font-serif);
-    letter-spacing: 0.18em;
-  }
-  /* A single centred device rather than a repeating band: tiling shows its
-     seam, and one ornament between sections is the classical setting anyway. */
+  /* Dürer: the foliate band from the Flammarion border, as one centred device
+     between sections. Tiling it shows the seam. */
+  .feed-section-label { display: flex; flex-direction: column; gap: 10px; }
   .feed-section-label::after {
     content: "";
     display: block;
-    width: 170px;
-    height: 9px;
-    opacity: 0.3;
+    width: 150px;
+    height: 8px;
+    opacity: 0.26;
     background: url("./assets/ornament-rule.webp") center / contain no-repeat;
   }
 }
@@ -4322,4 +4285,53 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   /* Eyebrows: the position already says "latest", and a page titled "Verify a
      piece" does not need "Authenticity" stacked above it. */
   .feed-lead-kicker, .verify-eyebrow { display: none !important; }
+}
+
+/* ─── Phone: iteration 2 — the last hairlines and stray serifs ───────────── */
+@media (max-width: 600px) {
+  /* Drafts list is UI, not writing, so it takes the interface face. */
+  .doc-item-title { font-family: var(--font-ui) !important; font-weight: 500; }
+
+  /* Remaining structural lines. The drawer is full width, so its right edge
+     divides nothing. */
+  #doc-panel, #panel-footer, #format-toolbar { border: none !important; }
+
+  /* Counters and secondary buttons were outlined boxes; a quiet fill reads as
+     one object instead of a rectangle drawn around a number. */
+  .feed-tab-count {
+    border: none !important;
+    background: rgba(62, 50, 36, 0.07);
+    border-radius: 999px;
+    padding: 2px 8px;
+  }
+  .profile-cta, .profile-cta-ghost, .auth-btn, .verify-submit, .primary, .ghost {
+    border: none !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    border-radius: 999px !important;
+    font-weight: 500 !important;
+    font-family: var(--font-ui) !important;
+  }
+  .profile-cta-ghost, .ghost { background: rgba(62, 50, 36, 0.06) !important; }
+}
+
+/* ─── Phone: iteration 3 — engraved rules, no diamonds ───────────────────── */
+@media (max-width: 600px) {
+  /* The badge diamond on every card. */
+  .hs-badge-mark { display: none !important; }
+
+  /* .feed-lead drew its divider as a 1px ::after, which is why the border
+     audit could not see it. Rather than delete the rule, let Dürer draw it:
+     the foliate band from the Flammarion border, faded at both ends so the
+     tile seam disappears and it reads as a printed rule. */
+  .feed-lead::after {
+    height: 11px !important;
+    background: url("./assets/ornament-rule.webp") center / auto 11px repeat-x !important;
+    opacity: 0.3;
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent);
+    mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent);
+  }
+  /* one ornament per break, so the small one under the label goes */
+  .feed-section-label::after { display: none !important; }
+  .feed-section-label { gap: 0 !important; }
 }
