@@ -4754,8 +4754,8 @@ body.is-mobile #auth-modal input { font-size: 16px; }
     --t-sm:  0.92rem;
     --t-md:  1.06rem;
     --t-lg:  1.22rem;
-    --t-xl:  1.5rem;
-    --t-2xl: 2.3rem;
+    --t-xl:  1.4rem;
+    --t-2xl: 2.15rem;
 
     /* spacing — tight inside a group, generous between sections */
     --s-1: 6px;
@@ -4778,11 +4778,14 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   .feed-quote-text   { font-size: var(--t-xl)  !important; }
   .verify-title      { font-size: var(--t-2xl) !important; }
   .reading-reflow-title { font-size: var(--t-2xl) !important; }
-  .feed-lead-excerpt, .feed-entry-excerpt,
+  /* excerpts are previews, one step below reading text — mapping them onto
+     t-lg was what inflated the feed */
   .reading-reflow-body, .reading-reflow-body p { font-size: var(--t-lg) !important; }
+  .feed-lead-excerpt, .feed-entry-excerpt      { font-size: var(--t-md) !important; }
   .verify-sub, .doc-item-title, .new-doc-btn   { font-size: var(--t-md) !important; }
-  #bottom-nav .nav-label, .feed-tab, button,
-  .primary, .ghost, .profile-cta               { font-size: var(--t-sm) !important; }
+  /* named controls only: a blanket button rule upsized every small glyph */
+  #bottom-nav .nav-label, .feed-tab,
+  .primary, .ghost, .profile-cta, .verify-submit { font-size: var(--t-sm) !important; }
   .feed-dateline, .feed-entry-date, .feed-entry-meta,
   .feed-quote-attr, .doc-item-meta, .rv-copy   { font-size: var(--t-xs) !important; }
 
@@ -4798,5 +4801,54 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   #bottom-nav {
     border: none !important;
     box-shadow: 0 8px 30px rgba(62, 50, 36, 0.13) !important;
+  }
+}
+
+/* ─── Phone: where the colour lives ──────────────────────────────────────────
+   Not decoration — a system with a story. A manuscript page was ink and
+   paper, and colour meant something: the scribe's red lead (rubric) marked
+   what mattered, and a day worth marking in the calendar was written in red —
+   literally a red-letter day. So:
+
+     · the caret you write with is red lead — the pen is inked
+     · the dateline turns red only on a day with fresh writing
+     · a pull quote opens with a red mark
+     · a liked piece keeps a red heart
+     · "Human-verified" is sealed in red — wax was always red
+
+   Everything else stays ink. Colour that appears this rarely is information. */
+@media (max-width: 600px) {
+  /* the pen is inked */
+  #text, #title-input { caret-color: var(--rubric) !important; }
+  #text:focus, #title-input:focus { caret-color: var(--rubric) !important; }
+  ::selection { background: rgba(158, 59, 40, 0.14); }
+
+  /* a red-letter day */
+  .feed-dateline.red-letter { color: var(--rubric) !important; }
+
+  /* the rubricated quote mark */
+  .feed-quote-text::before { color: var(--rubric); opacity: 0.55; }
+
+  /* a liked piece — replaces the off-palette #a8424a */
+  .reading-like.liked,
+  .feed-engage .liked, .engage-btn.liked {
+    color: var(--rubric) !important;
+    background: rgba(158, 59, 40, 0.06) !important;
+  }
+
+  /* the study/save dots come onto the palette: green was never in it.
+     quiet states are ink; activity is gold leaf, not traffic-light */
+  .ws-status .hs-status-dot, .hs-status-dot { background: var(--ink-4); }
+  .ws-status.ok .hs-status-dot, .hs-status-dot.ok { background: var(--ink-4); }
+  .ws-status.saving .hs-status-dot, .hs-status-dot.saving { background: var(--gold); }
+  .ws-status.off .hs-status-dot, .hs-status-dot.off { background: var(--rubric); }
+  .research-pulse, .research-pulse::after { background: var(--gold); }
+
+  #research-strip { font-size: var(--t-xs) !important; color: var(--ink-3) !important; }
+  .writing-stats {
+    background: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    color: var(--ink-3) !important;
   }
 }

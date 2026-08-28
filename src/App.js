@@ -2314,7 +2314,10 @@ function Feed({ user, onRead, onAuthorClick, dropCapImages, onRequestAuth }) {
   return (
     <div id="feed-container">
       <div id="feed-masthead">
-        <span className="feed-dateline">{editionDate}</span>
+        {/* a day with new writing is, literally, a red-letter day */}
+        <span className={"feed-dateline" + (pubs.some(p => isToday(p.published_at)) ? " red-letter" : "")}>
+          {editionDate}
+        </span>
       </div>
 
       <div id="feed-header">
