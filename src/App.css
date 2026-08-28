@@ -3943,6 +3943,46 @@ body.is-mobile #auth-modal input { font-size: 16px; }
     padding-bottom: var(--sab);
   }
 
+  /* ── The editor reads as a note, not a document ──────────────────────────
+     A phone note starts at the top and the title is simply the first line,
+     left-aligned with the body. Centring the title and floating the block in
+     the middle of a tall narrow screen is what made this feel like a shrunken
+     desktop page rather than something built for the device. */
+  #text-container {
+    padding-top: 3vh;
+    padding-bottom: 12vh;
+    /* the top fade eats the first line on a short screen */
+    -webkit-mask-image: linear-gradient(to bottom, black 0px, black calc(100% - 28px), transparent 100%);
+    mask-image: linear-gradient(to bottom, black 0px, black calc(100% - 28px), transparent 100%);
+  }
+  #text-container.writing-started { padding-top: 3vh; }
+
+  #title-input {
+    width: calc(100% - 44px);
+    text-align: left;
+    text-wrap: initial;
+    font-size: 1.32rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+    padding: 0;
+  }
+
+  /* Editor actions: quiet glyphs, not a row of competing boxes. Nothing solid
+     black next to paper. */
+  #top-bar-right .btn-label { display: none; }
+  #top-bar-right .icon-btn,
+  #top-bar-right #publish-btn,
+  #top-bar-right button {
+    background: none;
+    border: none;
+    box-shadow: none;
+    color: var(--muted);
+    padding: 6px;
+    min-width: 0;
+  }
+  #top-bar-right #publish-btn { color: var(--text); }
+  #top-bar { padding-right: 6px; }
+
   /* Sit the writing strip on top of the keyboard rather than behind it. */
   #text-container {
     bottom: calc(var(--bottom-nav) + 60px + var(--kb-inset, 0px));
@@ -3986,6 +4026,11 @@ body.is-mobile #auth-modal input { font-size: 16px; }
     transform: none;
   }
   #backdrop.bd-on { opacity: 0.1; }
+  /* On a phone there are no margins for the plate to live in, so anywhere with
+     a column of text it can only sit *behind* the words and fight them. Keep
+     the engraving as the greeting on a blank page, and let every reading
+     surface be plain paper. */
+  #backdrop.bd-on:not([data-view="editor"]) { opacity: 0; }
   #backdrop.bd-ring { -webkit-mask-image: none; mask-image: none; }
 
   /* Nothing but the page while writing. */

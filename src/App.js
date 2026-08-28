@@ -1291,6 +1291,7 @@ function Backdrop({ view, hidden, override, ringed }) {
   return (
     <div
       id="backdrop"
+      data-view={view}
       className={(hidden || veiled || !ready ? "" : "bd-on") + (veiled ? " bd-veil" : "") + (ringed ? " bd-ring" : "")}
       style={{
         backgroundImage: `url(/backdrops/${shown.img}.webp)`,
