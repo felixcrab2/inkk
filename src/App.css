@@ -4597,3 +4597,61 @@ body.is-mobile #auth-modal input { font-size: 16px; }
     mask-image: radial-gradient(ellipse 120% 60% at 50% 42%, transparent 30%, #000 100%);
   }
 }
+
+/* ─── Phone: the top, and the rhythm of the feed ─────────────────────────────
+   The date sat hard under the top bar and the backdrop cut in with a visible
+   edge at exactly that line, which is the compression at the top. The header
+   gets air, and the plate now fades in from nothing instead of starting at a
+   seam. */
+@media (max-width: 600px) {
+  #feed-masthead { padding-top: 30px !important; padding-bottom: 4px !important; }
+  .feed-dateline { font-size: 0.76rem !important; color: var(--subtle) !important; }
+  #feed-header { padding-top: 10px !important; padding-bottom: 22px !important; }
+  #feed-list { padding-top: 8px !important; }
+
+  /* no hard horizontal seam under the bar */
+  #backdrop:not([data-view="editor"]) {
+    -webkit-mask-image:
+      linear-gradient(to bottom, transparent 0, #000 34%),
+      radial-gradient(ellipse 120% 55% at 50% 46%, transparent 34%, #000 100%);
+    mask-image:
+      linear-gradient(to bottom, transparent 0, #000 34%),
+      radial-gradient(ellipse 120% 55% at 50% 46%, transparent 34%, #000 100%);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+  }
+
+  /* ── the pull quote ──────────────────────────────────────────────────────
+     A uniform list of title-and-excerpt rows scrolls past without ever asking
+     you to stop. One line set large, every few entries, gives the eye
+     somewhere to land and turns a piece into something quotable. */
+  .feed-quote {
+    margin: 6px 0 26px;
+    padding: 26px 4px 22px;
+    cursor: pointer;
+  }
+  .feed-quote-text {
+    font-family: var(--font-serif);
+    font-size: 1.62rem;
+    line-height: 1.28;
+    letter-spacing: -0.012em;
+    color: var(--text);
+    margin: 0 0 14px;
+    text-wrap: balance;
+  }
+  .feed-quote-text::before {
+    content: "“";
+    font-family: var(--font-serif);
+    font-size: 2.1em;
+    line-height: 0;
+    vertical-align: -0.32em;
+    margin-right: 0.06em;
+    opacity: 0.28;
+  }
+  .feed-quote-attr {
+    font-family: var(--font-ui);
+    font-size: 0.78rem;
+    color: var(--subtle);
+  }
+  .feed-quote-attr::before { content: "— "; }
+}
