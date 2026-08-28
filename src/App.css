@@ -4471,3 +4471,81 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   }
   .reading-reflow-body.has-initial > *:first-child { margin-top: 0; }
 }
+
+/* ─── Phone: reading-view chrome ─────────────────────────────────────────── */
+@media (max-width: 600px) {
+  /* comments and colophon are interface, not writing */
+  .comment-author, .comment-body, .comment-meta,
+  .reading-comments-title, .rv-status, .rv-copy, .report-btn {
+    font-family: var(--font-ui) !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+  }
+  .reading-comments-title { font-size: 0.95rem; font-weight: 600; }
+
+  /* the last hairlines on this page */
+  #reading-footer, .reading-like, .comment, .comment-list, .reading-verify {
+    border: none !important;
+  }
+  .reading-like {
+    background: rgba(62, 50, 36, 0.06) !important;
+    border-radius: 999px !important;
+    padding: 10px 18px !important;
+  }
+  /* the colophon becomes a quiet inset panel rather than a boxed rectangle */
+  .reading-verify {
+    background: rgba(62, 50, 36, 0.045) !important;
+    border-radius: 16px !important;
+    padding: 18px !important;
+  }
+}
+
+/* ─── Phone: every piece wears its plate ─────────────────────────────────────
+   A feed of nothing but text blocks is hard to scan and harder to want. Each
+   published piece already owns a Dürer plate for life (hashed from its id), so
+   the feed shows it: the lead gets a frontispiece band, index entries a small
+   square. Variety and rhythm come from the work itself rather than from
+   decoration invented for the purpose. */
+@media (max-width: 600px) {
+  .feed-plate {
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+  }
+  .feed-plate-lead {
+    height: 132px;
+    margin: 2px 0 16px;
+    opacity: 0.5;
+    -webkit-mask-image: radial-gradient(ellipse 62% 78% at 50% 50%, #000 55%, transparent 100%);
+    mask-image: radial-gradient(ellipse 62% 78% at 50% 50%, #000 55%, transparent 100%);
+  }
+  .feed-plate-entry {
+    width: 58px; height: 58px;
+    flex: none;
+    margin-right: 14px;
+    opacity: 0.55;
+  }
+  .feed-entry { display: flex; align-items: flex-start; }
+}
+
+/* ─── Phone: the entry list ──────────────────────────────────────────────────
+   .feed-entry drew its separator as a positioned ::after too, which is why a
+   border audit kept coming back clean while the lines were still on screen.
+   Space separates the entries now. */
+@media (max-width: 600px) {
+  .feed-entry::after { display: none !important; }
+  .feed-entry { padding: 22px 0 !important; }
+
+  /* One image per row. The plate is the piece's mark and carries the visual
+     rhythm, so the author's illuminated initial steps back to the byline. */
+  .feed-entry .feed-mark { display: none !important; }
+  .feed-plate-entry { width: 72px; height: 72px; opacity: 0.6; margin-right: 16px; }
+  .feed-entry-title { font-size: 1.34rem !important; }
+}
+
+/* ─── Phone: measure ─────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  /* the column ran almost to the edges, which is what made it feel wide */
+  #feed-list, #feed-header, #feed-masthead { padding-left: 22px !important; padding-right: 22px !important; }
+  .feed-lead, .feed-entry { padding-left: 0 !important; padding-right: 0 !important; }
+}

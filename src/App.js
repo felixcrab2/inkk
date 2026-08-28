@@ -2109,6 +2109,9 @@ function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, 
     return (
       <article className="feed-lead" style={{ "--card-index": index }} onClick={() => onRead(pub)}>
         <span className="feed-lead-kicker">{fresh ? "Today's read" : "Latest"}</span>
+        {/* every piece carries its own plate for life; here it is the card's art */}
+        <div className="feed-plate feed-plate-lead" aria-hidden="true"
+             style={{ backgroundImage: `url(/backdrops/${imgForPub(pub.id)}.webp)` }} />
         <h2 className="feed-lead-title">{pub.title || "Untitled"}</h2>
         {excerpt && <p className="feed-lead-excerpt">{excerpt}</p>}
         <div className="feed-lead-byline">
@@ -2138,6 +2141,8 @@ function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, 
           <DropCapAvatar letter={initial} avatarData={pub.avatar_data} dropCapImages={dropCapImages} size={34} />
         </span>
       )}
+      <div className="feed-plate feed-plate-entry" aria-hidden="true"
+           style={{ backgroundImage: `url(/backdrops/${imgForPub(pub.id)}.webp)` }} />
       <div className="feed-entry-body">
         <h2 className="feed-entry-title">{pub.title || "Untitled"}</h2>
         {excerpt && <p className="feed-entry-excerpt">{excerpt}</p>}
