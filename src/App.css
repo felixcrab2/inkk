@@ -4107,3 +4107,41 @@ body.is-mobile #auth-modal input { font-size: 16px; }
     background: url("./assets/ornament-rule.webp") center / contain no-repeat;
   }
 }
+
+/* ─── Phone: warm the palette, quiet the type ────────────────────────────────
+   The base palette is neutral grey (#f6f6f6 paper, pure-black borders), which
+   is the cold, screen-native tone that makes an interface read as generic.
+   inkk is paper and ink, so on the phone every neutral is warmed toward the
+   same off-white the carousels and the rendered pages already use. */
+@media (max-width: 600px) {
+  :root {
+    --bg:      #faf8f4;              /* warm paper, not neutral grey */
+    --surface: #f4f1ea;
+    --text:    #1f1b17;              /* warm near-black rather than #1a1a1a */
+    --muted:   #6b6259;              /* sepia, not slate */
+    --subtle:  #a09689;
+    --border:  rgba(62, 50, 36, 0.14);   /* warm brown, never pure black */
+  }
+
+  /* Any input under 16px makes iOS zoom the page on focus, and it does not
+     zoom back — which is why opening Verify left everything permanently
+     enlarged. */
+  /* [class] raises specificity above the component rules that set 0.95rem;
+     without it those win and the page still zooms. */
+  input, textarea, select,
+  input[class], textarea[class], select[class] { font-size: max(16px, 1rem); }
+
+  /* The tabs, set as words rather than tracked-out capitals. Wide letterspaced
+     caps read as a product UI; a serif in its normal case reads as a masthead. */
+  #bottom-nav .nav-label {
+    text-transform: none;
+    letter-spacing: 0.01em;
+    font-size: 0.98rem;
+    font-weight: 400;
+  }
+  #bottom-nav .nav-tab.active .nav-label { font-weight: 600; }
+
+  /* The diamond is retired. The wordmark is the mark. */
+  .nav-diamond, .cert-diamond, .rv-mark, .pac-code-mark,
+  .feed-empty-mark, .verify-cert-diamond { display: none; }
+}
