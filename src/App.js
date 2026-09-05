@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import "@fontsource/eb-garamond/400.css";
 import "@fontsource/eb-garamond/500.css";
@@ -34,7 +34,7 @@ import {
 import { HumanSignalBadge, HumanSignalPanel } from "./components/HumanSignal";
 import { PrivacyModal, TermsModal, TOS_VERSION } from "./components/Legal";
 import { VerifyView } from "./components/Verify";
-import { makeVerifyCode, hashContent, isVerifiedTier, normalizePlainText } from "./verify/code";
+import { makeVerifyCode, hashContent, isVerifiedTier } from "./verify/code";
 
 // ─── local storage ────────────────────────────────────────────────────────────
 
@@ -2233,6 +2233,9 @@ function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, 
   if (featured) {
     return (
       <article className="feed-lead" style={{ "--card-index": index }} onClick={() => onRead(pub)}>
+        {/* the piece's own plate, as the sheet's art */}
+        <span className="feed-lead-art" aria-hidden="true"
+          style={{ backgroundImage: `url(/backdrops/${imgForPub(pub.id)}.webp)` }} />
         <span className="feed-lead-kicker">{fresh ? "Today's read" : "Latest"}</span>
         <h2 className="feed-lead-title">{pub.title || "Untitled"}</h2>
         {excerpt && <LivingExcerpt text={excerpt} pub={pub} className="feed-lead-excerpt" />}
@@ -2273,45 +2276,21 @@ function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, 
           <FeedActions pub={pub} sc={sc} likeCount={likeCount} commentCount={commentCount} onRead={onRead} onLike={onLike} />
         </div>
       </div>
+      <span className="feed-entry-plate" aria-hidden="true"
+        style={{ backgroundImage: `url(/backdrops/${imgForPub(pub.id)}.webp)` }} />
     </article>
   );
 }
 
-// Pick a line worth setting large: the longest sentence that still fits on a
-// card, skipping the opening one so the quote is not simply the excerpt again.
-function pullQuote(html) {
-  const text = normalizePlainText(html || "");
-  const sentences = text.split(/(?<=[.!?])\s+/).map(x => x.trim())
-    .filter(x => x.length >= 45 && x.length <= 165);
-  if (!sentences.length) return null;
-  const pool = sentences.length > 1 ? sentences.slice(1) : sentences;
-  return pool.reduce((a, b) => (b.length > a.length ? b : a), pool[0]);
-}
-
-// Renders a feed: the newest piece as the lead, a quiet section label, then the
-// rest as index entries.
+// Renders a feed: the newest piece as the full-width lead sheet, the rest as
+// sheet cards. Containment does the separating — no interleaved devices.
 function FeedList({ pubs, onRead, onAuthorClick, onLike, dropCapImages }) {
   return (
     <>
-      {pubs.map((pub, i) => {
-        // Every few entries, a line from the piece set large. It breaks the
-        // rhythm of a uniform list, gives the eye somewhere to land, and is
-        // the one thing here worth screenshotting.
-        const quote = i > 1 && (i - 1) % 4 === 0 ? pullQuote(pub.content) : null;
-        return (
-          <Fragment key={pub.id}>
-            {i === 1 && <div className="feed-section-label">More to read</div>}
-            {quote && (
-              <blockquote className="feed-quote" onClick={() => onRead(pub)}>
-                <p className="feed-quote-text">{quote}</p>
-                <span className="feed-quote-attr">{pub.author_name || "Unknown"}</span>
-              </blockquote>
-            )}
-            <FeedCard pub={pub} index={i} featured={i === 0} dropCapImages={dropCapImages}
-              onRead={onRead} onAuthorClick={onAuthorClick} onLike={onLike} />
-          </Fragment>
-        );
-      })}
+      {pubs.map((pub, i) => (
+        <FeedCard key={pub.id} pub={pub} index={i} featured={i === 0} dropCapImages={dropCapImages}
+          onRead={onRead} onAuthorClick={onAuthorClick} onLike={onLike} />
+      ))}
     </>
   );
 }
@@ -2346,7 +2325,7 @@ function FeedEmpty({ title, sub, action, serif }) {
   );
 }
 
-function Feed({ user, onRead, onAuthorClick, dropCapImages, onRequestAuth }) {
+function Feed({ user, me, onRead, onAuthorClick, dropCapImages, onRequestAuth, onWrite }) {
   const [pubs, setPubs]               = useState([]);
   const [loading, setLoading]         = useState(true);
   const [feedTab, setFeedTab]         = useState("stories");
@@ -2404,6 +2383,44 @@ function Feed({ user, onRead, onAuthorClick, dropCapImages, onRequestAuth }) {
     });
   }, [pubs]);
 
+  // ── the social plumbing: who do I already follow, and real follow buttons ──
+  const [followedIds, setFollowedIds] = useState(() => new Set());
+  useEffect(() => {
+    if (!user || !supabase) { setFollowedIds(new Set()); return; }
+    supabase.from("follows").select("following_id").eq("follower_id", user.id)
+      .then(({ data }) => setFollowedIds(new Set((data || []).map(r => r.following_id))));
+  }, [user]);
+
+  const handleRailFollow = useCallback(async (writerId) => {
+    if (!user) { onRequestAuth?.(); return; }
+    const was = followedIds.has(writerId);
+    setFollowedIds(prev => {
+      const next = new Set(prev);
+      if (was) next.delete(writerId); else next.add(writerId);
+      return next;
+    });
+    const err = await toggleFollow(user.id, writerId, was);
+    if (err) {
+      setFollowedIds(prev => {
+        const next = new Set(prev);
+        if (was) next.add(writerId); else next.delete(writerId);
+        return next;
+      });
+    } else {
+      setFollowingFetched(false);  // the Following tab refetches with the new list
+    }
+  }, [user, followedIds, onRequestAuth]);
+
+  // rail: the writers worth meeting (not yourself), and the most-loved pieces
+  const railWriters = useMemo(
+    () => writers.filter(w => w.user_id !== user?.id).slice(0, 5),
+    [writers, user]);
+  const mostLoved = useMemo(
+    () => [...pubs].filter(p => getRelCount(p.like_count) > 0)
+      .sort((a, b) => getRelCount(b.like_count) - getRelCount(a.like_count))
+      .slice(0, 3),
+    [pubs]);
+
   const makeLikeHandler = useCallback((pubList, setPubList) => async (pub) => {
     if (!user) { onRequestAuth?.(); return; }
     if (inflightLikes.current.has(pub.id)) return;
@@ -2434,11 +2451,26 @@ function Feed({ user, onRead, onAuthorClick, dropCapImages, onRequestAuth }) {
 
   return (
     <div id="feed-container">
+     <div id="feed-desk">
+      <div id="feed-main">
       <div id="feed-masthead">
         {/* a day with new writing is, literally, a red-letter day */}
         <span className={"feed-dateline" + (pubs.some(p => isToday(p.published_at)) ? " red-letter" : "")}>
           {editionDate}
         </span>
+      </div>
+
+      {/* the open invitation: the feed is a place you write, not just read */}
+      <div id="feed-composer-wrap">
+        <button id="feed-composer" onClick={onWrite}>
+          {user && (
+            <DropCapAvatar letter={(me?.username || me?.display_name || "i")[0]}
+              avatarData={me?.avatar_data} dropCapImages={dropCapImages} size={32} />
+          )}
+          <span className="feed-composer-ghost">
+            Write something by hand<span className="lf-caret" aria-hidden="true" />
+          </span>
+        </button>
       </div>
 
       <div id="feed-header">
@@ -2545,6 +2577,49 @@ function Feed({ user, onRead, onAuthorClick, dropCapImages, onRequestAuth }) {
           )}
         </div>
       )}
+      </div>
+
+      {/* the rail: the people of the place, and what they loved */}
+      <aside id="feed-rail">
+        {railWriters.length > 0 && (
+          <div className="rail-panel">
+            <p className="rail-title">Writers to follow</p>
+            {railWriters.map(w => (
+              <div key={w.user_id} className="rail-writer">
+                <button className="rail-writer-id" onClick={() => onAuthorClick(w.user_id)}>
+                  <DropCapAvatar letter={(w.author_name || "?")[0]} avatarData={w.avatar_data}
+                    dropCapImages={dropCapImages} size={30} />
+                  <span className="rail-writer-name">{w.author_name}</span>
+                </button>
+                <button
+                  className={"rail-follow" + (followedIds.has(w.user_id) ? " is-following" : "")}
+                  onClick={() => handleRailFollow(w.user_id)}
+                >
+                  {followedIds.has(w.user_id) ? "Following" : "Follow"}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {mostLoved.length > 0 && (
+          <div className="rail-panel">
+            <p className="rail-title">Most loved</p>
+            {mostLoved.map(p => (
+              <button key={p.id} className="rail-piece" onClick={() => onRead(p)}>
+                <span className="rail-piece-plate" aria-hidden="true"
+                  style={{ backgroundImage: `url(/backdrops/${imgForPub(p.id)}.webp)` }} />
+                <span className="rail-piece-info">
+                  <span className="rail-piece-title">{p.title || "Untitled"}</span>
+                  <span className="rail-piece-meta">
+                    {p.author_name} · {getRelCount(p.like_count)} {getRelCount(p.like_count) === 1 ? "like" : "likes"}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </aside>
+     </div>
     </div>
   );
 }
@@ -5505,10 +5580,12 @@ export default function App() {
       {view === "feed" && (
         <Feed
           user={user}
+          me={profile}
           onRead={openReading}
           onAuthorClick={openUserProfile}
           dropCapImages={dropCapImages}
           onRequestAuth={() => openAuth()}
+          onWrite={() => navigate("editor")}
         />
       )}
       {view === "profile" && (
