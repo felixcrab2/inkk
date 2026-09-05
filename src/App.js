@@ -2085,6 +2085,127 @@ function FeedActions({ pub, sc, likeCount, commentCount, onRead, onLike }) {
   );
 }
 
+// ─── The living excerpt ───────────────────────────────────────────────────────
+// The feed does not print a finished sentence; it lets the piece write itself,
+// once, at ITS OWN recorded rhythm. Every other platform can only show the
+// result — inkk owns the process, so a card performs the becoming: the real
+// tempo, hesitancy and correction rate of how this specific piece was written,
+// then it settles into stillness.
+//
+// It runs on data already public on the row (text, keystrokes, deletions,
+// writing_time_seconds, score_features) — never another author's raw
+// keystrokes, which stay private. The exact keystroke-for-keystroke replay is
+// the productionisation (a small derived track stored at publish time); this
+// prototype reconstructs the rhythm faithfully from the piece's own numbers.
+
+// deterministic PRNG so a given piece always writes itself the same way — it is
+// authored, not random noise.
+function seededRandom(seed) {
+  let h = 2166136261 >>> 0;
+  for (const c of String(seed)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); }
+  return () => { h += 0x6D2B79F5; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+
+// Turn a piece's aggregate numbers into a per-character playback rhythm.
+function rhythmOf(pub) {
+  const secs   = Math.max(1, pub.writing_time_seconds || pub.total_writing_secs || 0);
+  const keys   = Math.max(1, pub.keystrokes || 0);
+  const dels   = pub.deletions || 0;
+  const feats  = pub.score_features || {};
+  const netCps = keys > 1 ? keys / secs : 3;            // real chars/sec for THIS piece
+  const hesit  = Math.min(1, (feats.thinking_pauses || feats.pause_count_2000 || 0) / 8
+                            + (feats.pause_count_500 || 0) / 40);
+  const delRate = Math.min(0.06, dels / keys);          // real correction propensity
+  return {
+    slow: netCps < 3.2,        // a slow, deliberate writer vs a fast one
+    hesit,                     // 0..1 how much it stops to think
+    delRate,                   // chance per char of a type-then-fix flourish
+  };
+}
+
+function LivingExcerpt({ text, pub, className }) {
+  const [shown, setShown] = useState("");
+  const [done, setDone]   = useState(false);
+  const ref = useRef(null);
+  const startedRef = useRef(false);
+
+  useEffect(() => {
+    if (!text) return;
+    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const seen = sessionStorage.getItem("lf_" + pub.id);   // once per piece per session
+    if (reduce || seen) { setShown(text); setDone(true); return; }
+
+    const el = ref.current;
+    if (!el) return;
+    const rng = seededRandom(pub.id + text.length);
+    const r = rhythmOf(pub);
+    let i = 0, timer = null, cancelled = false;
+
+    // base per-char delay scaled so the whole excerpt performs in a few seconds
+    // regardless of length; the piece's rhythm modulates AROUND this base.
+    // A fixed performance budget keeps it a few seconds whatever the length;
+    // the piece's rhythm is felt as gentle unevenness within that, never as a
+    // pile of dead stops. base is the flat per-char pace; everything jitters
+    // mildly around it, with short punctuation breaths.
+    const budget = Math.min(3200, Math.max(1800, text.length * 12)) * (r.slow ? 1.1 : 1);
+    const base = budget / text.length;
+    const delRate = Math.min(0.03, r.delRate);
+    // corrections and thinking pauses are human TELLS, not a tax: cap the
+    // count so a long excerpt shows a couple, not dozens that pile into a slog.
+    let delLeft = r.delRate > 0.005 ? 2 : (r.delRate > 0 ? 1 : 0);
+    let thinkLeft = 1 + Math.round(r.hesit);
+
+    const step = () => {
+      if (cancelled) return;
+      if (i >= text.length) { setDone(true); sessionStorage.setItem("lf_" + pub.id, "1"); return; }
+      const ch = text[i];
+      // a correction flourish: a wrong letter, a beat, delete, carry on
+      if (delLeft > 0 && ch !== " " && i > 5 && i < text.length - 5 && rng() < delRate) {
+        delLeft--;
+        const wrong = "aeiotrns"[Math.floor(rng() * 8)];
+        setShown(text.slice(0, i) + wrong);
+        timer = setTimeout(() => { if (cancelled) return;
+          setShown(text.slice(0, i));
+          timer = setTimeout(step, 60 + rng() * 70);
+        }, 110 + rng() * 110);
+        return;
+      }
+      i++;
+      setShown(text.slice(0, i));
+      let gap = base * (0.7 + rng() * 0.6);                 // mild jitter around the pace
+      if (/[.!?]/.test(ch)) gap += 140 + rng() * 150;       // a short breath at a full stop
+      else if (/[,;:]/.test(ch)) gap += 55 + rng() * 70;
+      else if (thinkLeft > 0 && rng() < 0.02) { thinkLeft--; gap += (160 + rng() * 300) * (0.4 + r.hesit); }  // a rare think
+      timer = setTimeout(step, gap);
+    };
+
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting && !startedRef.current) {
+          startedRef.current = true;
+          timer = setTimeout(step, 220);
+        }
+      });
+    }, { threshold: 0.6 });
+    io.observe(el);
+
+    return () => { cancelled = true; clearTimeout(timer); io.disconnect(); };
+    // key on the STABLE id: the feed hands a fresh pub object whenever like or
+    // comment counts refresh, and depending on it would cancel the timer
+    // mid-write and freeze the animation.
+  }, [text, pub.id]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // a click/scroll settle: if the card is opened mid-write, show it whole
+  const settle = () => { if (!done) { setShown(text); setDone(true); sessionStorage.setItem("lf_" + pub.id, "1"); } };
+
+  return (
+    <p ref={ref} className={className + (done ? "" : " is-writing")} onClick={settle}>
+      {shown}{!done && <span className="lf-caret" aria-hidden="true" />}
+    </p>
+  );
+}
+
 function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, onLike, noAvatar }) {
   const excerpt      = feedExcerpt(pub.content, featured ? 300 : 168);
   const likeCount    = getRelCount(pub.like_count);
@@ -2114,7 +2235,7 @@ function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, 
       <article className="feed-lead" style={{ "--card-index": index }} onClick={() => onRead(pub)}>
         <span className="feed-lead-kicker">{fresh ? "Today's read" : "Latest"}</span>
         <h2 className="feed-lead-title">{pub.title || "Untitled"}</h2>
-        {excerpt && <p className="feed-lead-excerpt">{excerpt}</p>}
+        {excerpt && <LivingExcerpt text={excerpt} pub={pub} className="feed-lead-excerpt" />}
         <div className="feed-lead-byline">
           {!noAvatar && (
             <span className="feed-mark">
@@ -2144,7 +2265,7 @@ function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, 
       )}
       <div className="feed-entry-body">
         <h2 className="feed-entry-title">{pub.title || "Untitled"}</h2>
-        {excerpt && <p className="feed-entry-excerpt">{excerpt}</p>}
+        {excerpt && <LivingExcerpt text={excerpt} pub={pub} className="feed-entry-excerpt" />}
         <div className="feed-entry-meta">
           {author}
           <span className="feed-dot">·</span>

@@ -5213,3 +5213,19 @@ body { font-variant-numeric: lining-nums tabular-nums; }
    the GIS iframe is centred, and the fallback stops going full-bleed */
 #google-btn { align-self: center; width: 272px; }
 .gsi-material-button, div[aria-labelledby] > div[role="button"] { margin: 0 auto; }
+
+/* ─── The living excerpt caret ───────────────────────────────────────────────
+   A thin red-lead caret rides at the end of the text while a piece writes
+   itself, then vanishes when it settles. Red because the writing act is the
+   one thing inkk holds sacred. */
+.lf-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 1px;
+  vertical-align: -0.16em;
+  background: var(--rubric);
+  animation: lf-blink 1.05s steps(2, start) infinite;
+}
+@keyframes lf-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+.feed-lead-excerpt.is-writing, .feed-entry-excerpt.is-writing { cursor: default; }
