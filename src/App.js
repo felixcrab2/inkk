@@ -2783,56 +2783,23 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
   return (
     <div id="profile-container">
       <header id="profile-header">
-        <div id="profile-avatar-wrap">
-          <DropCapAvatar letter={avatarLetter} avatarData={profile?.avatar_data} dropCapImages={dropCapImages} size={64} />
-          <button id="avatar-upload-btn" onClick={() => fileInputRef.current?.click()} title="Change photo">
-            {uploading ? "…" : "✎"}
-          </button>
-          {hasCustomAvatar && (
-            <button
-              id="avatar-remove-btn"
-              onClick={handleRemoveAvatar}
-              title="Remove photo, revert to default"
-              disabled={uploading}
-            >×</button>
-          )}
-          <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFileChange} />
-        </div>
-
-        {editingProfile ? (
-          <div className="profile-edit-form">
-            <input
-              className="profile-edit-input"
-              type="text"
-              value={editUsername}
-              onChange={e => setEditUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
-              placeholder="Username"
-              maxLength={20}
-              autoFocus
-            />
-            <input
-              className="profile-edit-input"
-              type="text"
-              value={editDisplayName}
-              onChange={e => setEditDisplayName(e.target.value)}
-              placeholder="display name (optional)"
-              maxLength={50}
-            />
-            <textarea
-              className="profile-edit-input profile-edit-bio"
-              value={editBio}
-              onChange={e => setEditBio(e.target.value)}
-              placeholder="bio: who you are, what you write about (optional)"
-              maxLength={200}
-              rows={3}
-            />
-            {profileError && <p className="profile-edit-error">{profileError}</p>}
-            <div className="profile-edit-actions">
-              <button className="text-btn" onClick={() => { setEditingProfile(false); setProfileError(""); }} disabled={profileSaving}>Cancel</button>
-              <button className="text-btn text-btn-accent" onClick={saveProfile} disabled={profileSaving || editUsername.length < 3}>{profileSaving ? "saving…" : "Save"}</button>
-            </div>
+        <div id="profile-head-row">
+          <div id="profile-avatar-wrap">
+            <DropCapAvatar letter={avatarLetter} avatarData={profile?.avatar_data} dropCapImages={dropCapImages} size={64} />
+            <button id="avatar-upload-btn" onClick={() => fileInputRef.current?.click()} title="Change photo">
+              {uploading ? "…" : "✎"}
+            </button>
+            {hasCustomAvatar && (
+              <button
+                id="avatar-remove-btn"
+                onClick={handleRemoveAvatar}
+                title="Remove photo, revert to default"
+                disabled={uploading}
+              >×</button>
+            )}
+            <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFileChange} />
           </div>
-        ) : (
+
           <div id="profile-identity">
             <h1 id="profile-username">{profile?.username ? `@${profile.username}` : user.email}</h1>
             {profile?.display_name && <div id="profile-displayname">{profile.display_name}</div>}
@@ -2840,22 +2807,23 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
             {user.created_at && (
               <div id="profile-joined">Member since {formatJoined(user.created_at)}</div>
             )}
-            <button className="profile-edit-btn" onClick={startEditProfile}>Edit profile</button>
           </div>
-        )}
-      </header>
 
-      <div id="profile-stats">
-        {streak > 0 && (
-          <div className="stat-fig">
-            <span className="stat-fig-num">{streak}</span>
-            <span className="stat-fig-label">Day streak</span>
-          </div>
-        )}
-        <div className="stat-fig">
-          <span className="stat-fig-num">{pubs.length}</span>
-          <span className="stat-fig-label">Published</span>
+          <button className="profile-edit-btn" onClick={startEditProfile}>Edit profile</button>
         </div>
+
+        {/* the numbers live with the person, as the card's own footer */}
+        <div id="profile-stats">
+          {streak > 0 && (
+            <div className="stat-fig">
+              <span className="stat-fig-num">{streak}</span>
+              <span className="stat-fig-label">Day streak</span>
+            </div>
+          )}
+          <div className="stat-fig">
+            <span className="stat-fig-num">{pubs.length}</span>
+            <span className="stat-fig-label">Published</span>
+          </div>
         <div className="stat-fig">
           <span className="stat-fig-num">{totalWords.toLocaleString()}</span>
           <span className="stat-fig-label">Words</span>
@@ -2868,7 +2836,56 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
           <span className="stat-fig-num">{followCounts.following}</span>
           <span className="stat-fig-label">Following</span>
         </div>
-      </div>
+        </div>
+      </header>
+
+      {/* ── Edit profile, in its own room ── */}
+      {editingProfile && (
+        <div className="pe-overlay" onClick={() => { if (!profileSaving) { setEditingProfile(false); setProfileError(""); } }}>
+          <div className="pe-modal" onClick={e => e.stopPropagation()}>
+            <h2 className="pe-title">Edit profile</h2>
+            <label className="pe-field">
+              <span className="pe-label">Username</span>
+              <input
+                className="pe-input"
+                type="text"
+                value={editUsername}
+                onChange={e => setEditUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+                maxLength={20}
+                autoFocus
+              />
+            </label>
+            <label className="pe-field">
+              <span className="pe-label">Display name</span>
+              <input
+                className="pe-input"
+                type="text"
+                value={editDisplayName}
+                onChange={e => setEditDisplayName(e.target.value)}
+                placeholder="Optional"
+                maxLength={50}
+              />
+            </label>
+            <label className="pe-field">
+              <span className="pe-label">Bio</span>
+              <textarea
+                className="pe-input pe-bio"
+                value={editBio}
+                onChange={e => setEditBio(e.target.value)}
+                placeholder="Who you are, what you write about"
+                maxLength={200}
+                rows={3}
+              />
+              <span className="pe-count">{200 - editBio.length} characters left</span>
+            </label>
+            {profileError && <p className="pe-error">{profileError}</p>}
+            <div className="pe-actions">
+              <button className="pe-btn" onClick={() => { setEditingProfile(false); setProfileError(""); }} disabled={profileSaving}>Cancel</button>
+              <button className="pe-btn pe-btn-primary" onClick={saveProfile} disabled={profileSaving || editUsername.length < 3}>{profileSaving ? "Saving…" : "Save"}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Drafts ─────────────────────────────────────────────────────── */}
       {(() => {
