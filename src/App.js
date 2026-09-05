@@ -11,10 +11,9 @@ import { jsPDF } from "jspdf";
 import { supabase } from "./supabase";
 import { renderBookPdfPages, PAGE_PRESETS } from "./pdf/bookPage";
 import {
-  Menu, ArrowLeft, PenLine, Globe, User,
-  Share2, Check, Download, Maximize2, Minimize2,
+  Menu, ArrowLeft, Share2, Check, Download, Maximize2, Minimize2,
   Copy, CheckCheck, Plus, Trash2, Type, Search,
-  Heart, MessageCircle, Eye, EyeOff,
+  Heart, Eye, EyeOff,
   AlignLeft, AlignCenter, AlignRight,
 } from "lucide-react";
 import { createRecorder } from "./telemetry/recorder";
@@ -27,17 +26,34 @@ import {
   flushNow as syncFlushNow,
 } from "./telemetry/sync";
 import { claimAnonymous as claimAnonymousEvents, clearForUser as clearLocalForUser, countForUser as countLocalEvents, dumpForUser as dumpLocalForUser } from "./telemetry/store";
+import {
+  Heart as PHeart, ChatCircle as PChat, Export as PShare,
+  PenNib as PPen,
+  Globe as PGlobe, UserCircle as PUser,
+} from "@phosphor-icons/react";
 import { HumanSignalBadge, HumanSignalPanel } from "./components/HumanSignal";
 import { PrivacyModal, TermsModal, TOS_VERSION } from "./components/Legal";
 import { VerifyView } from "./components/Verify";
-import { makeVerifyCode, hashContent, isVerifiedTier } from "./verify/code";
+import { makeVerifyCode, hashContent, isVerifiedTier, normalizePlainText } from "./verify/code";
 
 // ─── local storage ────────────────────────────────────────────────────────────
+
+// crypto.randomUUID only exists in a secure context, so it is missing whenever
+// the app is served over plain http — a LAN address during device testing, for
+// instance. Falling back keeps documents creatable there instead of taking the
+// whole editor down with a TypeError.
+export function uid() {
+  try {
+    if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+  } catch { /* fall through */ }
+  const r = (n) => Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+  return `${r(8)}-${r(4)}-4${r(3)}-${((Math.random() * 4) | 8).toString(16)}${r(3)}-${r(12)}`;
+}
 
 function createDoc() {
   const now = Date.now();
   return {
-    id: crypto.randomUUID(), title: "", content: "",
+    id: uid(), title: "", content: "",
     updatedAt: now, createdAt: now,
     writingTimeSecs: 0, revisionCount: 0,
     keystrokes: 0, deletions: 0, pastes: 0,
@@ -1186,6 +1202,57 @@ function Toasts({ toasts }) {
 
 // ─── LandingScreen ────────────────────────────────────────────────────────────
 
+// Reflowed reading (phones). A fixed book page on a 390px screen is measurably
+// worse to read than reflowed text — slower, and worse for retention — so the
+// canvas pages stay the artifact (download, desktop, the thing certified) and
+// the phone gets the words at its own measure.
+//
+// The HTML is a published piece, so it is parsed in an inert <template> and
+// stripped to a small tag whitelist before it is ever inserted: no scripts, no
+// event handlers, no <img onerror>.
+const READ_TAGS = new Set(["P","BR","EM","I","STRONG","B","U","BLOCKQUOTE","H1","H2","H3","UL","OL","LI","A","IMG","DIV","SPAN"]);
+function sanitizeForReading(html) {
+  const tpl = document.createElement("template");
+  tpl.innerHTML = html || "";
+  const walk = (node) => {
+    [...node.children].forEach(el => {
+      if (!READ_TAGS.has(el.tagName)) { el.replaceWith(...el.childNodes); return; }
+      [...el.attributes].forEach(a => {
+        const keep = (el.tagName === "IMG" && a.name === "src") || (el.tagName === "A" && a.name === "href");
+        if (!keep) el.removeAttribute(a.name);
+      });
+      if (el.tagName === "A") { el.setAttribute("rel", "noopener noreferrer"); el.setAttribute("target", "_blank"); }
+      walk(el);
+    });
+  };
+  walk(tpl.content);
+  return tpl.innerHTML;
+}
+
+// The opening letter, and the same string with that letter lifted out — an
+// illuminated initial replaces it rather than sitting next to a duplicate.
+function openingLetter(html) {
+  const tpl = document.createElement("template");
+  tpl.innerHTML = html || "";
+  const t = (tpl.content.textContent || "").trim();
+  const m = t.match(/[A-Za-z]/);
+  return m ? m[0] : null;
+}
+function stripOpeningLetter(html) {
+  const tpl = document.createElement("template");
+  tpl.innerHTML = html || "";
+  const walker = document.createTreeWalker(tpl.content, NodeFilter.SHOW_TEXT);
+  let n;
+  while ((n = walker.nextNode())) {
+    const i = n.textContent.search(/[A-Za-z]/);
+    if (i !== -1) { n.textContent = n.textContent.slice(0, i) + n.textContent.slice(i + 1); break; }
+  }
+  return tpl.innerHTML;
+}
+
+const isPhone = () => typeof window !== "undefined"
+  && window.matchMedia("(max-width: 600px)").matches;
+
 // ─── Engraving backdrop ───────────────────────────────────────────────────────
 // A pool of faded public-domain plates, some at more than one framing. The
 // plate advances (randomly, never repeating itself) each time the backdrop
@@ -1279,6 +1346,7 @@ function Backdrop({ view, hidden, override, ringed }) {
   return (
     <div
       id="backdrop"
+      data-view={view}
       className={(hidden || veiled || !ready ? "" : "bd-on") + (veiled ? " bd-veil" : "") + (ringed ? " bd-ring" : "")}
       style={{
         backgroundImage: `url(/backdrops/${shown.img}.webp)`,
@@ -1576,7 +1644,7 @@ function AuthModal({ onClose, initialMode = "signin" }) {
       el.innerHTML = "";
       gid.renderButton(el, {
         type: "standard", theme: "outline", size: "large",
-        text: "continue_with", shape: "rectangular", width: 320,
+        text: "continue_with", shape: "pill", logo_alignment: "center", width: 272,
       });
     }).catch(() => {});
     return () => { active = false; };
@@ -1717,11 +1785,11 @@ function AuthModal({ onClose, initialMode = "signin" }) {
         ) : mode === "reset" ? (
           <>
             <div id="auth-tabs">
-              <button className="active" style={{ cursor: "default" }}>reset password</button>
+              <button className="active" style={{ cursor: "default" }}>Reset password</button>
             </div>
             <p className="auth-blurb">Enter the email you signed up with and we'll send you a link to set a new password.</p>
             <form onSubmit={submit}>
-              <input type="email" placeholder="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus={!isMobile()} />
+              <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus={!isMobile()} />
               {error && <p className="auth-error">{error}</p>}
               <button id="auth-submit" type="submit" disabled={loading}>
                 {loading ? "…" : "Send reset link"}
@@ -1732,21 +1800,21 @@ function AuthModal({ onClose, initialMode = "signin" }) {
         ) : (
           <>
             <div id="auth-tabs">
-              <button className={mode === "signin" ? "active" : ""} onClick={() => switchMode("signin")}>sign in</button>
-              <button className={mode === "signup" ? "active" : ""} onClick={() => switchMode("signup")}>create account</button>
+              <button className={mode === "signin" ? "active" : ""} onClick={() => switchMode("signin")}>Sign in</button>
+              <button className={mode === "signup" ? "active" : ""} onClick={() => switchMode("signup")}>Create account</button>
             </div>
             <form onSubmit={submit}>
               {/* Don't autofocus on mobile: it pops the keyboard the moment the
                   modal opens, covering the "continue with Google" button. The
                   keyboard should only appear when a field is actually tapped. */}
-              <input type="email" placeholder="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus={!isMobile()} autoComplete="email" />
+              <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus={!isMobile()} autoComplete="email" />
 
               {mode === "signup" && (
                 <>
                   <div className="auth-field">
                     <input
                       type="text"
-                      placeholder="username"
+                      placeholder="Username"
                       value={username}
                       onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
                       maxLength={20}
@@ -1763,7 +1831,7 @@ function AuthModal({ onClose, initialMode = "signin" }) {
               <div className="auth-field">
                 <input
                   type={showPw ? "text" : "password"}
-                  placeholder="password"
+                  placeholder="Password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   required
@@ -1799,7 +1867,7 @@ function AuthModal({ onClose, initialMode = "signin" }) {
 
               {error && <p className="auth-error">{error}</p>}
               <button id="auth-submit" type="submit" disabled={loading || (mode === "signup" && !signupReady)}>
-                {loading ? "…" : mode === "signin" ? "sign in" : "create account"}
+                {loading ? "…" : mode === "signin" ? "Sign in" : "Create account"}
               </button>
             </form>
             {mode === "signin" && (
@@ -1826,7 +1894,7 @@ function AuthModal({ onClose, initialMode = "signin" }) {
             {useGsi ? (
               <div ref={googleBtnRef} style={{ display: "flex", justifyContent: "center" }} />
             ) : (
-              <button id="google-btn" onClick={googleSignIn}>continue with Google</button>
+              <button id="google-btn" onClick={googleSignIn}>Continue with Google</button>
             )}
           </>
         )}
@@ -2006,11 +2074,11 @@ function FeedActions({ pub, sc, likeCount, commentCount, onRead, onLike }) {
     <div className="feed-entry-actions">
       {sc && <HumanSignalBadge score={sc} />}
       <button className="feed-engage" onClick={e => { e.stopPropagation(); onLike(pub); }} aria-label="Like">
-        <Heart size={13} strokeWidth={1.5} fill="none" />
+        <PHeart size={15} weight="light" />
         <span>{likeCount}</span>
       </button>
       <button className="feed-engage" onClick={e => { e.stopPropagation(); onRead(pub, { focus: "comments" }); }} aria-label="Comments">
-        <MessageCircle size={13} strokeWidth={1.5} />
+        <PChat size={15} weight="light" />
         <span>{commentCount}</span>
       </button>
     </div>
@@ -2088,18 +2156,41 @@ function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, 
   );
 }
 
+// Pick a line worth setting large: the longest sentence that still fits on a
+// card, skipping the opening one so the quote is not simply the excerpt again.
+function pullQuote(html) {
+  const text = normalizePlainText(html || "");
+  const sentences = text.split(/(?<=[.!?])\s+/).map(x => x.trim())
+    .filter(x => x.length >= 45 && x.length <= 165);
+  if (!sentences.length) return null;
+  const pool = sentences.length > 1 ? sentences.slice(1) : sentences;
+  return pool.reduce((a, b) => (b.length > a.length ? b : a), pool[0]);
+}
+
 // Renders a feed: the newest piece as the lead, a quiet section label, then the
 // rest as index entries.
 function FeedList({ pubs, onRead, onAuthorClick, onLike, dropCapImages }) {
   return (
     <>
-      {pubs.map((pub, i) => (
-        <Fragment key={pub.id}>
-          {i === 1 && <div className="feed-section-label">More to read</div>}
-          <FeedCard pub={pub} index={i} featured={i === 0} dropCapImages={dropCapImages}
-            onRead={onRead} onAuthorClick={onAuthorClick} onLike={onLike} />
-        </Fragment>
-      ))}
+      {pubs.map((pub, i) => {
+        // Every few entries, a line from the piece set large. It breaks the
+        // rhythm of a uniform list, gives the eye somewhere to land, and is
+        // the one thing here worth screenshotting.
+        const quote = i > 1 && (i - 1) % 4 === 0 ? pullQuote(pub.content) : null;
+        return (
+          <Fragment key={pub.id}>
+            {i === 1 && <div className="feed-section-label">More to read</div>}
+            {quote && (
+              <blockquote className="feed-quote" onClick={() => onRead(pub)}>
+                <p className="feed-quote-text">{quote}</p>
+                <span className="feed-quote-attr">{pub.author_name || "Unknown"}</span>
+              </blockquote>
+            )}
+            <FeedCard pub={pub} index={i} featured={i === 0} dropCapImages={dropCapImages}
+              onRead={onRead} onAuthorClick={onAuthorClick} onLike={onLike} />
+          </Fragment>
+        );
+      })}
     </>
   );
 }
@@ -2223,7 +2314,10 @@ function Feed({ user, onRead, onAuthorClick, dropCapImages, onRequestAuth }) {
   return (
     <div id="feed-container">
       <div id="feed-masthead">
-        <span className="feed-dateline">{editionDate}</span>
+        {/* a day with new writing is, literally, a red-letter day */}
+        <span className={"feed-dateline" + (pubs.some(p => isToday(p.published_at)) ? " red-letter" : "")}>
+          {editionDate}
+        </span>
       </div>
 
       <div id="feed-header">
@@ -2510,7 +2604,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
               type="text"
               value={editUsername}
               onChange={e => setEditUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
-              placeholder="username"
+              placeholder="Username"
               maxLength={20}
               autoFocus
             />
@@ -2922,8 +3016,12 @@ function ReadingView({ pub, user, isAdmin, dropCapImages, focus, onRequestAuth, 
   const [pages, setPages]               = useState([]);
   const [pagesLoading, setPagesLoading] = useState(true);
   const [zoom, setZoom]                 = useState(1.0);
+  const [phone] = useState(isPhone);
+  // An illuminated initial opens the piece, as it would open a manuscript.
+  const initialSrc = phone ? dropCapSrc(openingLetter(pub.content), dropCapImages) : null;
 
   useEffect(() => {
+    if (isPhone()) { setPagesLoading(false); return; }   // phones reflow instead
     setPages([]);
     setPagesLoading(true);
     renderBookPdfPages({
@@ -3059,7 +3157,7 @@ function ReadingView({ pub, user, isAdmin, dropCapImages, focus, onRequestAuth, 
           <button id="reading-copy" onClick={copyText} title="Copy text">
             {copied ? <CheckCheck size={14} /> : <Copy size={14} />}
           </button>
-          <div className="reading-zoom">
+          <div className="reading-zoom" data-desktop-only="">
             <button className="zoom-btn" onClick={() => setZoom(z => Math.max(0.6, +(z - 0.2).toFixed(1)))} title="Zoom out">−</button>
             <button className="zoom-btn" onClick={() => setZoom(z => Math.min(2.4, +(z + 0.2).toFixed(1)))} title="Zoom in">+</button>
           </div>
@@ -3068,6 +3166,19 @@ function ReadingView({ pub, user, isAdmin, dropCapImages, focus, onRequestAuth, 
           {pub.author_note && (
             <p className="reading-author-note">{pub.author_note}</p>
           )}
+          {phone ? (
+            <article id="reading-reflow">
+              {/* the piece's own plate, as a frontispiece */}
+              <div className="reading-plate"
+                   style={{ backgroundImage: `url(/backdrops/${imgForPub(pub.id)}.webp)` }} />
+              <h1 className="reading-reflow-title">{pub.title}</h1>
+              {initialSrc && <img className="reading-initial" src={initialSrc} alt="" aria-hidden="true" />}
+              <div className={"reading-reflow-body" + (initialSrc ? " has-initial" : "")}
+                   dangerouslySetInnerHTML={{ __html: initialSrc
+                     ? sanitizeForReading(stripOpeningLetter(pub.content))
+                     : sanitizeForReading(pub.content) }} />
+            </article>
+          ) : (
           <div id="reading-pages">
             {pagesLoading && pages.length === 0 && (
               <p className="reading-pages-loading">rendering…</p>
@@ -3076,6 +3187,7 @@ function ReadingView({ pub, user, isAdmin, dropCapImages, focus, onRequestAuth, 
               <img key={i} className="reading-page-img" src={url} alt="" />
             ))}
           </div>
+          )}
 
           {/* ── Verification colophon ──────────────────────────────────────── */}
           {pub.verify_code && (
@@ -3524,6 +3636,54 @@ export default function App() {
     };
   }, []);
 
+  // ── native safe areas ────────────────────────────────────────────────────
+  // Capacitor's webview reports env(safe-area-inset-*) as 0, so the notch and
+  // home indicator would sit on top of the UI. The plugin reads the real insets
+  // natively and publishes them as --safe-area-inset-* for the CSS to use. On
+  // the web this import resolves to a no-op implementation.
+  useEffect(() => {
+    let cancelled = false;
+    import("@capacitor-community/safe-area")
+      .then(({ SafeArea }) => { if (!cancelled) SafeArea?.enable?.({ config: {} }); })
+      .catch(() => { /* web build, or plugin unavailable */ });
+    // iOS puts a prev/next/Done bar above the keyboard. On a page that is just
+    // paper and a sentence it is the only piece of furniture left, so remove it.
+    import("@capacitor/keyboard")
+      .then(({ Keyboard }) => { if (!cancelled) Keyboard?.setAccessoryBarVisible?.({ isVisible: false }); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  // ── on-screen keyboard (phones) ──────────────────────────────────────────
+  // visualViewport is the only reliable way to know how much of the window the
+  // keyboard is covering. Publish it as --kb-inset so the editor can sit above
+  // the keyboard, and flag body.keyboard-open for the typewriter scroll rule.
+  // No-ops on desktop: the inset stays 0 and the class is never added.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    // Phones only. On desktop, browser zoom also shrinks the visual viewport,
+    // which would otherwise look exactly like a keyboard appearing.
+    if (!vv || !window.matchMedia("(pointer: coarse)").matches) return;
+    let raf = 0;
+    const apply = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+        document.documentElement.style.setProperty("--kb-inset", `${Math.round(inset)}px`);
+        document.body.classList.toggle("keyboard-open", inset > 80);
+      });
+    };
+    apply();
+    vv.addEventListener("resize", apply);
+    vv.addEventListener("scroll", apply);
+    return () => {
+      cancelAnimationFrame(raf);
+      vv.removeEventListener("resize", apply);
+      vv.removeEventListener("scroll", apply);
+      document.body.classList.remove("keyboard-open");
+    };
+  }, []);
+
   useEffect(() => {
     if (focusMode) document.body.classList.add("focus-mode");
     else document.body.classList.remove("focus-mode");
@@ -3826,6 +3986,9 @@ export default function App() {
   }, []);
 
   const IDLE_MS = 1200;
+  // Where the caret sits on screen while typing on a phone (fraction of the
+  // visible editor strip). ~0.4 keeps it above the thumb and below the eyeline.
+  const TYPEWRITER_ANCHOR = 0.4;
 
   // ─ load doc into DOM ────────────────────────────────────────────────────────
 
@@ -4240,7 +4403,17 @@ export default function App() {
       const rect = sel.getRangeAt(0).getBoundingClientRect();
       const container = containerRef.current;
       if (!container) return;
-      const cb = container.getBoundingClientRect().bottom;
+      const cr = container.getBoundingClientRect();
+      // Phone with the keyboard up: typewriter scrolling. Hold the caret at a
+      // fixed height in the visible strip rather than letting it drift toward
+      // the bottom edge, so the line you are writing stays where your eyes
+      // already are. Desktop keeps the original catch-it-near-the-bottom rule.
+      if (document.body.classList.contains("keyboard-open")) {
+        const delta = rect.top - (cr.top + cr.height * TYPEWRITER_ANCHOR);
+        if (Math.abs(delta) > 12) container.scrollTop += delta;
+        return;
+      }
+      const cb = cr.bottom;
       if (rect.bottom > cb - 80) container.scrollTop += rect.bottom - cb + 100;
     });
   }, []);
@@ -4899,7 +5072,7 @@ export default function App() {
               >
                 {isPublished
                   ? <><Check size={13} /><span className="btn-label">Published</span></>
-                  : <><Share2 size={13} /><span className="btn-label">Publish</span></>
+                  : <><PShare size={15} weight="light" /><span className="btn-label">Publish</span></>
                 }
               </button>
               {!isPublished && publishConfirmOpen && (
@@ -5044,9 +5217,9 @@ export default function App() {
             ))}
           </div>
           <div id="panel-footer">
-            <button id="font-toggle" onClick={() => setFont(f => f === "garamond" ? "arial" : "garamond")}>
+            <button id="font-toggle" onClick={() => setFont(f => f === "garamond" ? "sans" : "garamond")}>
               <Type size={13} />
-              {font === "garamond" ? "Garamond" : "Arial"}
+              {font === "garamond" ? "Garamond" : "Switzer"}
             </button>
           </div>
         </div>
@@ -5141,7 +5314,7 @@ export default function App() {
           suppressContentEditableWarning
           spellCheck={false}
           data-placeholder="Title"
-          className={font === "arial" ? "font-arial" : ""}
+          className={font === "garamond" ? "" : "font-sans"}
           onInput={onTitleInput}
           onBlur={finalizeTitle}
           onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); finalizeTitle(); editorRef.current?.focus(); } }}
@@ -5151,7 +5324,7 @@ export default function App() {
           <div
             id="text"
             ref={editorRef}
-            className={font === "arial" ? "font-arial" : ""}
+            className={font === "garamond" ? "" : "font-sans"}
             contentEditable
             suppressContentEditableWarning
             spellCheck={false}
@@ -5283,11 +5456,11 @@ export default function App() {
       {view !== "reading" && view !== "userProfile" && (
         <nav id="bottom-nav" className={isEditor ? menuClass : ""}>
           <button className={`nav-tab ${isEditor ? "active" : ""}`} onClick={() => navigate("editor")}>
-            <PenLine size={18} strokeWidth={1.75} />
+            <PPen size={19} weight="light" />
             <span className="nav-label">Write</span>
           </button>
           <button className={`nav-tab ${view === "feed" ? "active" : ""}`} onClick={() => navigate("feed")}>
-            <Globe size={18} strokeWidth={1.75} />
+            <PGlobe size={19} weight="light" />
             <span className="nav-label">Feed</span>
           </button>
           <button className={`nav-tab ${view === "verify" ? "active" : ""}`} onClick={() => navigate("verify")}>
@@ -5312,7 +5485,7 @@ export default function App() {
                 size={22}
               />
             ) : (
-              <User size={18} strokeWidth={1.75} />
+              <PUser size={19} weight="light" />
             )}
             <span className="nav-label">{user ? "Profile" : "Sign in"}</span>
             {streak > 1 && <span className="nav-streak">{streak}</span>}

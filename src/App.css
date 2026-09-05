@@ -1,19 +1,51 @@
+@font-face{font-family:"Switzer";src:url("./assets/fonts/Switzer-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:swap;}
+@font-face{font-family:"Switzer";src:url("./assets/fonts/Switzer-500.woff2") format("woff2");font-weight:500;font-style:normal;font-display:swap;}
+@font-face{font-family:"Switzer";src:url("./assets/fonts/Switzer-600.woff2") format("woff2");font-weight:600;font-style:normal;font-display:swap;}
+@font-face{font-family:"Switzer";src:url("./assets/fonts/Switzer-700.woff2") format("woff2");font-weight:700;font-style:normal;font-display:swap;}
+
 /* ─── Design tokens ───────────────────────────────────────────────────────── */
 :root {
+  /* Paper and ink, never neutral screen-grey. This warm ramp began on the
+     phone and now carries the whole site; hierarchy comes from weight and
+     size, with greyness doing far less than it used to. */
+  --paper:   #faf8f4;
+  --paper-2: #f3efe7;
+  --ink:     #1a1613;
+  --ink-2:   #4c443b;
+  --ink-3:   #857a6b;
+  --ink-4:   #b5aa9a;
+  --line:    rgba(62, 50, 36, 0.12);
+  /* the one accent — red lead, reserved for what is verified or new */
+  --rubric:  #9e3b28;
+
+  /* Desktop keeps its original ground — the palette change was asked for on
+     the phone, not here. The phone re-declares warm paper in its own block. */
+  /* The type scale. Seven sizes for the whole product; nothing else.
+     297 font-size declarations across ~40 ad-hoc values were snapped to
+     these steps — the crowding was never spacing, it was sizes. */
+  --t-xs:      0.78rem;
+  --t-sm:      0.92rem;
+  --t-md:      1.06rem;
+  --t-lg:      1.22rem;
+  --t-xl:      1.4rem;
+  --t-2xl:     1.62rem;
+  --t-3xl:     2.15rem;
+  --t-display: 2.35rem;
+
   --bg:          #f6f6f6;
   --surface:     #f0f0f0;
-  --text:        #1a1a1a;
-  --muted:       #575350;
-  --subtle:      #8a8580;
-  --gold:        #a98a5c;
-  --border:      rgba(0, 0, 0, 0.13);
+  --text:        var(--ink);
+  --muted:       var(--ink-2);
+  --subtle:      var(--ink-3);
+  --gold:        #9a7b3f;
+  --border:      var(--line);
   --top-bar:     52px;
   --bottom-nav:  58px;
   /* Garamond is reserved for the brand wordmark and the authored writing itself
      (the editor's title + prose, the landing headline, drop caps). Everything
      else — the entire interface (nav, lists, panels, modals, stats, verify,
      profile, admin) — uses --font-ui. Swap --font-ui to restyle the whole UI. */
-  --font-ui:     "Work Sans Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, sans-serif;
+  --font-ui:     "Switzer", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, sans-serif;
   --font-serif:  "Cormorant Garamond", Georgia, serif;
 }
 
@@ -142,7 +174,7 @@ body {
 
 #landing-headline {
   font-family: var(--font-serif);
-  font-size: 2.2rem;
+  font-size: var(--t-3xl);
   color: var(--text);
   letter-spacing: -0.01em;
   line-height: 1.2;
@@ -187,7 +219,7 @@ body.landing-handoff #title-input:empty::before { color: transparent; }
 
 #brand {
   font-family: "EB Garamond", Georgia, serif;
-  font-size: 1.15rem;
+  font-size: var(--t-lg);
   font-weight: 500;
   color: var(--text);
   letter-spacing: 0.01em;
@@ -214,7 +246,7 @@ body.landing-handoff #title-input:empty::before { color: transparent; }
   border-radius: 18px;
 }
 .icon-btn-label {
-  font-size: 0.78rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.02em;
   color: var(--muted);
 }
@@ -223,11 +255,11 @@ body.landing-handoff #title-input:empty::before { color: transparent; }
   padding: 6px 10px 6px 8px;
   gap: 6px;
   border-radius: 18px;
-  font-size: 0.78rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.02em;
 }
 .icon-btn-preview .btn-label {
-  font-size: 0.78rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.02em;
   color: var(--muted);
 }
@@ -241,7 +273,7 @@ body.landing-handoff #title-input:empty::before { color: transparent; }
   border-radius: 10px;
   background: #e9e9e9;
   color: var(--text);
-  font-size: 0.7rem;
+  font-size: var(--t-xs);
   letter-spacing: 0;
 }
 @media (max-width: 480px) {
@@ -270,7 +302,7 @@ body.is-mobile .focus-btn {       /* Fullscreen */
   padding: 6px 12px;
   background: #f6efd9;
   color: #6a5a18;
-  font-size: 0.78rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.01em;
   border-bottom: 1px solid #e5d9aa;
 }
@@ -283,7 +315,7 @@ body.is-mobile .focus-btn {       /* Fullscreen */
   background: var(--text);
   color: var(--bg);
   border: none;
-  font-size: 0.75rem;
+  font-size: var(--t-xs);
   font-weight: 500;
   letter-spacing: 0.04em;
   padding: 5px 12px;
@@ -301,7 +333,7 @@ body.is-mobile .focus-btn {       /* Fullscreen */
   background: none;
   color: var(--muted);
   border: 1px solid var(--border);
-  font-size: 0.75rem;
+  font-size: var(--t-xs);
   font-weight: 500;
   letter-spacing: 0.04em;
   padding: 5px 12px;
@@ -312,7 +344,7 @@ body.is-mobile .focus-btn {       /* Fullscreen */
 }
 #pdf-btn:hover { color: var(--text); border-color: #aaa; }
 
-.btn-label { font-size: 0.78rem; }
+.btn-label { font-size: var(--t-xs); }
 
 /* ─── Publish dropdown ────────────────────────────────────────────────────── */
 #publish-menu-wrap {
@@ -346,7 +378,7 @@ body.is-mobile .focus-btn {       /* Fullscreen */
   background: none;
   border: none;
   border-radius: 5px;
-  font-size: 0.78rem;
+  font-size: var(--t-xs);
   color: var(--text);
   cursor: pointer;
 }
@@ -387,7 +419,7 @@ body.is-mobile .focus-btn {       /* Fullscreen */
 .nav-tab.active { color: var(--text); }
 
 .nav-label {
-  font-size: 0.58rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   font-weight: 500;
@@ -401,7 +433,7 @@ body.is-mobile .focus-btn {       /* Fullscreen */
   border-radius: 50%;
   background: var(--text);
   color: var(--bg);
-  font-size: 0.68rem;
+  font-size: var(--t-xs);
   font-weight: 500;
   display: flex;
   align-items: center;
@@ -413,7 +445,7 @@ body.is-mobile .focus-btn {       /* Fullscreen */
   position: absolute;
   top: 4px;
   right: calc(50% - 22px);
-  font-size: 0.6rem;
+  font-size: var(--t-xs);
   line-height: 1;
   background: none;
   color: var(--muted);
@@ -469,7 +501,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   border: none;
   border-bottom: 1px solid var(--border);
   width: 100%;
-  font-size: 0.8rem;
+  font-size: var(--t-xs);
   color: var(--muted);
   text-align: left;
   padding: 13px 20px;
@@ -497,7 +529,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .doc-item-title {
   display: block;
   font-family: var(--font-serif);
-  font-size: 0.95rem;
+  font-size: var(--t-sm);
   letter-spacing: -0.02em;
   color: var(--text);
   white-space: nowrap;
@@ -508,7 +540,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 
 .doc-item-meta {
   display: block;
-  font-size: 0.68rem;
+  font-size: var(--t-xs);
   color: var(--subtle);
   margin-top: 1px;
 }
@@ -552,7 +584,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   gap: 6px;
   background: none;
   border: none;
-  font-size: 0.75rem;
+  font-size: var(--t-xs);
   color: var(--muted);
   cursor: pointer;
   padding: 4px 0;
@@ -588,7 +620,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   border-radius: 99px;
-  font-size: 0.72rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.03em;
   color: var(--muted);
 }
@@ -671,7 +703,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   font-style: normal;
   pointer-events: none;
 }
-#title-input.font-arial { font-family: Arial, sans-serif; font-weight: 600; letter-spacing: -0.02em; }
+#title-input.font-sans { font-family: "Switzer", -apple-system, sans-serif; font-weight: 600; letter-spacing: -0.02em; }
 
 #format-toolbar {
   position: fixed;
@@ -691,7 +723,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .format-btn {
   background: none;
   border: none;
-  font-size: 0.82rem;
+  font-size: var(--t-xs);
   color: var(--subtle);
   cursor: pointer;
   padding: 3px 9px;
@@ -707,7 +739,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 #add-title-btn {
   background: none;
   border: none;
-  font-size: 0.7rem;
+  font-size: var(--t-xs);
   color: #9a9590;
   cursor: pointer;
   padding: 0 8px;
@@ -730,7 +762,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   white-space: pre-wrap;
   overflow-wrap: break-word;
   font-family: var(--font-serif);
-  font-size: 1.2rem;
+  font-size: var(--t-lg);
   line-height: 1.55;
   color: var(--text);
   padding: 0 8px 8px;
@@ -742,7 +774,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   min-height: 2em;
 }
 
-#text.font-arial { font-family: Arial, sans-serif; }
+#text.font-sans, #text.font-sans * { font-family: "Switzer", -apple-system, sans-serif; }
 
 /* List items: indent the whole line including bullet/number */
 #text > div[data-list], #text > p[data-list] {
@@ -800,7 +832,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 .feed-dateline {
   display: block;
-  font-size: 0.62rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--subtle);
@@ -831,7 +863,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   margin-bottom: -1px;
   padding: 15px 0;
   margin-right: 26px;
-  font-size: 0.68rem;
+  font-size: var(--t-xs);
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -849,7 +881,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0 6px;
-  font-size: 0.6rem;
+  font-size: var(--t-xs);
   line-height: 1.5;
   color: var(--subtle);
   font-weight: 600;
@@ -875,7 +907,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .writer-card-name {
   font-family: var(--font-serif);
   display: block;
-  font-size: 0.88rem;
+  font-size: var(--t-sm);
   font-weight: 500;
   font-style: normal;
   color: var(--text);
@@ -883,14 +915,14 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 .writer-card-meta {
   display: block;
-  font-size: 0.72rem;
+  font-size: var(--t-xs);
   color: var(--subtle);
   letter-spacing: 0;
   text-transform: none;
   margin-top: 2px;
 }
 .writer-card-arrow {
-  font-size: 0.82rem;
+  font-size: var(--t-xs);
   color: var(--subtle);
   flex-shrink: 0;
 }
@@ -904,7 +936,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 
 .feed-empty {
-  font-size: 0.85rem;
+  font-size: var(--t-xs);
   color: var(--subtle);
   text-align: center;
   padding-top: 60px;
@@ -961,7 +993,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 
 .feed-lead-title {
   font-family: var(--font-serif);
-  font-size: 1.7rem;
+  font-size: var(--t-2xl);
   font-weight: 600;
   line-height: 1.18;
   letter-spacing: -0.02em;
@@ -972,7 +1004,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .feed-lead:hover .feed-lead-title { color: #000; }
 .feed-lead-excerpt {
   font-family: var(--font-serif);
-  font-size: 1.07rem;
+  font-size: var(--t-md);
   line-height: 1.62;
   color: var(--muted);
   margin: 0 0 20px;
@@ -996,7 +1028,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .feed-lead-author {
   background: none; border: none; padding: 0;
   font-family: var(--font-serif);
-  font-size: 0.8rem;
+  font-size: var(--t-xs);
   font-weight: 500;
   letter-spacing: 0.01em;
   color: var(--text);
@@ -1010,7 +1042,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 0.73rem;
+  font-size: var(--t-xs);
   color: var(--subtle);
 }
 
@@ -1018,7 +1050,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
    rest of the index. Both echo the masthead dateline's small-caps treatment. */
 .feed-lead-kicker {
   display: block;
-  font-size: 0.6rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.22em;
   text-transform: uppercase;
   font-weight: 600;
@@ -1026,7 +1058,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   margin: 2px 0 9px;
 }
 .feed-section-label {
-  font-size: 0.6rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.22em;
   text-transform: uppercase;
   font-weight: 600;
@@ -1061,7 +1093,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 
 .feed-entry-title {
   font-family: var(--font-serif);
-  font-size: 1.2rem;
+  font-size: var(--t-lg);
   font-weight: 600;
   line-height: 1.3;
   letter-spacing: -0.02em;
@@ -1073,7 +1105,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 
 .feed-entry-excerpt {
   font-family: var(--font-serif);
-  font-size: 0.97rem;
+  font-size: var(--t-sm);
   line-height: 1.58;
   color: var(--muted);
   margin: 0 0 13px;
@@ -1087,7 +1119,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 0.73rem;
+  font-size: var(--t-xs);
   color: var(--subtle);
   flex-wrap: wrap;
 }
@@ -1128,7 +1160,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.73rem;
+  font-size: var(--t-xs);
   color: var(--subtle);
   cursor: pointer;
   transition: color 0.15s;
@@ -1181,14 +1213,14 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   padding: 64px 24px 40px;
 }
 .feed-empty-mark {
-  font-size: 1.4rem;
+  font-size: var(--t-xl);
   color: var(--gold);
   opacity: 0.7;
   margin-bottom: 16px;
 }
 .feed-empty-title {
   font-family: var(--font-ui);
-  font-size: 1.32rem;
+  font-size: var(--t-xl);
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text);
@@ -1196,11 +1228,11 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 .feed-empty-title-serif {
   font-family: var(--font-serif);
-  font-size: 1.6rem;
+  font-size: var(--t-2xl);
   letter-spacing: 0;
 }
 .feed-empty-sub {
-  font-size: 0.86rem;
+  font-size: var(--t-sm);
   line-height: 1.6;
   color: var(--subtle);
   margin: 0;
@@ -1227,7 +1259,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 
 .pub-author-btn {
   font-family: var(--font-serif);
-  font-size: 0.8rem;
+  font-size: var(--t-xs);
   font-weight: 500;
   color: var(--text);
   background: none;
@@ -1237,13 +1269,13 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   transition: color 0.15s;
 }
 .pub-author-btn:hover { color: var(--muted); text-decoration: underline; }
-.pub-dot    { font-size: 0.78rem; color: #d8d5d0; }
-.pub-date   { font-size: 0.78rem; color: var(--subtle); }
-.pub-read-time { font-size: 0.78rem; color: var(--subtle); }
+.pub-dot    { font-size: var(--t-xs); color: #d8d5d0; }
+.pub-date   { font-size: var(--t-xs); color: var(--subtle); }
+.pub-read-time { font-size: var(--t-xs); color: var(--subtle); }
 
 .pub-card-title {
   font-family: var(--font-serif);
-  font-size: 1.4rem;
+  font-size: var(--t-xl);
   font-weight: 600;
   color: var(--text);
   margin: 0 0 8px;
@@ -1254,7 +1286,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 
 .pub-card-opening {
   font-family: var(--font-serif);
-  font-size: 1rem;
+  font-size: var(--t-md);
   color: var(--muted);
   margin: 0 0 12px;
   line-height: 1.6;
@@ -1262,14 +1294,14 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 
 .pub-card-words {
-  font-size: 0.75rem;
+  font-size: var(--t-xs);
   color: var(--subtle);
 }
 
 .pub-remove {
   background: none;
   border: none;
-  font-size: 0.75rem;
+  font-size: var(--t-xs);
   color: #d0ceca;
   cursor: pointer;
   padding: 0;
@@ -1291,10 +1323,10 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 .hs-badge-mark {
   color: #b8a892;
-  font-size: 0.7rem;
+  font-size: var(--t-xs);
 }
 .hs-badge-text {
-  font-size: 0.68rem;
+  font-size: var(--t-xs);
   color: #a3a09a;
   letter-spacing: 0.06em;
   font-variant: small-caps;
@@ -1311,14 +1343,14 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .hs-line:disabled { cursor: default; }
 .hs-line-row {
   display: inline-flex; align-items: center; gap: 8px;
-  font-size: 0.73rem; letter-spacing: 0.02em;
+  font-size: var(--t-xs); letter-spacing: 0.02em;
   color: #a8a6a2;
 }
 .hs-line-label { color: #b8b6b2; }
 .hs-line-tier  { color: var(--text); }
 .hs-line-score { color: #a8a6a2; }
 .hs-line-sub {
-  font-size: 0.68rem; letter-spacing: 0.02em;
+  font-size: var(--t-xs); letter-spacing: 0.02em;
   color: var(--muted);
   display: inline-flex; align-items: center; gap: 5px;
 }
@@ -1375,13 +1407,13 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   flex-shrink: 0;
 }
 .hs-panel-title {
-  font-size: 0.72rem; letter-spacing: 0.1em; color: var(--muted);
+  font-size: var(--t-xs); letter-spacing: 0.1em; color: var(--muted);
   text-transform: uppercase;
   font-weight: 600;
 }
 .hs-panel-close {
   background: none; border: none; color: var(--subtle);
-  font-size: 1.4rem; line-height: 1; padding: 2px 4px; cursor: pointer;
+  font-size: var(--t-xl); line-height: 1; padding: 2px 4px; cursor: pointer;
 }
 .hs-panel-close:hover { color: var(--text); }
 
@@ -1399,13 +1431,13 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   color: var(--text); letter-spacing: -0.01em;
 }
 .hs-panel-score-denom {
-  font-size: 1rem; color: var(--muted);
+  font-size: var(--t-md); color: var(--muted);
 }
 .hs-panel-tier-block {
   display: flex; flex-direction: column; gap: 4px;
 }
 .hs-panel-tier-label {
-  font-size: 1.15rem; font-weight: 500; color: var(--text); letter-spacing: -0.01em;
+  font-size: var(--t-lg); font-weight: 500; color: var(--text); letter-spacing: -0.01em;
 }
 
 .hs-dots-sm .hs-dot { width: 5px; height: 5px; }
@@ -1419,7 +1451,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 .hs-tab {
   background: none; border: none;
-  font-size: 0.72rem; font-weight: 600; color: var(--muted);
+  font-size: var(--t-xs); font-weight: 600; color: var(--muted);
   padding: 12px 14px 11px;
   cursor: pointer; border-bottom: 2px solid transparent;
   margin-bottom: -1px; letter-spacing: 0.07em;
@@ -1435,14 +1467,14 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 
 .hs-panel-blurb {
-  font-size: 0.85rem; color: var(--muted);
+  font-size: var(--t-xs); color: var(--muted);
   line-height: 1.55; margin: 0 0 14px;
 }
 .hs-panel-empty {
-  font-size: 0.85rem; color: var(--muted);
+  font-size: var(--t-xs); color: var(--muted);
 }
 .hs-panel-warn {
-  font-size: 0.78rem; color: #8a6a3a;
+  font-size: var(--t-xs); color: #8a6a3a;
   margin-top: 12px; line-height: 1.5;
 }
 
@@ -1456,10 +1488,10 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   display: flex; flex-direction: column; gap: 1px;
 }
 .hs-contrib-label {
-  font-size: 0.82rem; color: var(--text);
+  font-size: var(--t-xs); color: var(--text);
 }
 .hs-contrib-desc {
-  font-size: 0.72rem; color: var(--muted);
+  font-size: var(--t-xs); color: var(--muted);
 }
 .hs-contrib-bar-wrap {
   height: 4px; background: #eaeaea; border-radius: 99px; overflow: hidden;
@@ -1470,7 +1502,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 .hs-contrib-val {
   text-align: right;
-  font-size: 0.75rem; color: var(--muted);
+  font-size: var(--t-xs); color: var(--muted);
 }
 
 .hs-chart-svg {
@@ -1482,7 +1514,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   font-family: var(--font-ui);
 }
 .hs-chart-empty {
-  font-size: 0.85rem; color: var(--muted);
+  font-size: var(--t-xs); color: var(--muted);
   margin: 20px 0;
 }
 
@@ -1504,16 +1536,16 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 .hs-stat-val {
   font-family: var(--font-serif);
-  font-size: 1.55rem; font-weight: 400; color: var(--text);
+  font-size: var(--t-2xl); font-weight: 400; color: var(--text);
   line-height: 1.05; letter-spacing: -0.01em;
 }
 .hs-stat-label {
-  font-size: 0.7rem; color: var(--muted);
+  font-size: var(--t-xs); color: var(--muted);
   text-transform: uppercase; letter-spacing: 0.05em;
   margin-top: 4px;
 }
 .hs-stat-sub {
-  font-size: 0.68rem; color: var(--subtle);
+  font-size: var(--t-xs); color: var(--subtle);
   margin-top: 1px;
 }
 
@@ -1530,7 +1562,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 
 /* ─── Section labels inside tabs ─────────────────────────────────────────── */
 .hs-section-label {
-  font-size: 0.66rem; font-weight: 600;
+  font-size: var(--t-xs); font-weight: 600;
   text-transform: uppercase; letter-spacing: 0.11em;
   color: var(--subtle);
   margin: 18px 0 11px;
@@ -1546,8 +1578,8 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   align-items: center; gap: 12px;
 }
 .hs-pause-label-block { display: flex; flex-direction: column; gap: 1px; }
-.hs-pause-label { font-size: 0.82rem; color: var(--text); }
-.hs-pause-sub { font-size: 0.7rem; color: var(--muted); }
+.hs-pause-label { font-size: var(--t-xs); color: var(--text); }
+.hs-pause-sub { font-size: var(--t-xs); color: var(--muted); }
 .hs-pause-bar-wrap {
   height: 4px; background: #eaeaea; border-radius: 99px; overflow: hidden;
 }
@@ -1558,7 +1590,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .hs-pause-val {
   text-align: right;
   font-family: var(--font-serif);
-  font-size: 1rem; color: var(--text);
+  font-size: var(--t-md); color: var(--text);
 }
 
 /* ─── Composition (provenance) ───────────────────────────────────────────── */
@@ -1571,20 +1603,20 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .hs-comp-seg.pasted { background: var(--gold); }
 .hs-comp-legend {
   display: flex; gap: 16px;
-  font-size: 0.74rem; color: var(--muted);
+  font-size: var(--t-xs); color: var(--muted);
 }
 .hs-comp-key { display: inline-flex; align-items: center; gap: 5px; }
 .hs-comp-dot { width: 7px; height: 7px; border-radius: 2px; display: inline-block; }
 .hs-comp-dot.typed  { background: #2a2a2a; }
 .hs-comp-dot.pasted { background: var(--gold); }
 .hs-comp-churn {
-  font-size: 0.74rem; color: var(--subtle);
+  font-size: var(--t-xs); color: var(--subtle);
   line-height: 1.5; margin-top: 9px;
 }
 
 /* ─── Method tab ─────────────────────────────────────────────────────────── */
 .hs-method-lead {
-  font-size: 0.9rem; color: var(--text);
+  font-size: var(--t-sm); color: var(--text);
   line-height: 1.6; margin: 0 0 18px;
 }
 .hs-method-list {
@@ -1598,15 +1630,15 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 .hs-method-item:last-child { border-bottom: none; padding-bottom: 0; }
 .hs-method-name {
-  font-size: 0.83rem; font-weight: 500; color: var(--text);
+  font-size: var(--t-xs); font-weight: 500; color: var(--text);
   letter-spacing: 0;
 }
 .hs-method-body {
-  font-size: 0.8rem; color: var(--muted);
+  font-size: var(--t-xs); color: var(--muted);
   line-height: 1.6;
 }
 .hs-method-footer {
-  font-size: 0.78rem; color: var(--subtle);
+  font-size: var(--t-xs); color: var(--subtle);
   line-height: 1.55;
   border-top: 1px solid var(--border);
   padding-top: 14px; margin: 0;
@@ -1616,12 +1648,12 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   background: none; border: none; padding: 2px 5px;
   font: inherit; color: var(--muted); cursor: pointer;
   display: inline-flex; align-items: center; gap: 2px;
-  font-size: 0.78rem;
+  font-size: var(--t-xs);
   border-radius: 4px;
   transition: background 0.15s, color 0.15s;
 }
 .ws-process-btn:hover { color: var(--text); background: rgba(0,0,0,0.05); }
-.ws-process-expand { font-size: 0.7rem; opacity: 0.45; margin-left: 2px; }
+.ws-process-expand { font-size: var(--t-xs); opacity: 0.45; margin-left: 2px; }
 .ws-process-btn:hover .ws-process-expand { opacity: 1; }
 .hs-dot-xs { width: 4px; height: 4px; border-radius: 50%; background: #dcdcdc; display: inline-block; }
 .hs-dot-xs.on { background: #2a2a2a; }
@@ -1653,7 +1685,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 
 #profile-signin-mark {
   font-family: var(--font-serif);
-  font-size: 2rem;
+  font-size: var(--t-3xl);
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text);
@@ -1662,7 +1694,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 
 #profile-signin-title {
   font-family: var(--font-ui);
-  font-size: 1.5rem;
+  font-size: var(--t-xl);
   font-weight: 500;
   color: var(--text);
   letter-spacing: -0.01em;
@@ -1670,7 +1702,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 
 #profile-signin-sub {
-  font-size: 0.86rem;
+  font-size: var(--t-sm);
   color: var(--muted);
   line-height: 1.7;
   margin: 0 0 34px;
@@ -1688,7 +1720,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   background: var(--text);
   color: var(--bg);
   border: 1px solid var(--text);
-  font-size: 0.7rem;
+  font-size: var(--t-xs);
   font-weight: 500;
   text-transform: uppercase;
   padding: 13px;
@@ -1704,7 +1736,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   background: none;
   color: var(--muted);
   border: 1px solid var(--border);
-  font-size: 0.7rem;
+  font-size: var(--t-xs);
   text-transform: uppercase;
   padding: 13px;
   cursor: pointer;
@@ -1740,7 +1772,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   border-radius: 50%;
   background: var(--bg);
   border: 1px solid var(--border);
-  font-size: 0.6rem;
+  font-size: var(--t-xs);
   color: var(--subtle);
   cursor: pointer;
   display: flex;
@@ -1760,7 +1792,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   border-radius: 50%;
   background: var(--bg);
   border: 1px solid var(--border);
-  font-size: 0.74rem;
+  font-size: var(--t-xs);
   color: #9a6a62;
   cursor: pointer;
   display: flex;
@@ -1787,7 +1819,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 
 #profile-username {
   font-family: var(--font-serif);
-  font-size: 1.55rem;
+  font-size: var(--t-2xl);
   font-weight: 600;
   letter-spacing: -0.015em;
   color: var(--text);
@@ -1798,13 +1830,13 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 
 #profile-displayname {
-  font-size: 0.86rem;
+  font-size: var(--t-sm);
   color: var(--muted);
   margin-top: 4px;
 }
 
 #profile-bio {
-  font-size: 0.82rem;
+  font-size: var(--t-xs);
   color: var(--muted);
   line-height: 1.5;
   margin: 8px 0 0;
@@ -1813,7 +1845,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 
 #profile-joined {
-  font-size: 0.62rem;
+  font-size: var(--t-xs);
   color: var(--subtle);
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -1844,7 +1876,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 
 .stat-fig-num {
   font-family: var(--font-serif);
-  font-size: 2.1rem;
+  font-size: var(--t-3xl);
   font-weight: 400;
   color: var(--text);
   letter-spacing: -0.01em;
@@ -1852,7 +1884,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 
 .stat-fig-label {
-  font-size: 0.58rem;
+  font-size: var(--t-xs);
   color: var(--subtle);
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -1875,7 +1907,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   margin-bottom: 4px;
 }
 .profile-section-label {
-  font-size: 0.68rem;
+  font-size: var(--t-xs);
   font-weight: 600;
   color: var(--text);
   letter-spacing: 0.2em;
@@ -1892,7 +1924,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   background: none;
   border: none;
   padding: 0;
-  font-size: 0.6rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--subtle);
@@ -1902,7 +1934,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .section-action:hover { color: var(--text); }
 .profile-section-sub {
   margin: 14px 0 6px;
-  font-size: 0.78rem;
+  font-size: var(--t-xs);
   color: var(--subtle);
   line-height: 1.5;
 }
@@ -1927,7 +1959,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .pac-title {
   display: block;
   font-family: var(--font-serif);
-  font-size: 0.92rem;
+  font-size: var(--t-sm);
   font-weight: 600;
   font-style: normal;
   color: var(--text);
@@ -1938,7 +1970,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 .pac-meta {
   display: block;
-  font-size: 0.64rem;
+  font-size: var(--t-xs);
   color: var(--subtle);
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1956,7 +1988,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .pac-btn {
   background: none;
   border: none;
-  font-size: 0.6rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--subtle);
@@ -1969,7 +2001,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .pac-btn-danger { color: var(--subtle); }
 .pac-btn-danger:hover { color: #9a5048; }
 .pac-confirm {
-  font-size: 0.6rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.16em;
   text-transform: uppercase;
   display: flex;
@@ -1983,7 +2015,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   background: none;
   border: none;
   padding: 0;
-  font-size: 0.62rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--subtle);
@@ -2005,7 +2037,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .pub-mini-btn {
   background: none;
   border: 1px solid transparent;
-  font-size: 0.75rem;
+  font-size: var(--t-xs);
   color: var(--muted);
   padding: 3px 9px;
   border-radius: 4px;
@@ -2022,14 +2054,14 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   flex-wrap: wrap;
 }
 .pub-confirm-text {
-  font-size: 0.75rem; color: var(--muted);
+  font-size: var(--t-xs); color: var(--muted);
   margin-right: 4px;
 }
 
 /* ─── Badges on cards ─────────────────────────────────────────────────── */
 .draft-badge,
 .pub-badge-published {
-  font-size: 0.62rem;
+  font-size: var(--t-xs);
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -2054,12 +2086,12 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   display: inline-flex; align-items: center; gap: 4px;
 }
 .doc-confirm-text {
-  font-size: 0.72rem; color: var(--muted); margin-right: 2px;
+  font-size: var(--t-xs); color: var(--muted); margin-right: 2px;
 }
 .doc-confirm-cancel,
 .doc-confirm-yes {
   background: none; border: none;
-  font-size: 0.72rem; cursor: pointer;
+  font-size: var(--t-xs); cursor: pointer;
   padding: 2px 5px; border-radius: 4px;
 }
 .doc-confirm-cancel { color: var(--muted); }
@@ -2070,7 +2102,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 /* ─── Publish menu confirm prompt ────────────────────────────────────── */
 .publish-menu-prompt {
   padding: 8px 12px 4px;
-  font-size: 0.75rem;
+  font-size: var(--t-xs);
   color: var(--muted);
 }
 
@@ -2079,7 +2111,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   max-width: 520px;
   background: none;
   border: none;
-  font-size: 0.82rem;
+  font-size: var(--t-xs);
   color: var(--subtle);
   cursor: pointer;
   padding: 18px 0 4px;
@@ -2100,7 +2132,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   padding: 26px 0 6px;
   margin-top: 8px;
   border-top: 1px solid var(--border);
-  font-size: 0.62rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
@@ -2122,7 +2154,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   margin-bottom: 8px;
 }
 #research-blurb {
-  font-size: 0.82rem; color: var(--muted);
+  font-size: var(--t-xs); color: var(--muted);
   line-height: 1.65;
   margin: 16px 0 0;
 }
@@ -2144,7 +2176,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   line-height: 1;
 }
 #contribution-label {
-  font-size: 0.78rem;
+  font-size: var(--t-xs);
   color: var(--muted);
   margin-top: 12px;
   max-width: 260px;
@@ -2152,14 +2184,14 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 #contribution-status {
   display: inline-flex; align-items: center; gap: 7px;
-  font-size: 0.7rem;
+  font-size: var(--t-xs);
   margin-top: 10px;
   letter-spacing: 0.02em;
 }
 #contribution-status.syncing { color: var(--muted); }
 #contribution-status.synced  { color: var(--subtle); }
 #contribution-since {
-  font-size: 0.58rem;
+  font-size: var(--t-xs);
   color: var(--subtle);
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -2190,7 +2222,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .research-toggle input:checked + .research-toggle-track { background: var(--text); }
 .research-toggle input:checked + .research-toggle-track .research-toggle-thumb { left: 18px; }
 .research-toggle-label {
-  font-size: 0.6rem; color: var(--muted);
+  font-size: var(--t-xs); color: var(--muted);
   letter-spacing: 0.16em; text-transform: uppercase;
 }
 
@@ -2200,14 +2232,14 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 .research-confirm {
   display: flex; flex-wrap: wrap; align-items: center; gap: 18px;
-  font-size: 0.72rem;
+  font-size: var(--t-xs);
   color: var(--muted);
 }
 
 #research-legal-links {
   display: flex; align-items: center; gap: 10px;
   margin-top: 22px;
-  font-size: 0.72rem;
+  font-size: var(--t-xs);
   color: var(--subtle);
 }
 .research-legal-dot { color: var(--subtle); opacity: 0.5; }
@@ -2226,7 +2258,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   accent-color: var(--text);
 }
 #tos-consent-text {
-  font-size: 0.8rem;
+  font-size: var(--t-xs);
   color: var(--muted);
   line-height: 1.5;
 }
@@ -2262,24 +2294,24 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .legal-close {
   position: absolute; top: 6px; right: 12px;
   background: none; border: none;
-  color: var(--subtle); font-size: 1.6rem;
+  color: var(--subtle); font-size: var(--t-2xl);
   line-height: 1; padding: 6px; cursor: pointer;
 }
 .legal-close:hover { color: var(--text); }
 .legal-title {
-  font-size: 1.1rem; font-weight: 500; color: var(--text);
+  font-size: var(--t-md); font-weight: 500; color: var(--text);
   letter-spacing: -0.01em;
   margin: 0 0 14px;
 }
 .legal-body {
-  font-size: 0.85rem; line-height: 1.6;
+  font-size: var(--t-xs); line-height: 1.6;
   color: #3a3a3a;
   white-space: pre-wrap;
   margin: 0;
 }
 
 .profile-edit-btn {
-  font-size: 0.62rem;
+  font-size: var(--t-xs);
   font-weight: 500;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -2304,7 +2336,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   max-width: 280px;
 }
 .profile-edit-input {
-  font-size: 0.92rem;
+  font-size: var(--t-sm);
   color: var(--text);
   background: none;
   border: none;
@@ -2331,7 +2363,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   margin-top: 6px;
 }
 .profile-edit-error {
-  font-size: 0.76rem;
+  font-size: var(--t-xs);
   color: #9a6a62;
   text-align: center;
 }
@@ -2368,7 +2400,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   flex: 1;
   background: none;
   border: none;
-  font-size: 0.9rem;
+  font-size: var(--t-sm);
   color: var(--text);
   outline: none;
   letter-spacing: 0;
@@ -2379,7 +2411,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   background: none;
   border: none;
   color: var(--subtle);
-  font-size: 1.1rem;
+  font-size: var(--t-md);
   cursor: pointer;
   padding: 0 2px;
   line-height: 1;
@@ -2411,7 +2443,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   flex: 1;
   background: none;
   border: none;
-  font-size: 0.9rem;
+  font-size: var(--t-sm);
   font-family: var(--font-ui);
   color: var(--text);
   outline: none;
@@ -2419,11 +2451,11 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .feed-search-input::placeholder { color: var(--subtle); }
 .feed-search-clear {
   background: none; border: none; color: var(--subtle);
-  font-size: 1.1rem; cursor: pointer; padding: 0 2px; line-height: 1;
+  font-size: var(--t-md); cursor: pointer; padding: 0 2px; line-height: 1;
 }
 .feed-search-clear:hover { color: var(--text); }
 .feed-search-label {
-  font-size: 0.6rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--subtle);
@@ -2451,7 +2483,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .user-card-username {
   font-family: var(--font-serif);
   display: block;
-  font-size: 0.88rem;
+  font-size: var(--t-sm);
   font-weight: 500;
   font-style: normal;
   color: var(--text);
@@ -2460,7 +2492,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .user-card-name {
   font-family: var(--font-serif);
   display: block;
-  font-size: 0.72rem;
+  font-size: var(--t-xs);
   color: var(--subtle);
   letter-spacing: 0;
   text-transform: none;
@@ -2500,7 +2532,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 
 #user-profile-username {
   font-family: var(--font-serif);
-  font-size: 1.15rem;
+  font-size: var(--t-lg);
   font-weight: 600;
   color: var(--text);
   letter-spacing: -0.02em;
@@ -2508,13 +2540,13 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 
 #user-profile-name {
   font-family: var(--font-serif);
-  font-size: 0.83rem;
+  font-size: var(--t-xs);
   color: var(--muted);
   margin-top: 2px;
 }
 
 #user-profile-bio {
-  font-size: 0.8rem;
+  font-size: var(--t-xs);
   color: var(--muted);
   line-height: 1.5;
   margin: 8px 0 0;
@@ -2529,17 +2561,17 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   margin-top: 6px;
 }
 .user-profile-stat {
-  font-size: 0.78rem;
+  font-size: var(--t-xs);
   color: var(--muted);
 }
 .user-profile-stat-sep {
-  font-size: 0.78rem;
+  font-size: var(--t-xs);
   color: var(--subtle);
   opacity: 0.4;
 }
 
 .follow-btn {
-  font-size: 0.72rem;
+  font-size: var(--t-xs);
   font-weight: 500;
   letter-spacing: 0.04em;
   color: var(--muted);
@@ -2616,7 +2648,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   color: #bbb;
   text-align: center;
   padding: 80px 0;
-  font-size: 0.82rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.04em;
 }
 
@@ -2624,7 +2656,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.72rem;
+  font-size: var(--t-xs);
   color: #b0ada8;
   letter-spacing: 0.01em;
   padding: 18px 24px 12px;
@@ -2652,7 +2684,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   padding: 0 24px;
   font-family: var(--font-serif);
   font-style: italic;
-  font-size: 0.82rem;
+  font-size: var(--t-xs);
   line-height: 1.55;
   color: var(--muted);
   text-align: center;
@@ -2669,7 +2701,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   border: none;
   cursor: pointer;
   color: var(--subtle);
-  font-size: 1.1rem;
+  font-size: var(--t-md);
   line-height: 1;
   padding: 2px 7px;
   border-radius: 3px;
@@ -2721,7 +2753,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .engage-btn {
   background: none; border: none; padding: 4px 6px;
   display: inline-flex; align-items: center; gap: 6px;
-  font-size: 0.73rem; color: var(--muted);
+  font-size: var(--t-xs); color: var(--muted);
   cursor: pointer;
   border-radius: 4px;
   transition: color 0.15s, background 0.15s;
@@ -2740,7 +2772,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 .reading-like {
   background: none; border: 1px solid var(--border);
-  font-size: 0.78rem;
+  font-size: var(--t-xs);
   color: var(--muted);
   padding: 8px 16px; border-radius: 99px;
   display: inline-flex; align-items: center; gap: 8px;
@@ -2753,7 +2785,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 
 .reading-comments-title {
   font-weight: 500;
-  font-size: 0.88rem; color: var(--text);
+  font-size: var(--t-sm); color: var(--text);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   margin: 0 0 18px;
@@ -2770,7 +2802,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 12px;
-  font-size: 0.88rem; color: var(--text);
+  font-size: var(--t-sm); color: var(--text);
   resize: vertical;
   min-height: 76px;
   outline: none;
@@ -2781,13 +2813,13 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   display: flex; align-items: center; justify-content: space-between;
 }
 .comment-counter {
-  font-size: 0.72rem;
+  font-size: var(--t-xs);
   color: var(--subtle);
 }
 .comment-post {
   background: var(--text); color: var(--bg);
   border: none;
-  font-size: 0.75rem; font-weight: 500; letter-spacing: 0.04em;
+  font-size: var(--t-xs); font-weight: 500; letter-spacing: 0.04em;
   padding: 6px 16px;
   border-radius: 4px;
   cursor: pointer;
@@ -2796,7 +2828,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .comment-post:hover { opacity: 0.85; }
 .comment-post:disabled { opacity: 0.4; cursor: not-allowed; }
 .comment-signin {
-  font-size: 0.85rem; color: var(--muted);
+  font-size: var(--t-xs); color: var(--muted);
   margin: 0 0 22px;
 }
 
@@ -2811,7 +2843,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .comment-header {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   margin-bottom: 4px;
-  font-size: 0.78rem;
+  font-size: var(--t-xs);
 }
 .comment-author {
   font-family: var(--font-serif);
@@ -2824,7 +2856,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .comment-delete {
   margin-left: auto;
   background: none; border: none;
-  font-size: 0.72rem;
+  font-size: var(--t-xs);
   color: var(--subtle); cursor: pointer;
   padding: 2px 4px;
 }
@@ -2836,7 +2868,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 .comment-body {
   margin: 0;
-  font-size: 0.88rem; line-height: 1.55;
+  font-size: var(--t-sm); line-height: 1.55;
   color: var(--text);
   white-space: pre-wrap;
   word-wrap: break-word;
@@ -2879,7 +2911,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   position: absolute;
   top: -4px; right: -4px;
   background: none; border: none;
-  font-size: 1.3rem; color: #ccc;
+  font-size: var(--t-lg); color: #ccc;
   cursor: pointer; padding: 4px; line-height: 1;
   transition: color 0.15s;
 }
@@ -2889,7 +2921,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 
 #auth-tabs button {
   background: none; border: none;
-  font-size: 0.82rem; font-weight: 500; color: #ccc;
+  font-size: var(--t-xs); font-weight: 500; color: #ccc;
   cursor: pointer; padding: 0;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -2900,7 +2932,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 #auth-modal form { display: flex; flex-direction: column; }
 
 #auth-modal input {
-  font-size: 0.9rem;
+  font-size: var(--t-sm);
   border: none; border-bottom: 1px solid #e0ded9;
   background: transparent; padding: 8px 0; margin-bottom: 14px;
   outline: none; color: var(--text); transition: border-color 0.15s;
@@ -2915,7 +2947,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 .publish-note-input {
   width: 100%;
   font: inherit;
-  font-size: 0.9rem;
+  font-size: var(--t-sm);
   border: none; border-bottom: 1px solid #e0ded9;
   background: transparent;
   padding: 8px 0; margin-bottom: 14px;
@@ -2927,14 +2959,14 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 .publish-note-input:focus { border-bottom-color: #888; }
 
 .auth-error {
-  font-size: 0.78rem;
+  font-size: var(--t-xs);
   color: #b94040; margin: -6px 0 10px;
 }
 
 #auth-submit {
   background: var(--text); color: var(--bg);
   border: none;
-  font-size: 0.8rem; font-weight: 500; letter-spacing: 0.06em;
+  font-size: var(--t-xs); font-weight: 500; letter-spacing: 0.06em;
   text-transform: uppercase;
   padding: 10px; cursor: pointer; margin-top: 2px;
   transition: opacity 0.15s; border-radius: 2px;
@@ -2944,7 +2976,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 
 /* ─── Download modal controls ─────────────────────────────────────────── */
 .dl-section-label {
-  font-size: 0.68rem;
+  font-size: var(--t-xs);
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -2960,7 +2992,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   padding: 5px 12px;
   border: 1px solid var(--border);
   border-radius: 999px;
-  font-size: 0.78rem;
+  font-size: var(--t-xs);
   color: var(--muted);
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
@@ -2970,7 +3002,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 .dl-radio input { position: absolute; opacity: 0; pointer-events: none; }
 .dl-check {
   display: flex; align-items: center; gap: 8px;
-  font-size: 0.82rem;
+  font-size: var(--t-xs);
   color: var(--text);
   cursor: pointer;
   padding: 4px 0;
@@ -2986,13 +3018,13 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 }
 #auth-divider span {
   position: relative;
-  font-size: 0.72rem; color: #ccc; background: var(--bg); padding: 0 10px;
+  font-size: var(--t-xs); color: #ccc; background: var(--bg); padding: 0 10px;
   letter-spacing: 0.04em;
 }
 
 #google-btn {
   background: none; border: 1px solid #dadada;
-  font-size: 0.82rem;
+  font-size: var(--t-xs);
   color: #555; padding: 9px; cursor: pointer;
   letter-spacing: 0.01em; transition: border-color 0.15s, color 0.15s;
   border-radius: 2px;
@@ -3000,14 +3032,14 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 #google-btn:hover { border-color: #aaa; color: var(--text); }
 
 #auth-message {
-  font-size: 0.88rem;
+  font-size: var(--t-sm);
   color: #666; text-align: center; padding: 24px 0; line-height: 1.6;
 }
 
 .auth-forgot {
   display: block;
   background: none; border: none; padding: 0;
-  font-size: 0.78rem;
+  font-size: var(--t-xs);
   color: var(--muted);
   cursor: pointer;
   margin: 14px auto 0;
@@ -3019,7 +3051,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 .auth-back {
   display: block;
   background: none; border: none; padding: 0;
-  font-size: 0.78rem; color: var(--muted);
+  font-size: var(--t-xs); color: var(--muted);
   cursor: pointer; margin: 16px auto 0;
   letter-spacing: 0.01em;
   transition: color 0.15s;
@@ -3027,7 +3059,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 .auth-back:hover { color: var(--text); }
 
 .auth-blurb {
-  font-size: 0.85rem; color: var(--muted);
+  font-size: var(--t-xs); color: var(--muted);
   line-height: 1.55;
   margin: 0 0 18px;
   text-align: center;
@@ -3053,7 +3085,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 .auth-uname-hint {
   position: absolute;
   right: 0; top: 9px;
-  font-size: 0.72rem; letter-spacing: 0.01em;
+  font-size: var(--t-xs); letter-spacing: 0.01em;
   pointer-events: none;
 }
 .auth-uname-hint.ok    { color: #5a8a5a; }
@@ -3066,7 +3098,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   display: flex; flex-wrap: wrap; gap: 4px 16px;
 }
 .auth-pw-reqs li {
-  font-size: 0.74rem; color: #bdbab4;
+  font-size: var(--t-xs); color: #bdbab4;
   letter-spacing: 0.01em;
   transition: color 0.15s;
 }
@@ -3079,12 +3111,12 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 }
 .auth-tos input { margin-top: 2px; accent-color: var(--text); flex-shrink: 0; }
 .auth-tos #tos-consent-text {
-  font-size: 0.75rem; line-height: 1.5; color: var(--muted);
+  font-size: var(--t-xs); line-height: 1.5; color: var(--muted);
 }
 
 #auth-message-wrap { text-align: center; }
 .auth-resend {
-  font-size: 0.78rem; color: var(--muted);
+  font-size: var(--t-xs); color: var(--muted);
   display: flex; flex-direction: column; align-items: center; gap: 12px;
   margin-top: 4px;
 }
@@ -3098,13 +3130,13 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 
 /* ─── Human Signal modal ──────────────────────────────────────────────────── */
 #hs-modal-title {
-  font-size: 1rem; font-weight: 500; color: var(--text);
+  font-size: var(--t-md); font-weight: 500; color: var(--text);
   margin-bottom: 20px; letter-spacing: -0.01em;
 }
 
 #hs-modal-body,
 .hs-modal-body {
-  font-size: 0.88rem; color: #666;
+  font-size: var(--t-sm); color: #666;
   line-height: 1.7; margin: 0;
 }
 
@@ -3122,7 +3154,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   padding: 5px 10px 5px 8px;
   border-radius: 99px;
   cursor: pointer;
-  font-size: 0.68rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.04em;
   color: #9c8a72;
   transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
@@ -3156,7 +3188,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   100% { transform: scale(3.2); opacity: 0;    }
 }
 @media (max-width: 480px) {
-  #research-strip { font-size: 0.66rem; right: 10px; padding: 4px 8px 4px 7px; }
+  #research-strip { font-size: var(--t-xs); right: 10px; padding: 4px 8px 4px 7px; }
 }
 /* On phones the centred writing-stats / human-score bar (#hs-editor-status)
    shares this bottom offset and is wide enough to sit on top of the studying
@@ -3180,7 +3212,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 }
 
 .toast {
-  font-size: 0.78rem;
+  font-size: var(--t-xs);
   font-weight: 500;
   color: var(--bg);
   background: var(--text);
@@ -3194,7 +3226,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 .toast.toast-hint {
   background: var(--surface);
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: var(--t-xs);
   padding: 5px 12px;
   border: 1px solid var(--border);
   box-shadow: none;
@@ -3246,7 +3278,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   }
   #text-container.writing-started { padding-top: 6vh; }
   #writing-area {
-    width: calc(100% - 56px);
+    width: calc(100% - 44px);
     max-width: none;
     min-width: 0;
   }
@@ -3259,7 +3291,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   #text {
     width: 100%;
     max-width: none;
-    font-size: 1.12rem;
+    font-size: var(--t-md);
     line-height: 1.65;
     padding: 0 0 8px;
   }
@@ -3272,17 +3304,17 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   #feed-masthead { padding: 24px 20px 14px; }
   #feed-header { padding-left: 20px; padding-right: 20px; }
   #feed-list { padding-left: 20px; padding-right: 20px; }
-  .feed-tagline { font-size: 1.08rem; max-width: none; }
-  .feed-lead-title { font-size: 1.42rem; }
-  .feed-lead-excerpt { font-size: 1.02rem; }
-  .feed-entry-title { font-size: 1.1rem; }
-  .pub-card-title { font-size: 1.2rem; }
+  .feed-tagline { font-size: var(--t-md); max-width: none; }
+  .feed-lead-title { font-size: var(--t-xl); }
+  .feed-lead-excerpt { font-size: var(--t-md); }
+  .feed-entry-title { font-size: var(--t-md); }
+  .pub-card-title { font-size: var(--t-lg); }
 
   /* ── Profile ── */
   #profile-container { padding: 44px 20px 28px; }
-  #profile-username { font-size: 1.4rem; }
+  #profile-username { font-size: var(--t-xl); }
   .stat-fig { padding: 0 18px; }
-  .stat-fig-num { font-size: 1.7rem; }
+  .stat-fig-num { font-size: var(--t-2xl); }
   .pac-actions { opacity: 1; }
   .pac-confirm { opacity: 1; }
 
@@ -3292,7 +3324,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   #doc-panel { width: 290px; }
 
   /* ── Landing ── */
-  #landing-headline { font-size: 1.75rem; }
+  #landing-headline { font-size: var(--t-2xl); }
   #landing-inner { padding: 0 28px; }
 }
 
@@ -3315,7 +3347,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   border-bottom: 1px solid var(--border);
 }
 .reading-verify .rv-mark {
-  font-size: 0.95rem;
+  font-size: var(--t-sm);
   color: #b8a892;
   line-height: 1;
 }
@@ -3328,7 +3360,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   min-width: 0;
 }
 .rv-status {
-  font-size: 0.62rem;
+  font-size: var(--t-xs);
   text-transform: uppercase;
   letter-spacing: 0.18em;
   color: var(--subtle);
@@ -3340,7 +3372,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   padding: 0;
   text-align: left;
   font-family: var(--font-ui);
-  font-size: 0.84rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.14em;
   color: var(--text);
   cursor: pointer;
@@ -3350,7 +3382,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 }
 .rv-code:hover .rv-copy { color: var(--muted); }
 .rv-copy {
-  font-size: 0.58rem;
+  font-size: var(--t-xs);
   text-transform: uppercase;
   letter-spacing: 0.16em;
   color: var(--subtle);
@@ -3361,7 +3393,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   border: none;
   padding: 0;
   flex: 0 0 auto;
-  font-size: 0.7rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.04em;
   color: var(--muted);
   cursor: pointer;
@@ -3378,7 +3410,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   border-bottom: 1px solid var(--border);
 }
 .pmc-label {
-  font-size: 0.56rem;
+  font-size: var(--t-xs);
   text-transform: uppercase;
   letter-spacing: 0.18em;
   color: var(--subtle);
@@ -3386,7 +3418,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 .pmc-code {
   background: none; border: none; padding: 0; text-align: left;
   font-family: var(--font-ui);
-  font-size: 0.8rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.12em;
   color: var(--text);
   cursor: pointer;
@@ -3394,7 +3426,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 .pmc-code:hover { color: var(--gold); }
 .pmc-verify-link {
   background: none; border: none; padding: 0; text-align: left;
-  font-size: 0.68rem;
+  font-size: var(--t-xs);
   color: var(--muted);
   cursor: pointer;
 }
@@ -3417,7 +3449,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 .verify-masthead { text-align: center; margin-bottom: 40px; }
 .verify-eyebrow {
   display: block;
-  font-size: 0.62rem;
+  font-size: var(--t-xs);
   text-transform: uppercase;
   letter-spacing: 0.26em;
   color: var(--subtle);
@@ -3426,13 +3458,13 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 .verify-title {
   font-family: var(--font-serif);
   font-weight: 500;
-  font-size: 2.4rem;
+  font-size: var(--t-display);
   letter-spacing: 0.01em;
   color: var(--text);
   margin: 0 0 14px;
 }
 .verify-sub {
-  font-size: 0.9rem;
+  font-size: var(--t-sm);
   line-height: 1.6;
   color: var(--muted);
   max-width: 420px;
@@ -3453,7 +3485,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   border-radius: 1px;
   padding: 13px 16px;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--t-sm);
   letter-spacing: 0.12em;
   color: var(--text);
   text-transform: uppercase;
@@ -3467,7 +3499,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   border: 1px solid var(--text);
   border-radius: 1px;
   padding: 0 22px;
-  font-size: 0.8rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.06em;
   cursor: pointer;
   transition: opacity 0.15s ease;
@@ -3479,7 +3511,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   max-width: 440px;
   margin: 18px auto 0;
   text-align: center;
-  font-size: 0.84rem;
+  font-size: var(--t-xs);
   line-height: 1.55;
   color: var(--muted);
 }
@@ -3504,17 +3536,17 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   gap: 10px;
   margin-bottom: 14px;
 }
-.verify-cert-diamond { font-size: 1.1rem; color: #b8a892; line-height: 1; }
+.verify-cert-diamond { font-size: var(--t-md); color: #b8a892; line-height: 1; }
 .verify-cert-mark.is-verified .verify-cert-diamond { color: var(--gold); }
 .verify-cert-status {
-  font-size: 0.66rem;
+  font-size: var(--t-xs);
   text-transform: uppercase;
   letter-spacing: 0.2em;
   color: var(--muted);
 }
 .verify-cert-mark.is-verified .verify-cert-status { color: var(--text); }
 .verify-cert-lead {
-  font-size: 0.86rem;
+  font-size: var(--t-sm);
   line-height: 1.6;
   color: var(--muted);
   margin: 0 0 24px;
@@ -3529,7 +3561,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   border-top: 1px solid var(--border);
 }
 .verify-cert-fields dt {
-  font-size: 0.58rem;
+  font-size: var(--t-xs);
   text-transform: uppercase;
   letter-spacing: 0.16em;
   color: var(--subtle);
@@ -3538,25 +3570,25 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 }
 .verify-cert-fields dd {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: var(--t-sm);
   color: var(--text);
   line-height: 1.4;
 }
 .verify-cert-tier {
   font-family: var(--font-ui);
-  font-size: 1.15rem;
+  font-size: var(--t-lg);
   margin-right: 10px;
 }
 .verify-cert-score {
   font-family: var(--font-serif);
-  font-size: 1.3rem;
+  font-size: var(--t-lg);
   color: var(--muted);
 }
-.verify-cert-score-denom { font-size: 0.8rem; color: var(--subtle); }
+.verify-cert-score-denom { font-size: var(--t-xs); color: var(--subtle); }
 .verify-cert-code {
   font-family: var(--font-ui);
   letter-spacing: 0.14em;
-  font-size: 0.88rem;
+  font-size: var(--t-sm);
 }
 
 .verify-read-btn {
@@ -3564,7 +3596,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   border: 1px solid var(--border);
   border-radius: 1px;
   padding: 11px 18px;
-  font-size: 0.8rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.04em;
   color: var(--text);
   cursor: pointer;
@@ -3574,7 +3606,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 
 .verify-match { margin-top: 24px; }
 .verify-match summary {
-  font-size: 0.74rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.02em;
   color: var(--muted);
   cursor: pointer;
@@ -3583,7 +3615,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 .verify-match summary::-webkit-details-marker { display: none; }
 .verify-match summary:hover { color: var(--text); }
 .verify-match-hint {
-  font-size: 0.78rem;
+  font-size: var(--t-xs);
   line-height: 1.55;
   color: var(--subtle);
   margin: 12px 0 10px;
@@ -3595,14 +3627,14 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   border-radius: 1px;
   padding: 12px 14px;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--t-sm);
   line-height: 1.5;
   color: var(--text);
   resize: vertical;
 }
 .verify-match-input:focus { outline: none; border-color: #aaa; }
 .verify-match-result {
-  font-size: 0.8rem;
+  font-size: var(--t-xs);
   margin: 10px 0 0;
   letter-spacing: 0.01em;
 }
@@ -3613,7 +3645,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 .verify-foot { text-align: center; margin-top: 44px; }
 .verify-link {
   background: none; border: none; padding: 0;
-  font-size: 0.78rem;
+  font-size: var(--t-xs);
   color: var(--subtle);
   cursor: pointer;
   transition: color 0.15s ease;
@@ -3622,7 +3654,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 
 @media (max-width: 600px) {
   #verify-inner { padding: 40px 20px 80px; }
-  .verify-title { font-size: 2rem; }
+  .verify-title { font-size: var(--t-3xl); }
   .verify-form { flex-direction: column; }
   .verify-submit { padding: 12px; }
   .verify-cert { padding: 24px 20px; }
@@ -3633,7 +3665,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 
 /* The ◇ signal mark as a bottom-nav icon — inherits the tab's colour. */
 .nav-diamond {
-  font-size: 1.05rem;
+  font-size: var(--t-md);
   line-height: 18px;
   height: 18px;
   display: flex;
@@ -3648,14 +3680,14 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   gap: 11px;
   margin-top: 9px;
 }
-.pac-code-mark { color: var(--gold); font-size: 0.7rem; line-height: 1; }
+.pac-code-mark { color: var(--gold); font-size: var(--t-xs); line-height: 1; }
 .pac-code-val {
   background: none;
   border: none;
   padding: 0;
   cursor: pointer;
   font-family: var(--font-ui);
-  font-size: 0.72rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.12em;
   color: var(--muted);
   display: inline-flex;
@@ -3664,7 +3696,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 }
 .pac-code-val:hover { color: var(--text); }
 .pac-code-copied {
-  font-size: 0.54rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--subtle);
@@ -3675,7 +3707,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   border: none;
   padding: 0;
   cursor: pointer;
-  font-size: 0.64rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.02em;
   color: var(--subtle);
 }
@@ -3684,13 +3716,13 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 /* ─── Content moderation: report control ──────────────────────────────────── */
 .report-btn {
   background: none; border: none; padding: 2px 4px; cursor: pointer;
-  font-size: 0.62rem; letter-spacing: 0.16em; text-transform: uppercase;
+  font-size: var(--t-xs); letter-spacing: 0.16em; text-transform: uppercase;
   color: var(--subtle); transition: color 0.18s;
 }
 .report-btn:hover { color: #9a6a62; }
 .comment-report { margin-left: auto; }
 .report-done {
-  font-size: 0.62rem; letter-spacing: 0.06em; color: var(--subtle);
+  font-size: var(--t-xs); letter-spacing: 0.06em; color: var(--subtle);
 }
 .comment-report.report-done { margin-left: auto; }
 
@@ -3709,12 +3741,12 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   margin-bottom: 10px;
 }
 .report-panel-title {
-  font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase;
+  font-size: var(--t-xs); letter-spacing: 0.18em; text-transform: uppercase;
   color: var(--muted);
 }
 .report-cancel {
   background: none; border: none; padding: 0; cursor: pointer;
-  font-size: 0.68rem; color: var(--subtle);
+  font-size: var(--t-xs); color: var(--subtle);
 }
 .report-cancel:hover { color: var(--muted); }
 .report-reasons {
@@ -3722,21 +3754,21 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 }
 .report-reason {
   display: flex; align-items: center; gap: 8px;
-  font-size: 0.8rem; color: var(--text); cursor: pointer;
+  font-size: var(--t-xs); color: var(--text); cursor: pointer;
 }
 .report-reason input { accent-color: #9a6a62; margin: 0; }
 .report-note {
   width: 100%; resize: vertical; padding: 8px 10px;
   border: 1px solid var(--border); background: var(--bg);
-  font-family: var(--font-ui); font-size: 0.82rem; color: var(--text);
+  font-family: var(--font-ui); font-size: var(--t-xs); color: var(--text);
   margin-bottom: 10px;
 }
 .report-note:focus { outline: none; border-color: var(--subtle); }
-.report-err { margin: 0 0 10px; font-size: 0.74rem; color: #7a3a32; }
+.report-err { margin: 0 0 10px; font-size: var(--t-xs); color: #7a3a32; }
 .report-actions { display: flex; justify-content: flex-end; }
 .report-submit {
   background: none; border: 1px solid #9a6a62; padding: 6px 14px; cursor: pointer;
-  font-size: 0.6rem; letter-spacing: 0.16em; text-transform: uppercase;
+  font-size: var(--t-xs); letter-spacing: 0.16em; text-transform: uppercase;
   color: #7a3a32; transition: background 0.18s, color 0.18s;
 }
 .report-submit:hover:not(:disabled) { background: #9a6a62; color: var(--bg); }
@@ -3756,12 +3788,12 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 }
 .admin-masthead { text-align: center; margin-bottom: 32px; }
 .admin-dateline {
-  font-size: 0.66rem; letter-spacing: 0.32em; text-transform: uppercase;
+  font-size: var(--t-xs); letter-spacing: 0.32em; text-transform: uppercase;
   color: var(--muted);
 }
 .admin-section { margin-bottom: 40px; }
 .admin-section-title {
-  font-family: var(--font-ui); font-weight: 500; font-size: 1.2rem;
+  font-family: var(--font-ui); font-weight: 500; font-size: var(--t-lg);
   color: var(--text); margin: 0 0 16px; padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
 }
@@ -3772,13 +3804,13 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 .admin-row-body { min-width: 0; flex: 1; }
 .admin-tag {
   display: inline-block; margin-right: 10px;
-  font-size: 0.58rem; letter-spacing: 0.14em; text-transform: uppercase;
+  font-size: var(--t-xs); letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--subtle);
 }
-.admin-reason { font-size: 0.8rem; color: var(--text); }
-.admin-note { margin: 6px 0 0; font-size: 0.82rem; color: var(--muted); }
+.admin-reason { font-size: var(--t-xs); color: var(--text); }
+.admin-note { margin: 6px 0 0; font-size: var(--t-xs); color: var(--muted); }
 .admin-snippet {
-  margin: 6px 0 0; font-family: var(--font-serif); font-size: 0.92rem;
+  margin: 6px 0 0; font-family: var(--font-serif); font-size: var(--t-sm);
   line-height: 1.45; color: var(--muted);
 }
 .admin-row-actions {
@@ -3794,7 +3826,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   background: none;
   color: var(--muted);
   border: 1px solid var(--border);
-  font-size: 0.75rem;
+  font-size: var(--t-xs);
   font-weight: 500;
   letter-spacing: 0.04em;
   padding: 5px 12px;
@@ -3806,7 +3838,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 #cert-btn:hover { color: var(--text); border-color: #aaa; }
 #cert-btn:disabled { opacity: 0.6; cursor: default; }
 #cert-btn.is-certified { color: var(--text); border-color: rgba(169, 138, 92, 0.5); }
-#cert-btn .cert-diamond { font-size: 0.9rem; line-height: 1; }
+#cert-btn .cert-diamond { font-size: var(--t-sm); line-height: 1; }
 #cert-btn.is-certified .cert-diamond { color: var(--gold); }
 
 #cert-menu {
@@ -3826,7 +3858,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   text-align: left;
 }
 .cert-menu-label {
-  font-size: 0.56rem;
+  font-size: var(--t-xs);
   text-transform: uppercase;
   letter-spacing: 0.18em;
   color: var(--subtle);
@@ -3837,14 +3869,14 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   padding: 0;
   text-align: left;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--t-sm);
   letter-spacing: 0.12em;
   color: var(--text);
   cursor: pointer;
 }
 .cert-menu-code:hover { color: var(--gold); }
 .cert-menu-note {
-  font-size: 0.72rem;
+  font-size: var(--t-xs);
   line-height: 1.5;
   color: var(--muted);
   margin: 2px 0 5px;
@@ -3854,17 +3886,17 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   border: none;
   padding: 0;
   text-align: left;
-  font-size: 0.74rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.01em;
   color: var(--muted);
   cursor: pointer;
 }
 .cert-menu-link:hover { color: var(--text); }
-.cert-menu-recertify { color: var(--subtle); font-size: 0.68rem; }
+.cert-menu-recertify { color: var(--subtle); font-size: var(--t-xs); }
 
 /* Private-certificate note in the verify view */
 .verify-cert-private {
-  font-size: 0.82rem;
+  font-size: var(--t-xs);
   line-height: 1.55;
   color: var(--muted);
   margin: 0;
@@ -3903,7 +3935,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   cursor: pointer;
   color: var(--muted);
   font-family: var(--font-ui);
-  font-size: 0.62rem;
+  font-size: var(--t-xs);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   transition: background 0.15s, color 0.15s;
@@ -3918,7 +3950,1266 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 .title-caps-btn.active { opacity: 1; color: var(--text); }
 .title-caps-glyph {
   font-family: var(--font-serif);
-  font-size: 0.98rem;
+  font-size: var(--t-sm);
   line-height: 1;
   letter-spacing: -0.01em;
 }
+
+/* ─── Phone: writing surface ──────────────────────────────────────────────────
+   Everything here is mobile-only. The desktop editor is untouched.
+
+   The keyboard eats ~40% of a phone screen, so the answer is not a smaller
+   toolbar but no toolbar: paper, your sentence, and nothing else. --kb-inset is
+   published by the visualViewport effect in App.js and is 0 on desktop. */
+@media (max-width: 600px) {
+  :root {
+    --sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+    --sab: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  }
+
+  /* An SVG in a column flex container is shrinkable, so a short nav collapses
+     the icons to zero height while the text-glyph tab keeps its mark. Pin them. */
+  #bottom-nav .nav-tab > svg { flex: 0 0 auto; width: 18px; height: 18px; }
+  #bottom-nav {
+    height: calc(var(--bottom-nav) + var(--sab));
+    padding-bottom: var(--sab);
+  }
+
+  /* ── The editor reads as a note, not a document ──────────────────────────
+     A phone note starts at the top and the title is simply the first line,
+     left-aligned with the body. Centring the title and floating the block in
+     the middle of a tall narrow screen is what made this feel like a shrunken
+     desktop page rather than something built for the device. */
+  #text-container {
+    padding-top: 3vh;
+    padding-bottom: 12vh;
+    /* the top fade eats the first line on a short screen */
+    -webkit-mask-image: linear-gradient(to bottom, black 0px, black calc(100% - 28px), transparent 100%);
+    mask-image: linear-gradient(to bottom, black 0px, black calc(100% - 28px), transparent 100%);
+  }
+  #text-container.writing-started { padding-top: 3vh; }
+
+  #title-input {
+    width: calc(100% - 44px);
+    text-align: left;
+    text-wrap: initial;
+    font-size: var(--t-xl);
+    font-weight: 600;
+    margin-bottom: 10px;
+    padding: 0;
+  }
+
+  /* Editor actions: quiet glyphs, not a row of competing boxes. Nothing solid
+     black next to paper. */
+  #top-bar-right .btn-label { display: none; }
+  #top-bar-right .icon-btn,
+  #top-bar-right #publish-btn,
+  #top-bar-right button {
+    background: none;
+    border: none;
+    box-shadow: none;
+    color: var(--muted);
+    padding: 6px;
+    min-width: 0;
+  }
+  #top-bar-right #publish-btn { color: var(--text); }
+  #top-bar { padding-right: 6px; }
+
+  /* Sit the writing strip on top of the keyboard rather than behind it. */
+  #text-container {
+    bottom: calc(var(--bottom-nav) + 60px + var(--kb-inset, 0px));
+    transition: padding-top 0.55s cubic-bezier(0.32, 0.72, 0, 1),
+                bottom 0.25s ease;
+  }
+
+  /* While the keyboard is up the nav is behind it anyway, and the writing
+     wants the whole strip. Reclaim it and drop the top padding so the first
+     line starts near the top instead of halfway down a short window. */
+  body.keyboard-open #text-container {
+    bottom: var(--kb-inset, 0px);
+    padding-top: 7vh;
+  }
+  body.keyboard-open #text-container.writing-started { padding-top: 4vh; }
+  body.keyboard-open #bottom-nav,
+  body.keyboard-open #research-strip { opacity: 0; pointer-events: none; }
+
+  /* Notch and home indicator. */
+  /* Capacitor's webview reports env(safe-area-inset-*) as 0, so the native
+     values are injected as --safe-area-inset-* by the SafeArea plugin. Prefer
+     those, fall back to env() on the web, then to 0. */
+  #top-bar {
+    height: calc(var(--top-bar) + var(--sat));
+    padding-top: var(--sat);
+  }
+  #text-container, #reading-container, #verify-view, #editor-preview-container {
+    top: calc(var(--top-bar) + var(--sat));
+  }
+
+  /* The flank mask has nowhere to live on a phone — there are no flanks — so
+     the plate goes full bleed and quiet. In the editor it still greets the
+     blank page and leaves once the piece has words, which is the whole ritual
+     and reads more strongly on a small screen, not less. */
+  #backdrop {
+    -webkit-mask-image: none;
+    mask-image: none;
+    /* `cover` crops a plate so hard on a phone that it reads as texture rather
+       than as a picture. `contain` keeps the whole engraving legible as art. */
+    background-size: contain;
+    transform: none;
+  }
+  #backdrop.bd-on { opacity: 0.1; }
+  /* On a phone there are no margins for the plate to live in, so anywhere with
+     a column of text it can only sit *behind* the words and fight them. Keep
+     the engraving as the greeting on a blank page, and let every reading
+     surface be plain paper. */
+  #backdrop.bd-on:not([data-view="editor"]) { opacity: 0; }
+  #backdrop.bd-ring { -webkit-mask-image: none; mask-image: none; }
+
+  /* Nothing but the page while writing. */
+  body.keyboard-open #hs-editor-status,
+  body.keyboard-open .writing-stats { opacity: 0; pointer-events: none; }
+}
+
+/* ─── Phone: drawer + section ornament ───────────────────────────────────────
+   What survives of the earlier all-Garamond experiment. The type rules it
+   carried are gone: they set buttons, headings and the nav in the serif and
+   went on overriding the later passes, which is why buttons stayed Garamond
+   long after the interface moved to a grotesque. */
+@media (max-width: 600px) {
+  #bottom-nav .nav-tab > svg,
+  #bottom-nav .nav-diamond { display: none; }
+
+  /* The drafts drawer was a desktop sidebar leaving a strip of editor showing
+     down the side. On a phone a drawer is the screen. */
+  #doc-panel {
+    width: 100%;
+    max-width: none;
+    padding-top: calc(var(--top-bar) + var(--sat));
+  }
+  .new-doc-btn { font-size: var(--t-sm); padding: 16px 22px; }
+  .new-doc-btn svg { display: none; }
+  .doc-item { padding: 16px 22px; }
+
+  /* Dürer: the foliate band from the Flammarion border, as one centred device
+     between sections. Tiling it shows the seam. */
+  .feed-section-label { display: flex; flex-direction: column; gap: 10px; }
+  .feed-section-label::after {
+    content: "";
+    display: block;
+    width: 150px;
+    height: 8px;
+    opacity: 0.26;
+    background: url("./assets/ornament-rule.webp") center / contain no-repeat;
+  }
+}
+
+/* ─── Phone: warm the palette, quiet the type ────────────────────────────────
+   The base palette is neutral grey (#f6f6f6 paper, pure-black borders), which
+   is the cold, screen-native tone that makes an interface read as generic.
+   inkk is paper and ink, so on the phone every neutral is warmed toward the
+   same off-white the carousels and the rendered pages already use. */
+@media (max-width: 600px) {
+  :root {
+    --bg:      #faf8f4;              /* warm paper, not neutral grey */
+    --surface: #f4f1ea;
+    --text:    #1f1b17;              /* warm near-black rather than #1a1a1a */
+    --muted:   #6b6259;              /* sepia, not slate */
+    --subtle:  #a09689;
+    --border:  rgba(62, 50, 36, 0.14);   /* warm brown, never pure black */
+  }
+
+  /* Any input under 16px makes iOS zoom the page on focus, and it does not
+     zoom back — which is why opening Verify left everything permanently
+     enlarged. */
+  /* [class] raises specificity above the component rules that set 0.95rem;
+     without it those win and the page still zooms. */
+  input, textarea, select,
+  input[class], textarea[class], select[class] { font-size: max(16px, 1rem); }
+
+  /* The tabs, set as words rather than tracked-out capitals. Wide letterspaced
+     caps read as a product UI; a serif in its normal case reads as a masthead. */
+  #bottom-nav .nav-label {
+    text-transform: none;
+    letter-spacing: 0.01em;
+    font-size: var(--t-sm);
+    font-weight: 400;
+  }
+  #bottom-nav .nav-tab.active .nav-label { font-weight: 600; }
+
+  /* The diamond is retired. The wordmark is the mark. */
+  .nav-diamond, .cert-diamond, .rv-mark, .pac-code-mark,
+  .feed-empty-mark, .verify-cert-diamond { display: none; }
+}
+
+/* ─── Phone: the tab bar floats ───────────────────────────────────────────────
+   A bar welded to the bottom edge belongs to the chrome; a capsule floating
+   above it belongs to the app, and the page keeps running underneath. Both
+   references agree on the same two moves: a rounded floating bar, and an
+   active tab marked by a filled pill rather than a colour change. */
+@media (max-width: 600px) {
+  #bottom-nav {
+    left: 14px;
+    right: 14px;
+    bottom: calc(var(--sab) + 10px);
+    height: 54px;
+    padding-bottom: 0;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    /* frosted paper, so what is behind stays faintly present */
+    background: rgba(250, 248, 244, 0.82);
+    -webkit-backdrop-filter: blur(22px) saturate(1.3);
+    backdrop-filter: blur(22px) saturate(1.3);
+    box-shadow: 0 6px 24px rgba(62, 50, 36, 0.10), 0 1px 2px rgba(62, 50, 36, 0.06);
+    padding-left: 5px;
+    padding-right: 5px;
+    gap: 2px;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+
+  .nav-tab {
+    border-radius: 999px;
+    padding: 0;
+    margin: 5px 0;
+    transition: background 0.22s ease, color 0.22s ease;
+  }
+  .nav-tab.active {
+    background: rgba(62, 50, 36, 0.07);
+    color: var(--text);
+  }
+  #bottom-nav .nav-label { font-size: var(--t-sm); }
+
+  /* The strip has to clear the floating bar rather than a flush one. */
+  #text-container { bottom: calc(64px + var(--sab) + var(--kb-inset, 0px)); }
+  body.keyboard-open #bottom-nav { transform: translateY(120%); opacity: 0; }
+}
+
+/* ─── Phone: the research pass ───────────────────────────────────────────────
+   Four findings drove this, and each one names something that was wrong:
+
+   1. "Most dividers are apologies — the border under every list row, the box
+      around every form section, the hairline between every card. Each one is
+      spacing that gave up." There were 57 hairline rules. Space separates
+      here instead, on the Gestalt rule that the gap between groups must
+      exceed the gap within them.
+   2. Stacked eyebrow labels above every block is the most recognisable
+      generated-UI habit. They are gone.
+   3. Garamond sets old-style figures, whose digits ride at different heights
+      by design. Correct in prose, wrong in an interface: UI wants lining and
+      tabular so numerals sit level and align in columns.
+   4. Templated work keeps every text size similar. Designed work is built on
+      a scale with real contrast. */
+@media (max-width: 600px) {
+  :root { --font-ui: "Switzer", -apple-system, BlinkMacSystemFont, sans-serif; }
+
+  html, body, button, input, textarea, select, a, span, div, p,
+  h1, h2, h3, h4, li, time, label, small { font-family: var(--font-ui); }
+
+  /* Garamond is whitelisted onto writing, and nowhere else. */
+  #text, #title-input, #brand,
+  .feed-lead-title, .feed-lead-excerpt,
+  .feed-entry-title, .feed-entry-excerpt,
+  .pub-card-title, .pub-card-excerpt, #reading-text {
+    font-family: var(--font-serif) !important;
+  }
+  #bottom-nav .nav-label, #bottom-nav .nav-tab,
+  .verify-title, .feed-section-label, .verify-sub {
+    font-family: var(--font-ui) !important;
+  }
+
+  /* Figures sit level everywhere except running prose, where old-style is
+     the correct setting. */
+  *, *::before, *::after { font-variant-numeric: lining-nums tabular-nums; }
+  .feed-lead-excerpt, .feed-entry-excerpt, #text, #reading-text { font-variant-numeric: normal; }
+
+  /* ── the hairlines go ── */
+  #top-bar, #feed-header, .feed-tabs, .feed-entry, .pub-card,
+  .pub-card:first-of-type, .feed-lead, .verify-cert, .doc-item,
+  .new-doc-btn, #reading-meta, .feed-masthead {
+    border: none !important;
+  }
+  /* …and space does their work */
+  .feed-entry { padding: 30px 0 !important; }
+  .feed-lead  { padding-bottom: 34px !important; }
+  #feed-header { padding-bottom: 18px !important; }
+
+  /* Boxes soften into fields: a quiet fill instead of a hard rectangle. */
+  input, textarea, .verify-input {
+    border: none !important;
+    background: rgba(62, 50, 36, 0.05) !important;
+    border-radius: 14px !important;
+    padding: 15px 18px !important;
+  }
+  .primary, .verify-submit, .auth-btn, button.primary {
+    border: none !important;
+    border-radius: 999px !important;
+    letter-spacing: 0 !important;
+    font-weight: 500 !important;
+  }
+  .ghost, .profile-cta-ghost {
+    border: none !important;
+    background: rgba(62, 50, 36, 0.05) !important;
+    border-radius: 999px !important;
+  }
+
+  /* ── scale with real contrast ── */
+  .feed-lead-title  { font-size: var(--t-display) !important; font-weight: 600 !important;
+                      letter-spacing: -0.02em !important; line-height: 1.06 !important; }
+  .feed-entry-title { font-size: var(--t-xl) !important; font-weight: 600 !important;
+                      letter-spacing: -0.012em !important; line-height: 1.16 !important; }
+  .verify-title     { font-size: var(--t-3xl) !important; font-weight: 600 !important;
+                      letter-spacing: -0.02em !important; }
+  .feed-dateline, .feed-section-label, .feed-entry-date, .feed-entry-meta {
+    font-size: var(--t-xs) !important; font-weight: 500 !important;
+    letter-spacing: 0 !important; text-transform: none !important;
+  }
+
+  /* ── Dürer, doing a job ──────────────────────────────────────────────────
+     Melencolia's magic square (1514) is a grid whose every row and column
+     sums to 34: a verification device, four centuries early. It marks the
+     verify page. The sleeping hound keeps an empty feed company. */
+  .verify-masthead::before {
+    content: "";
+    display: block;
+    width: 84px; height: 78px;
+    margin: 0 auto 22px;
+    opacity: 0.42;
+    background: url("./assets/durer/magic-square.webp") center / contain no-repeat;
+  }
+  .feed-empty-state::before {
+    content: "";
+    display: block;
+    width: 190px; height: 138px;
+    margin: 0 auto 18px;
+    opacity: 0.3;
+    background: url("./assets/durer/sleeping-dog.webp") center / contain no-repeat;
+  }
+}
+
+/* ─── Phone: the last of the lines ───────────────────────────────────────── */
+@media (max-width: 600px) {
+  /* #feed-tabs is an id, so the earlier class selector never matched it. */
+  #feed-tabs { border-bottom: none !important; margin-bottom: 4px; }
+
+  /* The section tabs now speak the same language as the bottom bar: a filled
+     pill marks the active one, so no underline rule is needed. */
+  .feed-tab {
+    border: none !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    font-size: var(--t-sm) !important;
+    font-weight: 500 !important;
+    padding: 8px 14px !important;
+    margin-right: 6px !important;
+    border-radius: 999px;
+    color: var(--subtle);
+  }
+  .feed-tab.active {
+    background: rgba(62, 50, 36, 0.07);
+    color: var(--text);
+    font-weight: 600 !important;
+  }
+
+  /* Eyebrows: the position already says "latest", and a page titled "Verify a
+     piece" does not need "Authenticity" stacked above it. */
+  .feed-lead-kicker, .verify-eyebrow { display: none !important; }
+}
+
+/* ─── Phone: iteration 2 — the last hairlines and stray serifs ───────────── */
+@media (max-width: 600px) {
+  /* Drafts list is UI, not writing, so it takes the interface face. */
+  .doc-item-title { font-family: var(--font-ui) !important; font-weight: 500; }
+
+  /* Remaining structural lines. The drawer is full width, so its right edge
+     divides nothing. */
+  #doc-panel, #panel-footer, #format-toolbar { border: none !important; }
+
+  /* Counters and secondary buttons were outlined boxes; a quiet fill reads as
+     one object instead of a rectangle drawn around a number. */
+  .feed-tab-count {
+    border: none !important;
+    background: rgba(62, 50, 36, 0.07);
+    border-radius: 999px;
+    padding: 2px 8px;
+  }
+  .profile-cta, .profile-cta-ghost, .auth-btn, .verify-submit, .primary, .ghost {
+    border: none !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    border-radius: 999px !important;
+    font-weight: 500 !important;
+    font-family: var(--font-ui) !important;
+  }
+  .profile-cta-ghost, .ghost { background: rgba(62, 50, 36, 0.06) !important; }
+}
+
+/* ─── Phone: iteration 3 — engraved rules, no diamonds ───────────────────── */
+@media (max-width: 600px) {
+  /* The badge diamond on every card. */
+  .hs-badge-mark { display: none !important; }
+
+  /* .feed-lead drew its divider as a 1px ::after, which is why the border
+     audit could not see it. Rather than delete the rule, let Dürer draw it:
+     the foliate band from the Flammarion border, faded at both ends so the
+     tile seam disappears and it reads as a printed rule. */
+  .feed-lead::after {
+    height: 11px !important;
+    background: url("./assets/ornament-rule.webp") center / auto 11px repeat-x !important;
+    opacity: 0.3;
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent);
+    mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent);
+  }
+  /* one ornament per break, so the small one under the label goes */
+  .feed-section-label::after { display: none !important; }
+  .feed-section-label { gap: 0 !important; }
+}
+
+/* ─── Phone: iteration 4 — the drawer, and time ──────────────────────────── */
+@media (max-width: 600px) {
+  /* The drawer sat on --surface, a flat grey, with the active draft marked by
+     a full-bleed grey band: the hard rectangle again. Paper ground, and the
+     selection becomes an inset rounded field like everything else. */
+  #doc-panel { background: var(--bg) !important; }
+  #doc-list { padding: 6px 12px !important; }
+  .doc-item {
+    border-radius: 14px !important;
+    padding: 15px 16px !important;
+    margin-bottom: 2px;
+  }
+  .doc-item.active { background: rgba(62, 50, 36, 0.06) !important; }
+  .doc-item-meta { font-size: var(--t-xs) !important; color: var(--subtle) !important; }
+  .new-doc-btn {
+    margin: 10px 12px 4px;
+    width: calc(100% - 24px) !important;
+    border-radius: 14px !important;
+    background: rgba(62, 50, 36, 0.05) !important;
+    color: var(--text) !important;
+    justify-content: flex-start;
+  }
+
+  /* An engraving needs room. The hourglass was tried on the status strip and
+     came out as an 11px smudge, so Dürer is kept to places with the space to
+     read him: the blank page, the verify mark, the section rule, empty states. */
+
+  /* Glassmorphism is itself on the generated-UI list, so the bar keeps the
+     float but loses most of the frost. */
+  #bottom-nav {
+    background: rgba(250, 248, 244, 0.93);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border-color: rgba(62, 50, 36, 0.09);
+  }
+}
+
+/* ─── Phone: the reading view reflows ────────────────────────────────────────
+   A fixed book page on a 390px screen measures ~12-15% slower to read and
+   ~23% worse for retention than reflowed text. The canvas pages stay the
+   artifact — the download, the desktop view, the thing that gets certified —
+   and the phone gets the words set at its own measure. */
+@media (max-width: 600px) {
+  [data-desktop-only] { display: none !important; }
+
+  #reading-inner { max-width: none !important; padding: 0 !important; }
+
+  #reading-reflow { padding: 0 22px 60px; }
+
+  /* the piece's own plate, as a frontispiece */
+  .reading-plate {
+    height: 168px;
+    margin: 4px -22px 26px;
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0.13;
+  }
+
+  .reading-reflow-title {
+    font-family: var(--font-serif) !important;
+    font-size: var(--t-3xl);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.08;
+    margin: 0 0 22px;
+  }
+  .reading-reflow-body {
+    font-family: var(--font-serif);
+    font-size: var(--t-lg);
+    line-height: 1.62;
+    color: var(--text);
+    font-variant-numeric: normal;
+  }
+  .reading-reflow-body p { margin: 0 0 1.15em; }
+  .reading-reflow-body img { max-width: 100%; height: auto; border-radius: 4px; }
+
+  /* the first paragraph opens with a raised initial, as a page would */
+  .reading-reflow-body > p:first-of-type::first-letter {
+    font-size: 3.1em;
+    line-height: 0.82;
+    float: left;
+    padding: 0.06em 0.08em 0 0;
+    font-weight: 600;
+  }
+
+  /* the reading chrome loses its rules too */
+  #reading-meta, #reading-container, .reading-verify { border: none !important; }
+}
+
+/* ─── Phone: reading reflow, specificity fix ─────────────────────────────────
+   The global sans rule targets `p` directly, so it beat the serif that the
+   body inherited from its parent — which is why only the first paragraph came
+   out in Garamond. Descendants are named explicitly here. */
+@media (max-width: 600px) {
+  .reading-reflow-body,
+  .reading-reflow-body p,
+  .reading-reflow-body div,
+  .reading-reflow-body span,
+  .reading-reflow-body li,
+  .reading-reflow-body blockquote,
+  .reading-reflow-body em,
+  .reading-reflow-body strong {
+    font-family: var(--font-serif) !important;
+    font-size: var(--t-lg);
+    line-height: 1.62;
+  }
+  .reading-reflow-body strong { font-weight: 600; }
+  .reading-reflow-body em { font-style: italic; }
+
+  /* the opening initial, whichever element the piece actually starts with */
+  .reading-reflow-body > *:first-child::first-letter {
+    font-size: 3.2em;
+    line-height: 0.8;
+    float: left;
+    padding: 0.05em 0.09em 0 0;
+    font-weight: 600;
+  }
+}
+
+/* ─── Phone: the illuminated initial ─────────────────────────────────────── */
+@media (max-width: 600px) {
+  /* a CSS ::first-letter cap is replaced by the real thing: the same
+     illuminated letters the feed already uses for avatars, opening the piece
+     the way they open a manuscript page */
+  .reading-reflow-body > *:first-child::first-letter { font-size: inherit; float: none; padding: 0; }
+  .reading-initial {
+    float: left;
+    width: 66px;
+    height: 66px;
+    margin: 5px 12px 2px 0;
+    shape-outside: margin-box;
+  }
+  .reading-reflow-body.has-initial > *:first-child { margin-top: 0; }
+}
+
+/* ─── Phone: reading-view chrome ─────────────────────────────────────────── */
+@media (max-width: 600px) {
+  /* comments and colophon are interface, not writing */
+  .comment-author, .comment-body, .comment-meta,
+  .reading-comments-title, .rv-status, .rv-copy, .report-btn {
+    font-family: var(--font-ui) !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+  }
+  .reading-comments-title { font-size: var(--t-sm); font-weight: 600; }
+
+  /* the last hairlines on this page */
+  #reading-footer, .reading-like, .comment, .comment-list, .reading-verify {
+    border: none !important;
+  }
+  .reading-like {
+    background: rgba(62, 50, 36, 0.06) !important;
+    border-radius: 999px !important;
+    padding: 10px 18px !important;
+  }
+  /* the colophon becomes a quiet inset panel rather than a boxed rectangle */
+  .reading-verify {
+    background: rgba(62, 50, 36, 0.045) !important;
+    border-radius: 16px !important;
+    padding: 18px !important;
+  }
+}
+
+/* ─── Phone: every piece wears its plate ─────────────────────────────────────
+   A feed of nothing but text blocks is hard to scan and harder to want. Each
+   published piece already owns a Dürer plate for life (hashed from its id), so
+   the feed shows it: the lead gets a frontispiece band, index entries a small
+   square. Variety and rhythm come from the work itself rather than from
+   decoration invented for the purpose. */
+@media (max-width: 600px) {
+  .feed-plate {
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+  }
+  .feed-plate-lead {
+    height: 132px;
+    margin: 2px 0 16px;
+    opacity: 0.5;
+    -webkit-mask-image: radial-gradient(ellipse 62% 78% at 50% 50%, #000 55%, transparent 100%);
+    mask-image: radial-gradient(ellipse 62% 78% at 50% 50%, #000 55%, transparent 100%);
+  }
+  .feed-plate-entry {
+    width: 58px; height: 58px;
+    flex: none;
+    margin-right: 14px;
+    opacity: 0.55;
+  }
+  .feed-entry { display: flex; align-items: flex-start; }
+}
+
+/* ─── Phone: the entry list ──────────────────────────────────────────────────
+   .feed-entry drew its separator as a positioned ::after too, which is why a
+   border audit kept coming back clean while the lines were still on screen.
+   Space separates the entries now. */
+@media (max-width: 600px) {
+  .feed-entry::after { display: none !important; }
+  .feed-entry { padding: 22px 0 !important; }
+
+  /* One image per row. The plate is the piece's mark and carries the visual
+     rhythm, so the author's illuminated initial steps back to the byline. */
+  .feed-entry .feed-mark { display: none !important; }
+  .feed-plate-entry { width: 72px; height: 72px; opacity: 0.6; margin-right: 16px; }
+  .feed-entry-title { font-size: var(--t-xl) !important; }
+}
+
+/* ─── Phone: measure ─────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  /* the column ran almost to the edges, which is what made it feel wide */
+  #feed-list, #feed-header, #feed-masthead { padding-left: 22px !important; padding-right: 22px !important; }
+  .feed-lead, .feed-entry { padding-left: 0 !important; padding-right: 0 !important; }
+}
+
+/* ─── Phone: the editor keeps its face ───────────────────────────────────────
+   The global interface rule names `div` and `p` directly, so it beat the
+   Garamond that #text passes down to its paragraphs: the first text node
+   stayed serif and every paragraph after it flipped to the sans. That is the
+   font change mid-piece. Editor descendants inherit now, and the choice moves
+   to the toggle, where it belongs. */
+@media (max-width: 600px) {
+  #text, #text *, #title-input, #title-input * { font-family: inherit; }
+  #text.font-sans, #text.font-sans *,
+  #title-input.font-sans, #title-input.font-sans * {
+    font-family: var(--font-ui) !important;
+  }
+  #title-input.font-sans { font-weight: 600; letter-spacing: -0.02em; }
+
+  /* the toggle was buried in the drawer footer; give it a real target */
+  #panel-footer { padding: 14px 22px calc(18px + var(--sab)) !important; }
+  #font-toggle {
+    width: 100%;
+    justify-content: center;
+    padding: 13px !important;
+    border-radius: 14px;
+    background: rgba(62, 50, 36, 0.05);
+    font-size: var(--t-sm);
+  }
+}
+
+/* ─── Phone: a detail, not a picture on every piece ──────────────────────────
+   Art on every card was too much and turned the feed into a catalogue. What
+   the feed wants is atmosphere: one plate held far off-scale so only a few
+   engraved lines cross the screen, faint enough to read straight through.
+   Zoomed this far the line frequency is low, which is why it no longer fights
+   the text the way a whole plate did. */
+@media (max-width: 600px) {
+  .feed-plate, .feed-plate-lead, .feed-plate-entry { display: none !important; }
+  .feed-entry .feed-mark { display: flex !important; }
+
+  #backdrop.bd-on:not([data-view="editor"]) { opacity: 0.045; }
+  #backdrop:not([data-view="editor"]) {
+    background-size: 260% auto;
+    background-position: 22% 18%;
+  }
+  /* clear of the column where the eye actually reads */
+  #backdrop:not([data-view="editor"]) {
+    -webkit-mask-image: radial-gradient(ellipse 120% 60% at 50% 42%, transparent 30%, #000 100%);
+    mask-image: radial-gradient(ellipse 120% 60% at 50% 42%, transparent 30%, #000 100%);
+  }
+}
+
+/* ─── Phone: the top, and the rhythm of the feed ─────────────────────────────
+   The date sat hard under the top bar and the backdrop cut in with a visible
+   edge at exactly that line, which is the compression at the top. The header
+   gets air, and the plate now fades in from nothing instead of starting at a
+   seam. */
+@media (max-width: 600px) {
+  #feed-masthead { padding-top: 30px !important; padding-bottom: 4px !important; }
+  .feed-dateline { font-size: var(--t-xs) !important; color: var(--subtle) !important; }
+  #feed-header { padding-top: 10px !important; padding-bottom: 22px !important; }
+  #feed-list { padding-top: 8px !important; }
+
+  /* no hard horizontal seam under the bar */
+  #backdrop:not([data-view="editor"]) {
+    -webkit-mask-image:
+      linear-gradient(to bottom, transparent 0, #000 34%),
+      radial-gradient(ellipse 120% 55% at 50% 46%, transparent 34%, #000 100%);
+    mask-image:
+      linear-gradient(to bottom, transparent 0, #000 34%),
+      radial-gradient(ellipse 120% 55% at 50% 46%, transparent 34%, #000 100%);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+  }
+
+  /* ── the pull quote ──────────────────────────────────────────────────────
+     A uniform list of title-and-excerpt rows scrolls past without ever asking
+     you to stop. One line set large, every few entries, gives the eye
+     somewhere to land and turns a piece into something quotable. */
+  .feed-quote {
+    margin: 6px 0 26px;
+    padding: 26px 4px 22px;
+    cursor: pointer;
+  }
+  .feed-quote-text {
+    font-family: var(--font-serif);
+    font-size: var(--t-2xl);
+    line-height: 1.28;
+    letter-spacing: -0.012em;
+    color: var(--text);
+    margin: 0 0 14px;
+    text-wrap: balance;
+  }
+  .feed-quote-text::before {
+    content: "“";
+    font-family: var(--font-serif);
+    font-size: 2.1em;
+    line-height: 0;
+    vertical-align: -0.32em;
+    margin-right: 0.06em;
+    opacity: 0.28;
+  }
+  .feed-quote-attr {
+    font-family: var(--font-ui);
+    font-size: var(--t-xs);
+    color: var(--subtle);
+  }
+  .feed-quote-attr::before { content: "— "; }
+}
+
+/* ─── Phone: ink, not grey ───────────────────────────────────────────────────
+   Two findings. First, greys should never be neutral: "tint that dark gray
+   ever so slightly with your brand colour", and digital work is moving off
+   cool greys toward earthy ones. Second, and the real problem here, hierarchy
+   was being carried by greyness alone across 170-odd rules — but it should
+   come from weight, size and position, with colour doing far less. So the
+   secondary tones move much closer to ink and warm considerably; the
+   difference between levels is now mostly weight.
+
+   Then the one colour. In a manuscript the scribe reserved red for what
+   mattered: the initial, the heading, the passage worth finding again. The
+   word rubric is simply Latin for red. So inkk gets a single accent, used
+   only where something has been verified or is new — never decoration. */
+@media (max-width: 600px) {
+  :root {
+    --text:   #1a1613;    /* warm near-black */
+    --muted:  #4c443b;    /* was #6b6259 — secondary text is ink, not grey */
+    --subtle: #857a6b;    /* was #a09689 — still quiet, no longer washed out */
+    --rubric: #9e3b28;    /* red lead, as a scribe would use it */
+    --gold:   #9a7b3f;
+  }
+
+  /* the stray hardcoded greys that were never in the palette */
+  [style*="color: #aaa"], .feed-dot { color: var(--subtle) !important; }
+
+  /* hierarchy by weight rather than by fading things out */
+  .feed-entry-excerpt, .feed-lead-excerpt { color: var(--muted) !important; }
+  .feed-entry-author, .feed-lead-author { color: var(--text) !important; font-weight: 500; }
+  .feed-entry-date, .feed-dateline { color: var(--subtle) !important; }
+
+  /* ── rubrication: the only colour in the app ── */
+  .feed-fresh-dot { background: var(--rubric) !important; }
+  .rv-status, .verify-cert-status,
+  .reading-verify.is-verified .rv-status,
+  .verify-cert-mark.is-verified .verify-cert-status { color: var(--rubric) !important; }
+  .hs-badge.is-verified, .feed-mark.is-verified { color: var(--rubric) !important; }
+}
+
+/* ─── Phone: the last washed-out greys ───────────────────────────────────── */
+@media (max-width: 600px) {
+  .rv-copy, .reading-dot, .comment-meta, .feed-tab-count,
+  .doc-item-meta, .verify-cert-score-denom {
+    color: var(--subtle) !important;
+  }
+}
+
+/* ─── Phone: the bar when signed in ──────────────────────────────────────────
+   Signed out there are four tabs; signed in there are five, and the profile
+   tab carries an avatar the others do not, so it sat taller than its
+   neighbours and pushed its own label out of line. Every tab is a word, and
+   the words size themselves to fit however many there are. */
+@media (max-width: 600px) {
+  #bottom-nav .nav-tab > .dropcap-avatar,
+  #bottom-nav .nav-tab img,
+  #bottom-nav .nav-tab .avatar { display: none !important; }
+
+  #bottom-nav { padding-left: 4px; padding-right: 4px; gap: 0; }
+  #bottom-nav .nav-tab { min-width: 0; padding: 0 2px !important; }
+  #bottom-nav .nav-label {
+    font-size: clamp(0.78rem, 3.4vw, 0.98rem) !important;
+    white-space: nowrap;
+    margin-top: 0 !important;
+    line-height: 1;
+  }
+}
+
+/* ─── Phone: a system, rather than 54 decisions ──────────────────────────────
+   "One default is harmless, but ten defaults together create the vibe-coded
+   look." Measured against that, three faults were mine:
+
+   • 54 distinct type sizes where the guidance is five or six. Everything was
+     sized ad hoc, so nothing related to anything else.
+   • Uniform padding everywhere, which reads as mechanical. Real work is tight
+     within a group, generous between sections.
+   • The floating bar had rounding AND a shadow AND a border. The rule is
+     rounding with no shadow, or a shadow with sharp corners — not both, and
+     certainly not all three.
+
+   Palette follows the warm-neutral ramp: a base quiet enough that one accent
+   reads as intentional rather than noisy. */
+@media (max-width: 600px) {
+  :root {
+    /* ink ramp — warm throughout, never neutral grey */
+    --paper:   #faf8f4;
+    --paper-2: #f3efe7;
+    --ink:     #1a1613;
+    --ink-2:   #4c443b;
+    --ink-3:   #857a6b;
+    --ink-4:   #b5aa9a;
+    --line:    rgba(62, 50, 36, 0.11);
+    /* the one accent, earned */
+    --rubric:  #9e3b28;
+
+
+    /* spacing — tight inside a group, generous between sections */
+    --s-1: 6px;
+    --s-2: 12px;
+    --s-3: 22px;
+    --s-4: 40px;
+    --s-5: 64px;
+
+    --bg: var(--paper);
+    --surface: var(--paper-2);
+    --text: var(--ink);
+    --muted: var(--ink-2);
+    --subtle: var(--ink-3);
+    --border: var(--line);
+  }
+
+  /* type onto the scale */
+  .feed-lead-title   { font-size: var(--t-2xl) !important; }
+  .feed-entry-title  { font-size: var(--t-xl)  !important; }
+  .feed-quote-text   { font-size: var(--t-xl)  !important; }
+  .verify-title      { font-size: var(--t-2xl) !important; }
+  .reading-reflow-title { font-size: var(--t-2xl) !important; }
+  /* excerpts are previews, one step below reading text — mapping them onto
+     t-lg was what inflated the feed */
+  .reading-reflow-body, .reading-reflow-body p { font-size: var(--t-lg) !important; }
+  .feed-lead-excerpt, .feed-entry-excerpt      { font-size: var(--t-md) !important; }
+  .verify-sub, .doc-item-title, .new-doc-btn   { font-size: var(--t-md) !important; }
+  /* named controls only: a blanket button rule upsized every small glyph */
+  #bottom-nav .nav-label, .feed-tab,
+  .primary, .ghost, .profile-cta, .verify-submit { font-size: var(--t-sm) !important; }
+  .feed-dateline, .feed-entry-date, .feed-entry-meta,
+  .feed-quote-attr, .doc-item-meta, .rv-copy   { font-size: var(--t-xs) !important; }
+
+  /* rhythm: close within a piece, open between them */
+  .feed-entry-title   { margin-bottom: var(--s-1) !important; }
+  .feed-entry-excerpt { margin-bottom: var(--s-2) !important; }
+  .feed-entry         { padding: var(--s-3) 0 !important; }
+  .feed-lead          { padding-bottom: var(--s-4) !important; }
+  .feed-section-label { margin-top: var(--s-4) !important; margin-bottom: var(--s-3) !important; }
+  .feed-quote         { margin: var(--s-4) 0 !important; padding: 0 !important; }
+
+  /* one treatment, not three: the bar floats on a shadow alone */
+  #bottom-nav {
+    border: none !important;
+    box-shadow: 0 8px 30px rgba(62, 50, 36, 0.13) !important;
+  }
+}
+
+/* ─── Phone: where the colour lives ──────────────────────────────────────────
+   Not decoration — a system with a story. A manuscript page was ink and
+   paper, and colour meant something: the scribe's red lead (rubric) marked
+   what mattered, and a day worth marking in the calendar was written in red —
+   literally a red-letter day. So:
+
+     · the caret you write with is red lead — the pen is inked
+     · the dateline turns red only on a day with fresh writing
+     · a pull quote opens with a red mark
+     · a liked piece keeps a red heart
+     · "Human-verified" is sealed in red — wax was always red
+
+   Everything else stays ink. Colour that appears this rarely is information. */
+@media (max-width: 600px) {
+  /* the pen is inked */
+  #text, #title-input { caret-color: var(--rubric) !important; }
+  #text:focus, #title-input:focus { caret-color: var(--rubric) !important; }
+  ::selection { background: rgba(158, 59, 40, 0.14); }
+
+  /* a red-letter day */
+  .feed-dateline.red-letter { color: var(--rubric) !important; }
+
+  /* the rubricated quote mark */
+  .feed-quote-text::before { color: var(--rubric); opacity: 0.55; }
+
+  /* a liked piece — replaces the off-palette #a8424a */
+  .reading-like.liked,
+  .feed-engage .liked, .engage-btn.liked {
+    color: var(--rubric) !important;
+    background: rgba(158, 59, 40, 0.06) !important;
+  }
+
+  /* the study/save dots come onto the palette: green was never in it.
+     quiet states are ink; activity is gold leaf, not traffic-light */
+  .ws-status .hs-status-dot, .hs-status-dot { background: var(--ink-4); }
+  .ws-status.ok .hs-status-dot, .hs-status-dot.ok { background: var(--ink-4); }
+  .ws-status.saving .hs-status-dot, .hs-status-dot.saving { background: var(--gold); }
+  .ws-status.off .hs-status-dot, .hs-status-dot.off { background: var(--rubric); }
+  .research-pulse, .research-pulse::after { background: var(--gold); }
+
+  #research-strip { font-size: var(--t-xs) !important; color: var(--ink-3) !important; }
+  .writing-stats {
+    background: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    color: var(--ink-3) !important;
+  }
+}
+
+/* ═══ The design language, site-wide ═════════════════════════════════════════
+   Everything below began as the phone redesign and is hoisted to every
+   viewport. The findings it encodes: dividers are apologies for spacing;
+   stacked eyebrow labels are the most recognisable generated-UI habit;
+   old-style figures wobble in an interface; hierarchy comes from weight and
+   size, not from fading things to grey; and one colour, earned, says more
+   than an accent system. Mobile-only mechanics (the floating bar, keyboard
+   handling, reflowed reading) stay in their media queries. */
+
+/* ── figures sit level everywhere except authored prose ── */
+body { font-variant-numeric: lining-nums tabular-nums; }
+#text, #reading-text, .feed-lead-excerpt, .feed-entry-excerpt,
+.pub-card-excerpt, .reading-reflow-body { font-variant-numeric: normal; }
+
+/* ── the hairlines go; space does their work ── */
+#top-bar, #feed-tabs, .feed-entry, .feed-lead, .pub-card,
+.pub-card:first-of-type, #reading-meta, #reading-footer,
+.reading-verify, .comment, .comment-list, #feed-masthead,
+#panel-footer, .new-doc-btn, .doc-item { border: none !important; }
+.feed-entry::after { display: none !important; }
+.feed-entry { padding: 26px 0; }
+.feed-lead  { padding-bottom: 34px; }
+#bottom-nav { border: none; box-shadow: 0 -8px 22px rgba(62, 50, 36, 0.05); }
+
+/* ── eyebrows: position already says it ── */
+.feed-lead-kicker, .verify-eyebrow { display: none !important; }
+.feed-dateline, .feed-section-label {
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-weight: 500;
+  font-size: var(--t-xs);
+}
+
+/* ── section tabs speak pill, like the phone ── */
+.feed-tab {
+  border: none !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-size: var(--t-sm) !important;
+  font-weight: 500 !important;
+  padding: 7px 14px !important;
+  margin-right: 8px !important;
+  border-radius: 999px;
+  color: var(--subtle);
+}
+.feed-tab.active { background: rgba(62, 50, 36, 0.07); color: var(--text); font-weight: 600 !important; }
+.feed-tab-count {
+  border: none !important;
+  background: rgba(62, 50, 36, 0.07);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+/* ── fields and buttons soften ── */
+.verify-input, #auth-modal input, .auth-input, .comment-input, textarea.verify-match-input {
+  border: none !important;
+  background: rgba(62, 50, 36, 0.05) !important;
+  border-radius: 14px !important;
+}
+.verify-submit, .auth-btn, .profile-cta, #publish-btn {
+  border: none !important;
+  border-radius: 999px !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-weight: 500 !important;
+}
+.profile-cta-ghost { border: none !important; background: rgba(62, 50, 36, 0.06) !important; border-radius: 999px !important; }
+.reading-verify { background: rgba(62, 50, 36, 0.045); border-radius: 16px; padding: 18px; }
+.reading-like { border: none !important; background: rgba(62, 50, 36, 0.06) !important; border-radius: 999px !important; }
+
+/* ── the pull quote, at every width ── */
+.feed-quote { margin: 6px 0 26px; padding: 26px 4px 22px; cursor: pointer; }
+.feed-quote-text {
+  font-family: var(--font-serif);
+  font-size: var(--t-2xl);
+  line-height: 1.28;
+  letter-spacing: -0.012em;
+  color: var(--text);
+  margin: 0 0 14px;
+  text-wrap: balance;
+}
+.feed-quote-text::before {
+  content: "\201C";
+  font-family: var(--font-serif);
+  font-size: 2.1em;
+  line-height: 0;
+  vertical-align: -0.32em;
+  margin-right: 0.06em;
+  color: var(--rubric);
+  opacity: 0.55;
+}
+.feed-quote-attr { font-family: var(--font-ui); font-size: var(--t-xs); color: var(--subtle); }
+.feed-quote-attr::before { content: "\2014\00a0"; }
+
+/* ── rubrication ── */
+.feed-dateline.red-letter { color: var(--rubric); }
+.feed-fresh-dot { background: var(--rubric) !important; }
+.reading-verify .rv-status, .verify-cert-mark.is-verified .verify-cert-status { color: var(--rubric); }
+.reading-like.liked { color: var(--rubric) !important; background: rgba(158, 59, 40, 0.07) !important; }
+#text, #title-input { caret-color: var(--rubric); }
+::selection { background: rgba(158, 59, 40, 0.14); }
+
+/* desktop nav labels join the sentence-case rule (mobile already had it) */
+#bottom-nav .nav-label { text-transform: none; letter-spacing: 0.01em; font-size: var(--t-xs); font-weight: 500; }
+
+/* the lead's divider is the engraved rule at every width — the foliate band
+   from the Flammarion border, faded at both ends so it reads as printing */
+.feed-lead::after {
+  height: 11px !important;
+  border: none !important;
+  background: url("./assets/ornament-rule.webp") center / auto 11px repeat-x !important;
+  opacity: 0.3;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent);
+}
+
+/* verify heading is interface, not authored writing — every width */
+.verify-title { font-family: var(--font-ui); font-weight: 600; letter-spacing: -0.02em; }
+.verify-sub { font-family: var(--font-ui); }
+
+/* status dots come onto the palette: gold = settled, rubric-adjacent = attention */
+.hs-status-dot, .ws-status .hs-status-dot { background: var(--ink-4); }
+.hs-status-dot.ok, .ws-status.ok .hs-status-dot { background: var(--gold); }
+.hs-status-dot.saving, .ws-status.saving .hs-status-dot { background: var(--ink-3); }
+.hs-status-dot.off, .ws-status.off .hs-status-dot { background: var(--rubric); }
+
+/* ── the byline and furniture take the interface face, at every width ──
+   (the phone fixed these inside its media query; the fix belongs to the
+   design language, not to a breakpoint) */
+.feed-entry-author, .feed-entry-date, .feed-entry-meta, .feed-dot,
+.feed-lead-author, .feed-lead-sub, .feed-lead-byline-text,
+.comment-author, .comment-body, .comment-meta,
+.reading-comments-title, .rv-status, .rv-copy, .report-btn {
+  font-family: var(--font-ui);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.feed-entry-author, .feed-lead-author { color: var(--text); font-weight: 500; }
+.reading-comments-title { font-weight: 600; }
+.profile-cta-ghost { text-transform: none !important; letter-spacing: 0 !important; }
+
+/* the diamond is retired everywhere; the wordmark is the mark */
+.hs-badge-mark, .nav-diamond, .cert-diamond, .rv-mark,
+.pac-code-mark, .feed-empty-mark, .verify-cert-diamond { display: none !important; }
+
+/* ── the dinkus, and the margin index (desktop) ──────────────────────────────
+   The user's instinct was right: bare spacing between entries is an absence,
+   not a solution. Books answered this centuries ago with the dinkus — a small
+   centred device marking a break without drawing a line. Ours is cut from the
+   same engraved Flammarion band as the lead's rule, so the feed's furniture
+   is Dürer's, not a divider's.
+
+   And in the margin, the classical index: entries numbered in small roman
+   numerals, the way a table of contents would, using space only a wide page
+   has. Both are marks of a hand, which is the entire brand. */
+@media (min-width: 601px) {
+  /* the entry is a flex row, so the device hangs absolutely: centred in the
+     white between entries, touching nothing */
+  .feed-entry { position: relative; }
+  .feed-entry:not(:first-of-type)::before {
+    content: "";
+    position: absolute;
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 78px;
+    height: 9px;
+    background: url("./assets/ornament-rule.webp") center / contain no-repeat;
+    opacity: 0.22;
+  }
+}
+@media (min-width: 900px) {
+  /* the margin index: roman numerals hanging in the page margin, clear of the
+     avatar column — the space only a wide page has */
+  #feed-list { counter-reset: entry; }
+  .feed-entry { counter-increment: entry; }
+  /* the scroller clips anything hung outside its box, so the numeral rides
+     inside the row as its first column: numeral, then initial, then words */
+  .feed-entry::after {
+    content: counter(entry, lower-roman) !important;
+    display: block !important;
+    border: none !important;
+    position: static !important;
+    order: -1;
+    flex: none;
+    width: 30px;
+    margin-right: 8px;
+    margin-top: 7px;
+    text-align: right;
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: var(--t-xs);
+    color: var(--subtle);
+    letter-spacing: 0.04em;
+  }
+}
+
+/* engagement counts and the verified chip are furniture, not prose — and the
+   verified word takes the rubric it earned */
+.feed-engage, .feed-engage span, .hs-badge {
+  font-family: var(--font-ui);
+  letter-spacing: 0;
+}
+.hs-badge { color: var(--rubric); text-transform: none; }
+
+/* ── the editor toolbar, homogenised ─────────────────────────────────────────
+   Certify, Aa, Preview, Publish, Download (and Drafts/Back on the left) were
+   five different treatments: some outlined, some bare, some filled. One shape
+   now — the rounded rectangle — with Publish as the filled primary in the
+   same geometry. */
+#top-bar .icon-btn,
+#top-bar .icon-btn-labelled,
+#top-bar .title-caps-btn,
+#cert-btn, #publish-btn, #pdf-btn {
+  height: 30px;
+  padding: 0 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: none;
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: var(--t-xs);
+  letter-spacing: 0;
+  line-height: 1;
+}
+#top-bar .icon-btn:hover, #cert-btn:hover, #pdf-btn:hover, #top-bar .title-caps-btn:hover {
+  color: var(--text);
+  border-color: rgba(62, 50, 36, 0.28);
+}
+#publish-btn {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+#publish-btn:hover { opacity: 0.88; color: var(--bg); }
+#cert-btn.is-certified { color: var(--rubric); border-color: rgba(158, 59, 40, 0.3); }
+.title-caps-glyph { font-size: var(--t-sm); }
+
+/* one device per break: the entry that follows the section label sits right
+   under the lead's engraved rule, so it needs no dinkus of its own */
+.feed-section-label + .feed-entry::before { display: none !important; }
+
+/* ─── The auth modal, de-clinicised ──────────────────────────────────────────
+   It was the last room still furnished in the old style: tracked-caps tabs
+   wearing the browser's blue focus ring, slab buttons with a grey disabled
+   state, a hairline-with-"or", and Google's button in its dated rectangular
+   cut. Everything joins the house language. */
+#auth-tabs { gap: 6px; margin-bottom: 26px; }
+#auth-tabs button {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--t-sm);
+  font-weight: 500;
+  color: var(--subtle);
+  padding: 7px 14px;
+  border-radius: 999px;
+}
+#auth-tabs button.active { background: rgba(62, 50, 36, 0.07); color: var(--text); font-weight: 600; }
+
+#auth-modal input { font-size: var(--t-md); padding: 13px 16px; }
+#auth-modal input::placeholder { color: var(--ink-4); }
+#auth-modal input:focus { border-bottom-color: transparent; }
+
+#auth-submit {
+  border-radius: 999px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--t-sm);
+  padding: 12px;
+  margin-top: 10px;
+}
+#auth-submit:disabled {
+  opacity: 1;
+  background: var(--surface);
+  color: var(--ink-4);
+}
+
+/* "or" needs no line to lean on */
+#auth-divider::before { display: none; }
+#auth-divider span { color: var(--ink-4); letter-spacing: 0; background: none; }
+#auth-divider { margin: 14px 0; }
+
+/* the fallback Google button reads like the real one: a pill, mark and words
+   as one centred group */
+#google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 11px;
+  font-size: var(--t-sm);
+  font-weight: 500;
+  color: var(--text);
+}
+#google-btn::before {
+  content: "";
+  width: 18px; height: 18px;
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="%23FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.4 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.7-.4-3.9z"/><path fill="%23FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.4 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="%234CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="%231976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C41.4 34.9 44 29.9 44 24c0-1.3-.1-2.7-.4-3.9z"/></svg>') center / contain no-repeat;
+}
+
+/* the browser's blue ring never belongs on paper; keyboard focus gets a warm
+   ring instead, and mouse clicks get none */
+#auth-modal :focus { outline: none; }
+#auth-modal :focus-visible {
+  outline: 2px solid rgba(158, 59, 40, 0.35);
+  outline-offset: 2px;
+}
+.auth-tos { font-size: var(--t-xs); color: var(--muted); line-height: 1.55; }
+.auth-tos input[type="checkbox"] { accent-color: var(--text); }
+
+/* the modal becomes a sheet of its own: opaque, rounded, softly lifted —
+   it was floating bare on the overlay's wash, letting the page ghost through */
+#auth-overlay { background: rgba(58, 48, 38, 0.18); }
+#auth-modal {
+  width: 320px;
+  background: var(--bg);
+  border-radius: 18px;
+  padding: 26px 24px 24px;
+  box-shadow: 0 18px 60px rgba(62, 50, 36, 0.16), 0 2px 8px rgba(62, 50, 36, 0.07);
+}
+#auth-close { top: 10px; right: 12px; color: var(--ink-4); }
+#auth-close:hover { color: var(--text); }
+
+/* a focused field deepens instead of ringing — the ring on an autofocused
+   input read as a pink error border before a single keystroke */
+#auth-modal input:focus-visible {
+  outline: none;
+  background: rgba(62, 50, 36, 0.075) !important;
+}
+.auth-tos input[type="checkbox"] { margin-top: 3px; }
+
+/* the Google button sits inset like the fields and the submit above it —
+   the GIS iframe is centred, and the fallback stops going full-bleed */
+#google-btn { align-self: center; width: 272px; }
+.gsi-material-button, div[aria-labelledby] > div[role="button"] { margin: 0 auto; }
