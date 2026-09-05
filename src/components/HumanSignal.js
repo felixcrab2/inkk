@@ -94,16 +94,16 @@ function RadarChart({ dims }) {
   return (
     <svg viewBox="0 0 300 246" className="hs-radar-svg" role="img" aria-label="Writing-process fingerprint">
       {rings.map((f, i) => (
-        <path key={`r${i}`} d={ringPath(f)} fill="none" stroke="#e4e1db" strokeWidth="0.7" />
+        <path key={`r${i}`} d={ringPath(f)} fill="none" stroke="rgba(62,50,36,0.12)" strokeWidth="0.7" />
       ))}
       {dims.map((_, i) => {
         const [x, y] = polar(cx, cy, R, angOf(i));
-        return <line key={`a${i}`} x1={cx} y1={cy} x2={x.toFixed(1)} y2={y.toFixed(1)} stroke="#e4e1db" strokeWidth="0.7" />;
+        return <line key={`a${i}`} x1={cx} y1={cy} x2={x.toFixed(1)} y2={y.toFixed(1)} stroke="rgba(62,50,36,0.12)" strokeWidth="0.7" />;
       })}
-      <path d={dataPath} fill="rgba(42,42,42,0.07)" stroke="#2a2a2a" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d={dataPath} fill="rgba(26,22,19,0.07)" stroke="#1a1613" strokeWidth="1.6" strokeLinejoin="round" />
       {dataPts.map((p, i) => (
         <circle key={`p${i}`} cx={p[0].toFixed(1)} cy={p[1].toFixed(1)} r="2.4"
-          fill="#2a2a2a" opacity={(0.25 + 0.75 * dims[i].conf).toFixed(2)} />
+          fill="#1a1613" opacity={(0.25 + 0.75 * dims[i].conf).toFixed(2)} />
       ))}
       {dims.map((d, i) => {
         const ang = angOf(i);
@@ -154,15 +154,15 @@ function VelocityChart({ series, peakWpm, avgWpm }) {
     <svg viewBox={`0 0 ${W} ${H}`} className="hs-chart-svg" aria-hidden="true">
       <defs>
         <linearGradient id="hsVelGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#2a2a2a" stopOpacity="0.14" />
-          <stop offset="100%" stopColor="#2a2a2a" stopOpacity="0" />
+          <stop offset="0%" stopColor="#1a1613" stopOpacity="0.14" />
+          <stop offset="100%" stopColor="#1a1613" stopOpacity="0" />
         </linearGradient>
       </defs>
       {yTicks.map((v, i) => {
         const y = yOf(v);
         return (
           <g key={i}>
-            <line x1={PAD.l} y1={y.toFixed(1)} x2={PAD.l + pw} y2={y.toFixed(1)} stroke="#e4e1db" strokeWidth="0.6" />
+            <line x1={PAD.l} y1={y.toFixed(1)} x2={PAD.l + pw} y2={y.toFixed(1)} stroke="rgba(62,50,36,0.12)" strokeWidth="0.6" />
             <text x={PAD.l - 5} y={y + 3} textAnchor="end" className="hs-chart-label">{v}</text>
           </g>
         );
@@ -171,16 +171,16 @@ function VelocityChart({ series, peakWpm, avgWpm }) {
       {avgY != null && (
         <g>
           <line x1={PAD.l} y1={avgY.toFixed(1)} x2={PAD.l + pw} y2={avgY.toFixed(1)}
-            stroke="#a98a5c" strokeWidth="1" strokeDasharray="3 3" opacity="0.85" />
-          <text x={PAD.l + pw} y={avgY - 4} textAnchor="end" className="hs-chart-label" fill="#a98a5c">avg {avgWpm}</text>
+            stroke="#9e3b28" strokeWidth="1" strokeDasharray="3 3" opacity="0.85" />
+          <text x={PAD.l + pw} y={avgY - 4} textAnchor="end" className="hs-chart-label" fill="#9e3b28">avg {avgWpm}</text>
         </g>
       )}
-      <path d={linePath} fill="none" stroke="#2a2a2a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={linePath} fill="none" stroke="#1a1613" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       {pts.map((p, i) => (
-        <circle key={i} cx={p[0].toFixed(1)} cy={p[1].toFixed(1)} r="2.2" fill="#2a2a2a" opacity="0.4" />
+        <circle key={i} cx={p[0].toFixed(1)} cy={p[1].toFixed(1)} r="2.2" fill="#1a1613" opacity="0.4" />
       ))}
-      <circle cx={peak[0].toFixed(1)} cy={peak[1].toFixed(1)} r="3.4" fill="#a98a5c" />
-      <text x={peak[0].toFixed(1)} y={(peak[1] - 7).toFixed(1)} textAnchor="middle" className="hs-chart-label" fill="#7a6440">
+      <circle cx={peak[0].toFixed(1)} cy={peak[1].toFixed(1)} r="3.4" fill="#9e3b28" />
+      <text x={peak[0].toFixed(1)} y={(peak[1] - 7).toFixed(1)} textAnchor="middle" className="hs-chart-label" fill="#9e3b28">
         {series[peakIdx].wpm}
       </text>
       {[0, series.length - 1].map(i => (
@@ -288,7 +288,7 @@ export function HumanSignalPanel({ score, onClose }) {
     <div className="hs-panel-backdrop" onClick={onClose}>
       <div className="hs-panel-modal" onClick={e => e.stopPropagation()}>
         <div className="hs-panel-header">
-          <span className="hs-panel-title">◇ Process Signal</span>
+          <span className="hs-panel-title">Process signal</span>
           <button className="hs-panel-close" onClick={onClose} aria-label="Close">×</button>
         </div>
         <div className="hs-panel-hero">
@@ -340,7 +340,7 @@ export function HumanSignalPanel({ score, onClose }) {
           )}
           {tab === "Velocity" && (
             <div className="hs-tab-velocity">
-              <p className="hs-panel-blurb">Words per minute across the session. The gold line is your average; the dot marks your peak.</p>
+              <p className="hs-panel-blurb">Words per minute across the session. The red line is your average; the dot marks your peak.</p>
               <VelocityChart series={score.velocity_series} peakWpm={score.peak_wpm} avgWpm={score.avg_wpm} />
               <div className="hs-stat-row">
                 <StatChip label="avg speed" value={score.avg_wpm ? `${score.avg_wpm}` : "-"} sub="words / min" />
