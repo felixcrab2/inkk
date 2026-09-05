@@ -5422,3 +5422,25 @@ body { font-variant-numeric: lining-nums tabular-nums; }
 .pe-btn-primary { background: var(--text); color: var(--bg); }
 .pe-btn-primary:hover { color: var(--bg); opacity: 0.88; }
 .pe-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+
+/* ── the last two rooms on the profile join the sheet system ── */
+#research-section {
+  width: 100%;
+  max-width: 560px;
+  margin-bottom: 20px;
+  padding: 20px 24px 18px;
+  background: var(--card);
+  border-radius: 16px;
+  box-shadow: var(--card-shadow);
+  box-sizing: border-box;
+}
+#account-footer {
+  width: 100%;
+  max-width: 560px;
+  box-sizing: border-box;
+  padding: 2px 6px 0;
+}
+
+/* an empty state inside a sheet panel is a line, not a hall */
+.profile-section .feed-empty { padding: 14px 0 6px; text-align: left; }
