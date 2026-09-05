@@ -5207,6 +5207,9 @@ body { font-variant-numeric: lining-nums tabular-nums; }
   font-size: var(--t-xs);
   letter-spacing: 0;
   line-height: 1;
+  /* one weight for the whole rail: Certify/Publish/Download sat at 500 while
+     Drafts/Aa/Preview/Fullscreen inherited 400 — near-identical, not identical */
+  font-weight: 500;
 }
 #top-bar .icon-btn:hover, #cert-btn:hover, #pdf-btn:hover, #top-bar .title-caps-btn:hover {
   color: var(--text);
