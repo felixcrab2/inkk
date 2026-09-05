@@ -1644,7 +1644,7 @@ function AuthModal({ onClose, initialMode = "signin" }) {
       el.innerHTML = "";
       gid.renderButton(el, {
         type: "standard", theme: "outline", size: "large",
-        text: "continue_with", shape: "rectangular", width: 320,
+        text: "continue_with", shape: "pill", logo_alignment: "center", width: 320,
       });
     }).catch(() => {});
     return () => { active = false; };
@@ -1785,11 +1785,11 @@ function AuthModal({ onClose, initialMode = "signin" }) {
         ) : mode === "reset" ? (
           <>
             <div id="auth-tabs">
-              <button className="active" style={{ cursor: "default" }}>reset password</button>
+              <button className="active" style={{ cursor: "default" }}>Reset password</button>
             </div>
             <p className="auth-blurb">Enter the email you signed up with and we'll send you a link to set a new password.</p>
             <form onSubmit={submit}>
-              <input type="email" placeholder="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus={!isMobile()} />
+              <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus={!isMobile()} />
               {error && <p className="auth-error">{error}</p>}
               <button id="auth-submit" type="submit" disabled={loading}>
                 {loading ? "…" : "Send reset link"}
@@ -1800,21 +1800,21 @@ function AuthModal({ onClose, initialMode = "signin" }) {
         ) : (
           <>
             <div id="auth-tabs">
-              <button className={mode === "signin" ? "active" : ""} onClick={() => switchMode("signin")}>sign in</button>
-              <button className={mode === "signup" ? "active" : ""} onClick={() => switchMode("signup")}>create account</button>
+              <button className={mode === "signin" ? "active" : ""} onClick={() => switchMode("signin")}>Sign in</button>
+              <button className={mode === "signup" ? "active" : ""} onClick={() => switchMode("signup")}>Create account</button>
             </div>
             <form onSubmit={submit}>
               {/* Don't autofocus on mobile: it pops the keyboard the moment the
                   modal opens, covering the "continue with Google" button. The
                   keyboard should only appear when a field is actually tapped. */}
-              <input type="email" placeholder="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus={!isMobile()} autoComplete="email" />
+              <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus={!isMobile()} autoComplete="email" />
 
               {mode === "signup" && (
                 <>
                   <div className="auth-field">
                     <input
                       type="text"
-                      placeholder="username"
+                      placeholder="Username"
                       value={username}
                       onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
                       maxLength={20}
@@ -1831,7 +1831,7 @@ function AuthModal({ onClose, initialMode = "signin" }) {
               <div className="auth-field">
                 <input
                   type={showPw ? "text" : "password"}
-                  placeholder="password"
+                  placeholder="Password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   required
@@ -1867,7 +1867,7 @@ function AuthModal({ onClose, initialMode = "signin" }) {
 
               {error && <p className="auth-error">{error}</p>}
               <button id="auth-submit" type="submit" disabled={loading || (mode === "signup" && !signupReady)}>
-                {loading ? "…" : mode === "signin" ? "sign in" : "create account"}
+                {loading ? "…" : mode === "signin" ? "Sign in" : "Create account"}
               </button>
             </form>
             {mode === "signin" && (
@@ -1894,7 +1894,7 @@ function AuthModal({ onClose, initialMode = "signin" }) {
             {useGsi ? (
               <div ref={googleBtnRef} style={{ display: "flex", justifyContent: "center" }} />
             ) : (
-              <button id="google-btn" onClick={googleSignIn}>continue with Google</button>
+              <button id="google-btn" onClick={googleSignIn}>Continue with Google</button>
             )}
           </>
         )}
@@ -2604,7 +2604,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
               type="text"
               value={editUsername}
               onChange={e => setEditUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
-              placeholder="username"
+              placeholder="Username"
               maxLength={20}
               autoFocus
             />
