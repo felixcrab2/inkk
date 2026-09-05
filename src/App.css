@@ -831,7 +831,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 #feed-masthead {
   width: 100%;
   max-width: 600px;
-  padding: 26px 24px 14px;
+  padding: 26px 24px 10px;
 }
 .feed-dateline {
   display: block;
@@ -848,7 +848,11 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   padding: 0 24px;
   position: sticky;
   top: 0;
-  background: linear-gradient(var(--bg) 72%, rgba(246,246,246,0));
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  -webkit-mask-image: linear-gradient(#000 calc(100% - 10px), transparent);
+  mask-image: linear-gradient(#000 calc(100% - 10px), transparent);
   z-index: 5;
 }
 
@@ -986,7 +990,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 #feed-composer-wrap {
   width: 100%;
   max-width: 640px;
-  padding: 2px 24px 0;
+  padding: 4px 24px 12px;
 }
 #feed-composer {
   width: 100%;
