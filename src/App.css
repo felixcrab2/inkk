@@ -1940,6 +1940,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 
 /* ─── Identity masthead ────────────────────────────────────────────────── */
 #profile-header {
+  margin-bottom: 22px;
   display: flex;
   flex-direction: column;
   text-align: left;
@@ -2058,10 +2059,11 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   display: flex;
   justify-content: flex-start;
   flex-wrap: wrap;
+  align-items: baseline;
   width: 100%;
   margin: 0;
   padding: 0;
-  gap: 20px;
+  gap: 18px;
   box-sizing: border-box;
 }
 
@@ -2069,22 +2071,23 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   display: flex;
   flex-direction: row;
   align-items: baseline;
-  gap: 6px;
+  gap: 5px;
   padding: 0;
 }
 
 .stat-fig-num {
-  font-family: var(--font-serif);
-  font-size: var(--t-lg);
-  font-weight: 500;
+  font-family: var(--font-ui);
+  font-size: var(--t-sm);
+  font-weight: 700;
   color: var(--text);
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   line-height: 1;
+  font-variant-numeric: lining-nums tabular-nums;
 }
 
 .stat-fig-label {
   font-size: var(--t-sm);
-  color: var(--subtle);
+  color: var(--ink-3);
   letter-spacing: 0.01em;
   text-transform: none;
   margin-top: 0;
@@ -2094,11 +2097,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .profile-section {
   width: 100%;
   max-width: 560px;
-  margin-bottom: 20px;
-  padding: 20px 24px 14px;
-  background: var(--card);
-  border-radius: 16px;
-  box-shadow: var(--card-shadow);
+  margin-bottom: 32px;
   box-sizing: border-box;
 }
 
@@ -2106,8 +2105,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 8px;
-  margin-bottom: 2px;
+  padding: 0 6px 10px;
 }
 .profile-section-label {
   font-size: var(--t-sm);
@@ -2139,7 +2137,8 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 .section-action:hover { color: var(--text); background: rgba(62, 50, 36, 0.1); }
 .profile-section-sub {
-  margin: 0 0 8px;
+  padding: 0 6px;
+  margin: 0 0 12px;
   font-size: var(--t-xs);
   color: var(--subtle);
   line-height: 1.5;
@@ -2147,6 +2146,9 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 
 .profile-list {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 /* ─── Profile article cards ──────────────────────────────────────────── */
@@ -2154,13 +2156,15 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 12px 10px;
-  margin: 0 -10px;
-  border-radius: 10px;
+  padding: 16px 20px;
+  margin: 0;
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: var(--card-shadow);
   cursor: pointer;
-  transition: background 0.15s;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
-.profile-article-card:hover { background: rgba(62, 50, 36, 0.045); }
+.profile-article-card:hover { transform: translateY(-1px); box-shadow: var(--card-shadow-hover); }
 .pac-main { flex: 1; min-width: 0; }
 .pac-title {
   display: block;
@@ -5443,4 +5447,7 @@ body { font-variant-numeric: lining-nums tabular-nums; }
 }
 
 /* an empty state inside a sheet panel is a line, not a hall */
-.profile-section .feed-empty { padding: 14px 0 6px; text-align: left; }
+.profile-section .feed-empty { padding: 4px 6px 0; text-align: left; }
+
+/* inside a sheeted section the head needs no extra inset */
+#research-section .profile-section-head { padding-left: 0; padding-right: 0; }
