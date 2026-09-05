@@ -5244,7 +5244,6 @@ export default function App() {
                   else certifyActiveDoc();
                 }}
               >
-                <span className="cert-diamond" aria-hidden="true">◇</span>
                 <span className="btn-label">{certifying ? "Certifying…" : activeCert ? "Certified" : "Certify"}</span>
               </button>
               {!activeCert && certConfirmOpen && (
