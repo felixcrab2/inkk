@@ -18,8 +18,10 @@
   /* the one accent — red lead, reserved for what is verified or new */
   --rubric:  #9e3b28;
 
-  --bg:          var(--paper);
-  --surface:     var(--paper-2);
+  /* Desktop keeps its original ground — the palette change was asked for on
+     the phone, not here. The phone re-declares warm paper in its own block. */
+  --bg:          #f6f6f6;
+  --surface:     #f0f0f0;
   --text:        var(--ink);
   --muted:       var(--ink-2);
   --subtle:      var(--ink-3);
@@ -4991,3 +4993,82 @@ body { font-variant-numeric: lining-nums tabular-nums; }
 .hs-status-dot.ok, .ws-status.ok .hs-status-dot { background: var(--gold); }
 .hs-status-dot.saving, .ws-status.saving .hs-status-dot { background: var(--ink-3); }
 .hs-status-dot.off, .ws-status.off .hs-status-dot { background: var(--rubric); }
+
+/* ── the byline and furniture take the interface face, at every width ──
+   (the phone fixed these inside its media query; the fix belongs to the
+   design language, not to a breakpoint) */
+.feed-entry-author, .feed-entry-date, .feed-entry-meta, .feed-dot,
+.feed-lead-author, .feed-lead-sub, .feed-lead-byline-text,
+.comment-author, .comment-body, .comment-meta,
+.reading-comments-title, .rv-status, .rv-copy, .report-btn {
+  font-family: var(--font-ui);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.feed-entry-author, .feed-lead-author { color: var(--text); font-weight: 500; }
+.reading-comments-title { font-weight: 600; }
+.profile-cta-ghost { text-transform: none !important; letter-spacing: 0 !important; }
+
+/* the diamond is retired everywhere; the wordmark is the mark */
+.hs-badge-mark, .nav-diamond, .cert-diamond, .rv-mark,
+.pac-code-mark, .feed-empty-mark, .verify-cert-diamond { display: none !important; }
+
+/* ── the dinkus, and the margin index (desktop) ──────────────────────────────
+   The user's instinct was right: bare spacing between entries is an absence,
+   not a solution. Books answered this centuries ago with the dinkus — a small
+   centred device marking a break without drawing a line. Ours is cut from the
+   same engraved Flammarion band as the lead's rule, so the feed's furniture
+   is Dürer's, not a divider's.
+
+   And in the margin, the classical index: entries numbered in small roman
+   numerals, the way a table of contents would, using space only a wide page
+   has. Both are marks of a hand, which is the entire brand. */
+@media (min-width: 601px) {
+  /* the entry is a flex row, so the device hangs absolutely: centred in the
+     white between entries, touching nothing */
+  .feed-entry { position: relative; }
+  .feed-entry:not(:first-of-type)::before {
+    content: "";
+    position: absolute;
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 78px;
+    height: 9px;
+    background: url("./assets/ornament-rule.webp") center / contain no-repeat;
+    opacity: 0.22;
+  }
+}
+@media (min-width: 900px) {
+  /* the margin index: roman numerals hanging in the page margin, clear of the
+     avatar column — the space only a wide page has */
+  #feed-list { counter-reset: entry; }
+  .feed-entry { counter-increment: entry; }
+  /* the scroller clips anything hung outside its box, so the numeral rides
+     inside the row as its first column: numeral, then initial, then words */
+  .feed-entry::after {
+    content: counter(entry, lower-roman) !important;
+    display: block !important;
+    border: none !important;
+    position: static !important;
+    order: -1;
+    flex: none;
+    width: 30px;
+    margin-right: 8px;
+    margin-top: 7px;
+    text-align: right;
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 0.82rem;
+    color: var(--subtle);
+    letter-spacing: 0.04em;
+  }
+}
+
+/* engagement counts and the verified chip are furniture, not prose — and the
+   verified word takes the rubric it earned */
+.feed-engage, .feed-engage span, .hs-badge {
+  font-family: var(--font-ui);
+  letter-spacing: 0;
+}
+.hs-badge { color: var(--rubric); text-transform: none; }
