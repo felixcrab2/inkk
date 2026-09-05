@@ -1946,8 +1946,12 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   text-align: left;
   gap: 18px;
   width: 100%;
-  max-width: 520px;
-  padding-bottom: 18px;
+  max-width: 560px;
+  padding: 24px 26px 20px;
+  background: var(--card);
+  border-radius: 16px;
+  box-shadow: var(--card-shadow);
+  box-sizing: border-box;
 }
 
 #profile-avatar-wrap {
@@ -2047,59 +2051,62 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 /* ─── Stats — editorial figures ────────────────────────────────────────── */
 #profile-stats {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   flex-wrap: wrap;
   width: 100%;
-  max-width: 520px;
-  margin-bottom: 28px;
-  padding: 14px 0;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  max-width: 560px;
+  margin: 14px 0 22px;
+  padding: 0 6px;
+  gap: 22px;
+  box-sizing: border-box;
 }
 
 .stat-fig {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 0 30px;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0;
 }
-.stat-fig + .stat-fig { border-left: 1px solid var(--border); }
 
 .stat-fig-num {
   font-family: var(--font-serif);
-  font-size: var(--t-3xl);
-  font-weight: 400;
+  font-size: var(--t-lg);
+  font-weight: 500;
   color: var(--text);
   letter-spacing: -0.01em;
   line-height: 1;
 }
 
 .stat-fig-label {
-  font-size: var(--t-xs);
+  font-size: var(--t-sm);
   color: var(--subtle);
   letter-spacing: 0.01em;
   text-transform: none;
-  margin-top: 10px;
+  margin-top: 0;
 }
 
 /* ─── Sections (Drafts / Published / Research) ─────────────────────────── */
 .profile-section {
   width: 100%;
-  max-width: 520px;
-  margin-bottom: 44px;
+  max-width: 560px;
+  margin-bottom: 20px;
+  padding: 20px 24px 14px;
+  background: var(--card);
+  border-radius: 16px;
+  box-shadow: var(--card-shadow);
+  box-sizing: border-box;
 }
 
 .profile-section-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 4px;
+  padding-bottom: 8px;
+  margin-bottom: 2px;
 }
 .profile-section-label {
-  font-size: var(--t-xs);
+  font-size: var(--t-sm);
   font-weight: 600;
   color: var(--text);
   letter-spacing: 0.01em;
@@ -2113,17 +2120,20 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   letter-spacing: 0.05em;
 }
 .section-action {
-  background: none;
+  background: rgba(62, 50, 36, 0.06);
   border: none;
-  padding: 0;
+  border-radius: 999px;
+  padding: 6px 13px;
+  font-family: var(--font-ui);
   font-size: var(--t-xs);
+  font-weight: 600;
   letter-spacing: 0.01em;
   text-transform: none;
-  color: var(--subtle);
+  color: var(--muted);
   cursor: pointer;
-  transition: color 0.18s;
+  transition: color 0.18s, background 0.18s;
 }
-.section-action:hover { color: var(--text); }
+.section-action:hover { color: var(--text); background: rgba(62, 50, 36, 0.1); }
 .profile-section-sub {
   margin: 14px 0 6px;
   font-size: var(--t-xs);
@@ -2140,19 +2150,19 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 18px 0;
-  border-bottom: 1px solid var(--border);
+  padding: 12px 10px;
+  margin: 0 -10px;
+  border-radius: 10px;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: background 0.15s;
 }
-.profile-article-card:last-child { border-bottom: none; }
-.profile-article-card:hover { opacity: 0.62; }
+.profile-article-card:hover { background: rgba(62, 50, 36, 0.045); }
 .pac-main { flex: 1; min-width: 0; }
 .pac-title {
   display: block;
   font-family: var(--font-serif);
-  font-size: var(--t-sm);
-  font-weight: 600;
+  font-size: var(--t-md);
+  font-weight: 500;
   font-style: normal;
   color: var(--text);
   letter-spacing: -0.02em;
@@ -2166,7 +2176,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   color: var(--subtle);
   letter-spacing: 0.01em;
   text-transform: none;
-  margin-top: 6px;
+  margin-top: 4px;
 }
 .pac-actions {
   display: flex;
@@ -2713,12 +2723,15 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 #user-profile-header {
   display: flex;
   align-items: flex-start;
-  gap: 14px;
+  gap: 16px;
   width: 100%;
-  max-width: 520px;
-  margin-bottom: 24px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid rgba(0,0,0,0.10);
+  max-width: 560px;
+  margin-bottom: 16px;
+  padding: 24px 26px;
+  background: var(--card);
+  border-radius: 16px;
+  box-shadow: var(--card-shadow);
+  box-sizing: border-box;
 }
 
 #user-profile-info {
@@ -2728,7 +2741,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 
 #user-profile-username {
   font-family: var(--font-serif);
-  font-size: var(--t-lg);
+  font-size: var(--t-xl);
   font-weight: 600;
   color: var(--text);
   letter-spacing: -0.02em;
@@ -2742,7 +2755,7 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 
 #user-profile-bio {
-  font-size: var(--t-xs);
+  font-size: var(--t-sm);
   color: var(--muted);
   line-height: 1.5;
   margin: 8px 0 0;
@@ -2767,31 +2780,34 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 }
 
 .follow-btn {
+  font-family: var(--font-ui);
   font-size: var(--t-xs);
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 99px;
-  padding: 4px 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--bg);
+  background: var(--text);
+  border: none;
+  border-radius: 999px;
+  padding: 7px 16px;
   cursor: pointer;
   flex-shrink: 0;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  transition: opacity 0.15s, background 0.2s, color 0.2s;
   line-height: 1.4;
 }
-.follow-btn:hover { color: var(--text); border-color: var(--text); }
+.follow-btn:hover { opacity: 0.85; }
 .follow-btn.following {
-  color: var(--text);
-  border-color: var(--text);
-  background: rgba(0,0,0,0.04);
+  color: var(--muted);
+  background: rgba(62, 50, 36, 0.07);
 }
-.follow-btn.following:hover { color: var(--muted); border-color: var(--border); background: none; }
+.follow-btn.following:hover { opacity: 1; background: rgba(62, 50, 36, 0.11); }
 .follow-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 #user-profile-list {
   width: 100%;
-  max-width: 520px;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 /* ─── Reading view ────────────────────────────────────────────────────────── */
@@ -5338,52 +5354,10 @@ body { font-variant-numeric: lining-nums tabular-nums; }
 }
 @keyframes lf-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 .feed-lead-excerpt.is-writing, .feed-entry-excerpt.is-writing { cursor: default; }
+/* While a piece writes itself, the caret span sits inside the clamped
+   -webkit-box and Chromium sizes the box to the FULL text height (the clamp
+   only clips it visually) — cards ballooned with dead paper below the meta.
+   Cap the writing state at exactly the clamped height. */
+.feed-entry-excerpt.is-writing { max-height: calc(1.58em * 2); }
+.feed-lead-excerpt.is-writing  { max-height: calc(1.62em * 3); }
 
-/* ═══ Profile: content over metrics ══════════════════════════════════════════
-   The page is about a person's writing, so the writing must be the largest
-   thing on it after their name. It was the reverse: 850 WORDS set huge in a
-   ruled box, the actual drafts whispering beneath it. The metrics become a
-   quiet caption; the writing is promoted; the ruled box goes. */
-
-/* stats → one calm caption row, no box, no giant numerals */
-#profile-stats {
-  border: none !important;
-  padding: 4px 0 0 !important;
-  margin-bottom: 34px !important;
-  gap: 22px;
-}
-.stat-fig { flex-direction: row !important; align-items: baseline; gap: 6px; padding: 0 !important; }
-.stat-fig + .stat-fig { border-left: none !important; }
-.stat-fig-num {
-  font-family: var(--font-serif) !important;
-  font-size: var(--t-lg) !important;
-  font-weight: 500 !important;
-  color: var(--text) !important;
-}
-.stat-fig-label {
-  font-size: var(--t-sm) !important;
-  color: var(--subtle) !important;
-  margin-top: 0 !important;
-}
-
-/* the writing is the focus: draft/published titles up to reading size */
-.pac-title, .profile-article-card .pac-title {
-  font-family: var(--font-serif) !important;
-  font-size: var(--t-lg) !important;
-  font-weight: 500 !important;
-  color: var(--text) !important;
-  line-height: 1.3;
-}
-.pac-meta { font-size: var(--t-xs) !important; color: var(--subtle) !important; }
-.profile-article-card { padding: 16px 0 !important; }
-
-/* the section rules go, like everywhere else — space carries it */
-.profile-section-head, #profile-stats, .profile-article-card,
-.profile-article-card:last-child { border: none !important; }
-.profile-section-head { padding-bottom: 6px !important; margin-bottom: 6px !important; }
-
-/* one identity block, left-aligned and quiet — the joined line is a caption,
-   not a gold plaque */
-#profile-joined, .profile-section-sub { color: var(--subtle) !important; }
-#profile-displayname { color: var(--text) !important; }
-.profile-edit-btn, .section-action { color: var(--subtle) !important; }
