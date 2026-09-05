@@ -2629,6 +2629,7 @@ function Feed({ user, me, onRead, onAuthorClick, dropCapImages, onRequestAuth, o
 function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapImages, onRead, onUnpublish, onSignIn, onCreateAccount, onSignOut, onAvatarChange, onEditDoc, onNewDoc, onDeleteDoc, onPublishDoc, researchOptIn, onToggleOptIn, onDownloadData, onDeleteData, onChangePassword, onProfileUpdate, onOpenVerify }) {
   const [pubs, setPubs]           = useState([]);
   const [loading, setLoading]     = useState(!!user);
+  const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
   const [uploading, setUploading] = useState(false);
   const [optBusy, setOptBusy]     = useState(false);
   const [delBusy, setDelBusy]     = useState(false);
@@ -2654,6 +2655,11 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
   const [profileSaving, setProfileSaving]     = useState(false);
   const [profileError, setProfileError]       = useState("");
   const fileInputRef              = useRef(null);
+
+  useEffect(() => {
+    if (!user) { setFollowCounts({ followers: 0, following: 0 }); return; }
+    fetchFollowCounts(user.id).then(setFollowCounts);
+  }, [user]);
 
   useEffect(() => {
     if (!user || !researchOptIn) { setContribution(null); setPendingLocal(0); return; }
@@ -2853,6 +2859,14 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
         <div className="stat-fig">
           <span className="stat-fig-num">{totalWords.toLocaleString()}</span>
           <span className="stat-fig-label">Words</span>
+        </div>
+        <div className="stat-fig">
+          <span className="stat-fig-num">{followCounts.followers}</span>
+          <span className="stat-fig-label">{followCounts.followers === 1 ? "Follower" : "Followers"}</span>
+        </div>
+        <div className="stat-fig">
+          <span className="stat-fig-num">{followCounts.following}</span>
+          <span className="stat-fig-label">Following</span>
         </div>
       </div>
 
