@@ -33,6 +33,9 @@
   --t-display: 2.35rem;
 
   --bg:          #f6f6f6;
+  --card: #fcfbf8;               /* a sheet of paper laid on the desk */
+  --card-shadow: 0 1px 2px rgba(45, 36, 24, 0.045), 0 7px 22px rgba(45, 36, 24, 0.055);
+  --card-shadow-hover: 0 2px 4px rgba(45, 36, 24, 0.05), 0 16px 38px rgba(45, 36, 24, 0.09);
   --surface:     #f0f0f0;
   --text:        var(--ink);
   --muted:       var(--ink-2);
@@ -892,17 +895,17 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 20px 0;
-  border-bottom: 1px solid var(--border);
+  padding: 18px 22px;
+  border: none;
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--card-shadow);
   cursor: pointer;
-  transition: opacity 0.12s;
-  animation: cardIn 0.3s ease both;
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+  animation: cardIn 0.3s ease backwards;
   animation-delay: calc(var(--card-index, 0) * 0.04s);
-  background: none;
-  box-shadow: none;
 }
-.writer-card:last-child { border-bottom: none; }
-.writer-card:hover { opacity: 0.6; }
+.writer-card:hover { transform: translateY(-2px); box-shadow: var(--card-shadow-hover); }
 .writer-card-info { flex: 1; min-width: 0; }
 .writer-card-name {
   font-family: var(--font-serif);
@@ -930,9 +933,23 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 
 #feed-list {
   width: 100%;
-  max-width: 600px;
-  padding: 22px 24px 8px;
+  max-width: 640px;
+  padding: 20px 24px 8px;
   overflow-x: hidden;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  align-items: start;
+}
+/* everything that is not a sheet spans the desk (skeleton, empty states,
+   writer rows, search); the sheets take cells */
+#feed-list > * { grid-column: 1 / -1; }
+#feed-list > .feed-entry, #feed-list > .writer-card { grid-column: auto; }
+
+/* the wide desk: lead spans, entries sit two abreast */
+@media (min-width: 980px) {
+  #feed-list { max-width: 936px; grid-template-columns: 1fr 1fr; gap: 22px; }
+  #feed-masthead, #feed-header { max-width: 936px; }
 }
 
 .feed-empty {
@@ -975,21 +992,19 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 /* ── Lead story — the editorial feature at the top of the edition ─────────── */
 .feed-lead {
   position: relative;
-  padding: 4px 14px 30px;
-  margin: 0 -14px;
+  padding: 30px 34px 26px;
+  margin: 0;
   cursor: pointer;
-  border-radius: 14px;
-  animation: cardIn 0.5s ease both;
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: var(--card-shadow);
+  /* backwards, not both: a frozen final keyframe would pin transform and
+     swallow the hover lift */
+  animation: cardIn 0.5s ease backwards;
   animation-delay: calc(var(--card-index, 0) * 0.05s);
-  transition: background 0.3s ease;
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
 }
-.feed-lead::after {
-  content: "";
-  position: absolute;
-  left: 14px; right: 14px; bottom: 0;
-  border-bottom: 1px solid var(--border);
-}
-.feed-lead:hover { background: rgba(169, 138, 92, 0.05); }
+.feed-lead:hover { transform: translateY(-2px); box-shadow: var(--card-shadow-hover); }
 
 .feed-lead-title {
   font-family: var(--font-serif);
@@ -1070,23 +1085,20 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .feed-entry {
   position: relative;
   display: flex;
-  gap: 16px;
-  padding: 24px 14px;
-  margin: 0 -14px;
+  gap: 14px;
+  padding: 24px 24px 20px;
+  margin: 0;
+  height: 100%;
+  box-sizing: border-box;
   cursor: pointer;
-  border-radius: 12px;
-  animation: cardIn 0.45s ease both;
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--card-shadow);
+  animation: cardIn 0.45s ease backwards;
   animation-delay: calc(var(--card-index, 0) * 0.05s);
-  transition: background 0.28s ease;
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
 }
-.feed-entry::after {
-  content: "";
-  position: absolute;
-  left: 14px; right: 14px; bottom: 0;
-  border-bottom: 1px solid var(--border);
-}
-.feed-entry:last-child::after { display: none; }
-.feed-entry:hover { background: rgba(169, 138, 92, 0.05); }
+.feed-entry:hover { transform: translateY(-2px); box-shadow: var(--card-shadow-hover); }
 .feed-entry:hover .feed-mark { transform: scale(1.06); }
 
 .feed-entry-body { flex: 1; min-width: 0; }
@@ -2434,10 +2446,14 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 20px 14px 14px;
-  border-bottom: 1px solid var(--border);
-  margin: 0 -14px;
+  padding: 12px 18px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(62, 50, 36, 0.055);
+  margin: 4px 0 2px;
+  max-width: 460px;
 }
+.feed-search-bar:focus-within { background: rgba(62, 50, 36, 0.075); }
 .feed-search-icon { color: var(--subtle); flex-shrink: 0; }
 .feed-search-input {
   flex: 1;
@@ -4228,7 +4244,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
     border: none !important;
   }
   /* …and space does their work */
-  .feed-entry { padding: 30px 0 !important; }
+  .feed-entry { padding: 22px 20px !important; }
   .feed-lead  { padding-bottom: 34px !important; }
   #feed-header { padding-bottom: 18px !important; }
 
@@ -4560,8 +4576,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
    border audit kept coming back clean while the lines were still on screen.
    Space separates the entries now. */
 @media (max-width: 600px) {
-  .feed-entry::after { display: none !important; }
-  .feed-entry { padding: 22px 0 !important; }
+  .feed-entry { padding: 20px 20px 18px !important; }
 
   /* One image per row. The plate is the piece's mark and carries the visual
      rhythm, so the author's illuminated initial steps back to the byline. */
@@ -4574,7 +4589,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
 @media (max-width: 600px) {
   /* the column ran almost to the edges, which is what made it feel wide */
   #feed-list, #feed-header, #feed-masthead { padding-left: 22px !important; padding-right: 22px !important; }
-  .feed-lead, .feed-entry { padding-left: 0 !important; padding-right: 0 !important; }
+  .feed-lead { padding: 24px 22px 20px !important; }
 }
 
 /* ─── Phone: the editor keeps its face ───────────────────────────────────────
@@ -4634,7 +4649,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   #feed-masthead { padding-top: 30px !important; padding-bottom: 4px !important; }
   .feed-dateline { font-size: var(--t-xs) !important; color: var(--subtle) !important; }
   #feed-header { padding-top: 10px !important; padding-bottom: 22px !important; }
-  #feed-list { padding-top: 8px !important; }
+  #feed-list { padding-top: 8px !important; gap: 12px; }
 
   /* no hard horizontal seam under the bar */
   #backdrop:not([data-view="editor"]) {
@@ -4892,8 +4907,6 @@ body { font-variant-numeric: lining-nums tabular-nums; }
 .pub-card:first-of-type, #reading-meta, #reading-footer,
 .reading-verify, .comment, .comment-list, #feed-masthead,
 #panel-footer, .new-doc-btn, .doc-item { border: none !important; }
-.feed-entry::after { display: none !important; }
-.feed-entry { padding: 26px 0; }
 .feed-lead  { padding-bottom: 34px; }
 #bottom-nav { border: none; box-shadow: 0 -8px 22px rgba(62, 50, 36, 0.05); }
 
@@ -4943,29 +4956,6 @@ body { font-variant-numeric: lining-nums tabular-nums; }
 .reading-verify { background: rgba(62, 50, 36, 0.045); border-radius: 16px; padding: 18px; }
 .reading-like { border: none !important; background: rgba(62, 50, 36, 0.06) !important; border-radius: 999px !important; }
 
-/* ── the pull quote, at every width ── */
-.feed-quote { margin: 6px 0 26px; padding: 26px 4px 22px; cursor: pointer; }
-.feed-quote-text {
-  font-family: var(--font-serif);
-  font-size: var(--t-2xl);
-  line-height: 1.28;
-  letter-spacing: -0.012em;
-  color: var(--text);
-  margin: 0 0 14px;
-  text-wrap: balance;
-}
-.feed-quote-text::before {
-  content: "\201C";
-  font-family: var(--font-serif);
-  font-size: 2.1em;
-  line-height: 0;
-  vertical-align: -0.32em;
-  margin-right: 0.06em;
-  color: var(--rubric);
-  opacity: 0.55;
-}
-.feed-quote-attr { font-family: var(--font-ui); font-size: var(--t-xs); color: var(--subtle); }
-.feed-quote-attr::before { content: "\2014\00a0"; }
 
 /* ── rubrication ── */
 .feed-dateline.red-letter { color: var(--rubric); }
@@ -4978,16 +4968,8 @@ body { font-variant-numeric: lining-nums tabular-nums; }
 /* desktop nav labels join the sentence-case rule (mobile already had it) */
 #bottom-nav .nav-label { text-transform: none; letter-spacing: 0.01em; font-size: var(--t-xs); font-weight: 500; }
 
-/* the lead's divider is the engraved rule at every width — the foliate band
-   from the Flammarion border, faded at both ends so it reads as printing */
-.feed-lead::after {
-  height: 11px !important;
-  border: none !important;
-  background: url("./assets/ornament-rule.webp") center / auto 11px repeat-x !important;
-  opacity: 0.3;
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent);
-  mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent);
-}
+/* (the lead's engraved rule retired: the sheet's edge now does the
+   separating, so a divider inside it would be double furniture) */
 
 /* verify heading is interface, not authored writing — every width */
 .verify-title { font-family: var(--font-ui); font-weight: 600; letter-spacing: -0.02em; }
@@ -5018,57 +5000,7 @@ body { font-variant-numeric: lining-nums tabular-nums; }
 .hs-badge-mark, .nav-diamond, .cert-diamond, .rv-mark,
 .pac-code-mark, .feed-empty-mark, .verify-cert-diamond { display: none !important; }
 
-/* ── the dinkus, and the margin index (desktop) ──────────────────────────────
-   The user's instinct was right: bare spacing between entries is an absence,
-   not a solution. Books answered this centuries ago with the dinkus — a small
-   centred device marking a break without drawing a line. Ours is cut from the
-   same engraved Flammarion band as the lead's rule, so the feed's furniture
-   is Dürer's, not a divider's.
-
-   And in the margin, the classical index: entries numbered in small roman
-   numerals, the way a table of contents would, using space only a wide page
-   has. Both are marks of a hand, which is the entire brand. */
-@media (min-width: 601px) {
-  /* the entry is a flex row, so the device hangs absolutely: centred in the
-     white between entries, touching nothing */
-  .feed-entry { position: relative; }
-  .feed-entry:not(:first-of-type)::before {
-    content: "";
-    position: absolute;
-    top: -5px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 78px;
-    height: 9px;
-    background: url("./assets/ornament-rule.webp") center / contain no-repeat;
-    opacity: 0.22;
-  }
-}
-@media (min-width: 900px) {
-  /* the margin index: roman numerals hanging in the page margin, clear of the
-     avatar column — the space only a wide page has */
-  #feed-list { counter-reset: entry; }
-  .feed-entry { counter-increment: entry; }
-  /* the scroller clips anything hung outside its box, so the numeral rides
-     inside the row as its first column: numeral, then initial, then words */
-  .feed-entry::after {
-    content: counter(entry, lower-roman) !important;
-    display: block !important;
-    border: none !important;
-    position: static !important;
-    order: -1;
-    flex: none;
-    width: 30px;
-    margin-right: 8px;
-    margin-top: 7px;
-    text-align: right;
-    font-family: var(--font-serif);
-    font-style: italic;
-    font-size: var(--t-xs);
-    color: var(--subtle);
-    letter-spacing: 0.04em;
-  }
-}
+/* (dinkus and margin index retired: sheets are contained, breaks need no device) */
 
 /* engagement counts and the verified chip are furniture, not prose — and the
    verified word takes the rubric it earned */
@@ -5114,9 +5046,6 @@ body { font-variant-numeric: lining-nums tabular-nums; }
 #cert-btn.is-certified { color: var(--rubric); border-color: rgba(158, 59, 40, 0.3); }
 .title-caps-glyph { font-size: var(--t-sm); }
 
-/* one device per break: the entry that follows the section label sits right
-   under the lead's engraved rule, so it needs no dinkus of its own */
-.feed-section-label + .feed-entry::before { display: none !important; }
 
 /* ─── The auth modal, de-clinicised ──────────────────────────────────────────
    It was the last room still furnished in the old style: tracked-caps tabs

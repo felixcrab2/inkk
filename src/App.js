@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import "@fontsource/eb-garamond/400.css";
 import "@fontsource/eb-garamond/500.css";
@@ -34,7 +34,7 @@ import {
 import { HumanSignalBadge, HumanSignalPanel } from "./components/HumanSignal";
 import { PrivacyModal, TermsModal, TOS_VERSION } from "./components/Legal";
 import { VerifyView } from "./components/Verify";
-import { makeVerifyCode, hashContent, isVerifiedTier, normalizePlainText } from "./verify/code";
+import { makeVerifyCode, hashContent, isVerifiedTier } from "./verify/code";
 
 // ─── local storage ────────────────────────────────────────────────────────────
 
@@ -2277,41 +2277,15 @@ function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, 
   );
 }
 
-// Pick a line worth setting large: the longest sentence that still fits on a
-// card, skipping the opening one so the quote is not simply the excerpt again.
-function pullQuote(html) {
-  const text = normalizePlainText(html || "");
-  const sentences = text.split(/(?<=[.!?])\s+/).map(x => x.trim())
-    .filter(x => x.length >= 45 && x.length <= 165);
-  if (!sentences.length) return null;
-  const pool = sentences.length > 1 ? sentences.slice(1) : sentences;
-  return pool.reduce((a, b) => (b.length > a.length ? b : a), pool[0]);
-}
-
-// Renders a feed: the newest piece as the lead, a quiet section label, then the
-// rest as index entries.
+// Renders a feed: the newest piece as the full-width lead sheet, the rest as
+// sheet cards. Containment does the separating — no interleaved devices.
 function FeedList({ pubs, onRead, onAuthorClick, onLike, dropCapImages }) {
   return (
     <>
-      {pubs.map((pub, i) => {
-        // Every few entries, a line from the piece set large. It breaks the
-        // rhythm of a uniform list, gives the eye somewhere to land, and is
-        // the one thing here worth screenshotting.
-        const quote = i > 1 && (i - 1) % 4 === 0 ? pullQuote(pub.content) : null;
-        return (
-          <Fragment key={pub.id}>
-            {i === 1 && <div className="feed-section-label">More to read</div>}
-            {quote && (
-              <blockquote className="feed-quote" onClick={() => onRead(pub)}>
-                <p className="feed-quote-text">{quote}</p>
-                <span className="feed-quote-attr">{pub.author_name || "Unknown"}</span>
-              </blockquote>
-            )}
-            <FeedCard pub={pub} index={i} featured={i === 0} dropCapImages={dropCapImages}
-              onRead={onRead} onAuthorClick={onAuthorClick} onLike={onLike} />
-          </Fragment>
-        );
-      })}
+      {pubs.map((pub, i) => (
+        <FeedCard key={pub.id} pub={pub} index={i} featured={i === 0} dropCapImages={dropCapImages}
+          onRead={onRead} onAuthorClick={onAuthorClick} onLike={onLike} />
+      ))}
     </>
   );
 }
