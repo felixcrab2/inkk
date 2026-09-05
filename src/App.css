@@ -5208,3 +5208,8 @@ body { font-variant-numeric: lining-nums tabular-nums; }
   background: rgba(62, 50, 36, 0.075) !important;
 }
 .auth-tos input[type="checkbox"] { margin-top: 3px; }
+
+/* the Google button sits inset like the fields and the submit above it —
+   the GIS iframe is centred, and the fallback stops going full-bleed */
+#google-btn { align-self: center; width: 272px; }
+.gsi-material-button, div[aria-labelledby] > div[role="button"] { margin: 0 auto; }

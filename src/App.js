@@ -1644,7 +1644,7 @@ function AuthModal({ onClose, initialMode = "signin" }) {
       el.innerHTML = "";
       gid.renderButton(el, {
         type: "standard", theme: "outline", size: "large",
-        text: "continue_with", shape: "pill", logo_alignment: "center", width: 320,
+        text: "continue_with", shape: "pill", logo_alignment: "center", width: 272,
       });
     }).catch(() => {});
     return () => { active = false; };
