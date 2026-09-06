@@ -29,22 +29,26 @@
     {
       "username": "oldgreenhouse",
       "display_name": "Marion Fell",
-      "bio": "Retired, mostly. Two greenhouses, one knee that forecasts rain. I write down what the plants are doing because no one at home will listen."
+      "bio": "Retired, mostly. Two greenhouses, one knee that forecasts rain. I write down what the plants are doing because no one at home will listen.",
+      "avatar": "https://upload.wikimedia.org/wikipedia/commons/0/01/A_robin_on_a_garden_fence_-_geograph.org.uk_-_1161083.jpg"
     },
     {
       "username": "nightbus",
       "display_name": "Night Bus",
-      "bio": "I clean offices while the city sleeps and I take the last bus home. Things look different at that hour. I write some of them down."
+      "bio": "I clean offices while the city sleeps and I take the last bus home. Things look different at that hour. I write some of them down.",
+      "avatar": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/JP_%E6%97%A5%E6%9C%AC_Japan_%E4%BA%AC%E9%83%BD_Kyoto_Nagatsuji_Street_bus_stop_sign_night_June_2026_N13P_01.jpg/960px-JP_%E6%97%A5%E6%9C%AC_Japan_%E4%BA%AC%E9%83%BD_Kyoto_Nagatsuji_Street_bus_stop_sign_night_June_2026_N13P_01.jpg"
     },
     {
       "username": "keeps_receipts",
       "display_name": "Keeps Receipts",
-      "bio": "Lists, grievances, and small victories over machines. If it beeped at me unfairly, it's probably in here."
+      "bio": "Lists, grievances, and small victories over machines. If it beeped at me unfairly, it's probably in here.",
+      "avatar": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Cash_register_%288058279685%29_%282%29.jpg/960px-Cash_register_%288058279685%29_%282%29.jpg"
     },
     {
       "username": "harbourlight",
       "display_name": "Harbour Light",
-      "bio": "Grew up in a fishing town, live in a city now. Most of what I write is trying to get back to the water."
+      "bio": "Grew up in a fishing town, live in a city now. Most of what I write is trying to get back to the water.",
+      "avatar": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Split_Rock_Lighthouse_The_Electric_Lamp_%282890826923%29.jpg/960px-Split_Rock_Lighthouse_The_Electric_Lamp_%282890826923%29.jpg"
     },
     {
       "username": "deadlineadjacent",
@@ -54,17 +58,20 @@
     {
       "username": "smallhours",
       "display_name": "Small Hours",
-      "bio": "Insomniac. Everything here was written between two and five in the morning, which is its own kind of honesty."
+      "bio": "Insomniac. Everything here was written between two and five in the morning, which is its own kind of honesty.",
+      "avatar": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/Full_moon_over_Gullmarn_fjord_at_Holma_Marina_1.jpg/960px-Full_moon_over_Gullmarn_fjord_at_Holma_Marina_1.jpg"
     },
     {
       "username": "provingdrawer",
       "display_name": "The Proving Drawer",
-      "bio": "Bread, mostly, and the people who taught me. Flour on the keyboard is a permanent feature now."
+      "bio": "Bread, mostly, and the people who taught me. Flour on the keyboard is a permanent feature now.",
+      "avatar": "https://upload.wikimedia.org/wikipedia/commons/5/59/Cassava_flour_-_making_dough_in_mortar.jpg"
     },
     {
       "username": "fieldnotes",
       "display_name": "Field Notes",
-      "bio": "I travel for dull reasons and pay attention for interesting ones. Notebooks, launderettes, the backs of towns."
+      "bio": "I travel for dull reasons and pay attention for interesting ones. Notebooks, launderettes, the backs of towns.",
+      "avatar": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Latzina_Map_of_Argentina_1882_foldings.jpg/960px-Latzina_Map_of_Argentina_1882_foldings.jpg"
     }
   ],
   "pieces": [
@@ -72,13 +79,25 @@
       "author_username": "saltmarsh",
       "title": "Stand on the right",
       "note": "i complain into my phone on the commute. this is some of it.",
-      "content": "<p>There is a sign. There is always a sign. It says STAND ON THE RIGHT, and it is the single clearest instruction in the entire transport network. Clearer than the maps, clearer than the announcements nobody can hear.</p><p>And yet.</p><p>This morning a man stood square in the middle of the escalator with a wheelie suitcase parked beside him like a small obedient dog, and he looked back at the queue building up behind him with the mild, faraway expression of someone watching weather happen to other people.</p><p>I'm not a confrontational person. I rehearse arguments in my head for hours and then say \"no worries\" out loud. So I said nothing. I stood there composing this instead, which is, I'm starting to realise, the only thing I ever actually do about anything.</p>"
+      "content": "<p>There is a sign. There is always a sign. It says STAND ON THE RIGHT, and it is the single clearest instruction in the entire transport network. Clearer than the maps, clearer than the announcements nobody can hear.</p><p>And yet.</p><p>This morning a man stood square in the middle of the escalator with a wheelie suitcase parked beside him like a small obedient dog, and he looked back at the queue building up behind him with the mild, faraway expression of someone watching weather happen to other people.</p><p>I'm not a confrontational person. I rehearse arguments in my head for hours and then say \"no worries\" out loud. So I said nothing. I stood there composing this instead, which is, I'm starting to realise, the only thing I ever actually do about anything.</p>",
+      "comments": [
+        {
+          "by": "fieldnotes",
+          "body": "I have timed launderette dryers in three towns and you rehearse escalator arguments for hours. Between us we could staff a small bureau of unnecessary vigilance. The suitcase like an obedient dog is perfect."
+        }
+      ]
     },
     {
       "author_username": "saltmarsh",
       "title": "I bought a label maker",
       "note": "37, too many hobbies, none of them finished. here to find out if writing is different.",
-      "content": "<p>I bought a label maker three weeks ago and I am now a different person.</p><p>It started reasonably. The spice jars. Fine, normal, the kind of thing a functioning adult does on a Sunday. But once the spice jars are done there's a small voice that says: what else doesn't have a name?</p><p>So far: the spices, the router (\"ROUTER: DO NOT UNPLUG\"), the drawer that's just chargers, and, this morning, the label maker itself, which now wears a label that says LABEL MAKER. I stood looking at that one for a while.</p><p>I think I believed that if I could get everything named and in its place, something else might settle down too. It hasn't. But the cupboard looks incredible.</p>"
+      "content": "<p>I bought a label maker three weeks ago and I am now a different person.</p><p>It started reasonably. The spice jars. Fine, normal, the kind of thing a functioning adult does on a Sunday. But once the spice jars are done there's a small voice that says: what else doesn't have a name?</p><p>So far: the spices, the router (\"ROUTER: DO NOT UNPLUG\"), the drawer that's just chargers, and, this morning, the label maker itself, which now wears a label that says LABEL MAKER. I stood looking at that one for a while.</p><p>I think I believed that if I could get everything named and in its place, something else might settle down too. It hasn't. But the cupboard looks incredible.</p>",
+      "comments": [
+        {
+          "by": "keeps_receipts",
+          "body": "The label maker wearing a label that says LABEL MAKER is where I had to put the phone down. That is the correct amount of power for one person to hold."
+        }
+      ]
     },
     {
       "author_username": "saltmarsh",
@@ -102,7 +121,13 @@
       "author_username": "oliveandash",
       "title": "My nan's handwriting",
       "note": "small things, mostly. this one less small.",
-      "content": "<p>I found a recipe card in my nan's handwriting today, tucked inside a cookbook I inherited and never use.</p><p>It's for a fruit cake. Half the measurements are in \"teacups\" and one instruction just says \"until it looks right,\" which is the least helpful and most accurate baking instruction ever written.</p><p>But it was the handwriting that got me. That specific slant. I'd know it anywhere, and I hadn't seen it in four years, and there it was, telling me to use the good butter and not be mean with it. I'm not going to make the cake. I just wanted it out of the drawer and somewhere I'd see it.</p>"
+      "content": "<p>I found a recipe card in my nan's handwriting today, tucked inside a cookbook I inherited and never use.</p><p>It's for a fruit cake. Half the measurements are in \"teacups\" and one instruction just says \"until it looks right,\" which is the least helpful and most accurate baking instruction ever written.</p><p>But it was the handwriting that got me. That specific slant. I'd know it anywhere, and I hadn't seen it in four years, and there it was, telling me to use the good butter and not be mean with it. I'm not going to make the cake. I just wanted it out of the drawer and somewhere I'd see it.</p>",
+      "comments": [
+        {
+          "by": "provingdrawer",
+          "body": "A recipe card in her hand is worth more than the cake ever was. Mine wrote water until it feels right, and I spent years learning what her hands meant by right."
+        }
+      ]
     },
     {
       "author_username": "e.vestergaard",
@@ -114,7 +139,13 @@
       "author_username": "e.vestergaard",
       "title": "He learned my name",
       "note": "",
-      "content": "<p>The man in the corner shop learned my name this week, and I nearly cried in the crisp aisle about it.</p><p>Six months I've been going in. Milk, mostly, and the occasional sad-day chocolate. This week he said \"see you tomorrow, Elin,\" and I have no memory of ever telling him my name, which means he caught it somewhere, and kept it.</p><p>It's such a small thing. But when you move somewhere new you become no one for a while, just a face that buys milk, and then one day someone hands a little piece of you back and says: here, you live here now. I bought chocolate I didn't need, just to have a reason to go back tomorrow.</p>"
+      "content": "<p>The man in the corner shop learned my name this week, and I nearly cried in the crisp aisle about it.</p><p>Six months I've been going in. Milk, mostly, and the occasional sad-day chocolate. This week he said \"see you tomorrow, Elin,\" and I have no memory of ever telling him my name, which means he caught it somewhere, and kept it.</p><p>It's such a small thing. But when you move somewhere new you become no one for a while, just a face that buys milk, and then one day someone hands a little piece of you back and says: here, you live here now. I bought chocolate I didn't need, just to have a reason to go back tomorrow.</p>",
+      "comments": [
+        {
+          "by": "nightbus",
+          "body": "Third city in five years here too. The first time someone at a counter knows your order it undoes you a little. Glad the crisp aisle held."
+        }
+      ]
     },
     {
       "author_username": "paper_kite",
@@ -138,19 +169,45 @@
       "author_username": "nightbus",
       "title": "The 03:40",
       "note": null,
-      "content": "<img src=\"https://upload.wikimedia.org/wikipedia/commons/thumb/9/92/GD_%E5%BB%A3%E6%9D%B1_Guangdong_%E4%B8%AD%E5%B1%B1_Zhongshan_Bus_003_tour_interior_door_night_August_2024_R12S.jpg/1920px-GD_%E5%BB%A3%E6%9D%B1_Guangdong_%E4%B8%AD%E5%B1%B1_Zhongshan_Bus_003_tour_interior_door_night_August_2024_R12S.jpg\" alt=\"The interior of a bus at night, empty seats under white light\"><p>There's a man who gets the same night bus as me on Thursdays. Suit, no tie, shoes that were expensive a while ago. He falls asleep before we clear the second stop and he always wakes up exactly one before his, like his body keeps a timetable his face has given up on.</p><p>I've never spoken to him. On the night bus you don't. There's an agreement nobody signed: we are all just getting home, we all look worse than we'd like, and we will grant each other the enormous kindness of not noticing.</p><p>Tonight he woke up, checked the window, and smiled at nothing. Just a small private smile at whatever he'd been dreaming. Then the doors hissed and he was gone into the dark and the bus carried the rest of us onward, lighter by one.</p>"
+      "content": "<img src=\"https://upload.wikimedia.org/wikipedia/commons/thumb/9/92/GD_%E5%BB%A3%E6%9D%B1_Guangdong_%E4%B8%AD%E5%B1%B1_Zhongshan_Bus_003_tour_interior_door_night_August_2024_R12S.jpg/1920px-GD_%E5%BB%A3%E6%9D%B1_Guangdong_%E4%B8%AD%E5%B1%B1_Zhongshan_Bus_003_tour_interior_door_night_August_2024_R12S.jpg\" alt=\"The interior of a bus at night, empty seats under white light\"><p>There's a man who gets the same night bus as me on Thursdays. Suit, no tie, shoes that were expensive a while ago. He falls asleep before we clear the second stop and he always wakes up exactly one before his, like his body keeps a timetable his face has given up on.</p><p>I've never spoken to him. On the night bus you don't. There's an agreement nobody signed: we are all just getting home, we all look worse than we'd like, and we will grant each other the enormous kindness of not noticing.</p><p>Tonight he woke up, checked the window, and smiled at nothing. Just a small private smile at whatever he'd been dreaming. Then the doors hissed and he was gone into the dark and the bus carried the rest of us onward, lighter by one.</p>",
+      "comments": [
+        {
+          "by": "fieldnotes",
+          "body": "The body keeping a timetable the face has given up on is the truest thing I have read on here. I once watched a man wake exactly at his stop three nights running. Never saw him check a phone."
+        }
+      ]
     },
     {
       "author_username": "keeps_receipts",
       "title": "Things the self-checkout has accused me of",
       "note": "a partial list",
-      "content": "<p>An unexpected item in the bagging area. There was no item. The area was empty. I showed it my empty hands like a man being searched at a border.</p><p>Not scanning when I had scanned. It heard the beep. We both heard the beep. It chose to gaslight me in front of a queue.</p><p>Needing approval for a birthday card, as though I might be twelve and buying a card is the gateway to harder crimes.</p><p>Placing my own bag in the bagging area, which is the bagging area, whose entire job is bags. It summoned a human to confirm the bag was a bag. The human sighed the sigh of someone who has confirmed a great many bags today.</p><p>I have started using the staffed till again. She doesn't accuse me of anything. She just says have a good one, and somehow I believe her.</p>"
+      "content": "<p>An unexpected item in the bagging area. There was no item. The area was empty. I showed it my empty hands like a man being searched at a border.</p><p>Not scanning when I had scanned. It heard the beep. We both heard the beep. It chose to gaslight me in front of a queue.</p><p>Needing approval for a birthday card, as though I might be twelve and buying a card is the gateway to harder crimes.</p><p>Placing my own bag in the bagging area, which is the bagging area, whose entire job is bags. It summoned a human to confirm the bag was a bag. The human sighed the sigh of someone who has confirmed a great many bags today.</p><p>I have started using the staffed till again. She doesn't accuse me of anything. She just says have a good one, and somehow I believe her.</p>",
+      "comments": [
+        {
+          "by": "deadlineadjacent",
+          "body": "We have a machine at work that rejects expense receipts for being too faded, then prints its rejection on paper that fades in a fortnight. Solidarity."
+        },
+        {
+          "by": "smallhours",
+          "body": "The human sighing the sigh of someone who has confirmed a great many bags today. I know that sigh. At four in the morning I have been that sigh."
+        }
+      ]
     },
     {
       "author_username": "harbourlight",
       "title": "My father's knots",
       "note": null,
-      "content": "<img src=\"https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Mooring_ropes%2C_Boscastle_Harbour_-_geograph.org.uk_-_7049868.jpg/1920px-Mooring_ropes%2C_Boscastle_Harbour_-_geograph.org.uk_-_7049868.jpg\" alt=\"Coiled mooring ropes at a small harbour\"><p>My father could tie a bowline in the dark, in the rain, with cold hands, without looking. I watched him do it a thousand times on the deck of a boat that smelled of diesel and fish and the particular wet rope smell I have never found anywhere since.</p><p>He tried to teach me. The rabbit comes out of the hole, round the tree, back down the hole. I could do it slowly, on the kitchen table, in good light, with him narrating. I could never do it the way he did, which was not really tying at all but something his hands simply knew, the way you know your own name.</p><p>He's been gone six years. Last week I found an old length of rope in a box of his things and I sat on the floor and tried, and my hands remembered more than I expected. Not all of it. But the rabbit found the hole. Round the tree. Back down.</p><p>I cried, a bit, on the kitchen floor, holding a knot my father taught me. Then I made tea, because that is the other thing he taught me: after the hard feeling, you make tea.</p>"
+      "content": "<img src=\"https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Mooring_ropes%2C_Boscastle_Harbour_-_geograph.org.uk_-_7049868.jpg/1920px-Mooring_ropes%2C_Boscastle_Harbour_-_geograph.org.uk_-_7049868.jpg\" alt=\"Coiled mooring ropes at a small harbour\"><p>My father could tie a bowline in the dark, in the rain, with cold hands, without looking. I watched him do it a thousand times on the deck of a boat that smelled of diesel and fish and the particular wet rope smell I have never found anywhere since.</p><p>He tried to teach me. The rabbit comes out of the hole, round the tree, back down the hole. I could do it slowly, on the kitchen table, in good light, with him narrating. I could never do it the way he did, which was not really tying at all but something his hands simply knew, the way you know your own name.</p><p>He's been gone six years. Last week I found an old length of rope in a box of his things and I sat on the floor and tried, and my hands remembered more than I expected. Not all of it. But the rabbit found the hole. Round the tree. Back down.</p><p>I cried, a bit, on the kitchen floor, holding a knot my father taught me. Then I made tea, because that is the other thing he taught me: after the hard feeling, you make tea.</p>",
+      "comments": [
+        {
+          "by": "provingdrawer",
+          "body": "The tea at the end is what did it. My nan was the same after any hard thing: kettle on, no discussion. I think it is how that generation said the sentence they could not say."
+        },
+        {
+          "by": "oldgreenhouse",
+          "body": "Hands remember what heads forget. Forty years of pricking out seedlings and I still could not tell you how I know the right pressure. Your father sounds like he taught you more than the knot."
+        }
+      ]
     },
     {
       "author_username": "deadlineadjacent",
@@ -162,13 +219,25 @@
       "author_username": "smallhours",
       "title": "Four a.m. is a country",
       "note": null,
-      "content": "<p>Four a.m. is a country and I have a passport now. Everyone here is very quiet. The fridge hums the national anthem.</p><p>Things that are true at four a.m. and false by nine: that I should reorganise my entire life. That the text I sent in 2019 is still being discussed by a committee somewhere. That I am the only person awake on the whole turning earth, which is lonely, and also, briefly, a kind of throne.</p><p>The heating clicks. A car goes past, someone else exiled here, headlights sweeping the ceiling like a lighthouse checking on me. There, there. Still awake. Noted.</p><p>I don't fight it the way I used to. I've learned the border guards can smell fear. I just wait, and read the walls, and eventually the sky goes the colour of dishwater and the birds start up and the country quietly annexes itself back into ordinary morning, and I am, at last, allowed to sleep.</p>"
+      "content": "<p>Four a.m. is a country and I have a passport now. Everyone here is very quiet. The fridge hums the national anthem.</p><p>Things that are true at four a.m. and false by nine: that I should reorganise my entire life. That the text I sent in 2019 is still being discussed by a committee somewhere. That I am the only person awake on the whole turning earth, which is lonely, and also, briefly, a kind of throne.</p><p>The heating clicks. A car goes past, someone else exiled here, headlights sweeping the ceiling like a lighthouse checking on me. There, there. Still awake. Noted.</p><p>I don't fight it the way I used to. I've learned the border guards can smell fear. I just wait, and read the walls, and eventually the sky goes the colour of dishwater and the birds start up and the country quietly annexes itself back into ordinary morning, and I am, at last, allowed to sleep.</p>",
+      "comments": [
+        {
+          "by": "nightbus",
+          "body": "I work most nights and can confirm the throne part. Around four the whole city is yours, and it is lonely, and it is also the only hour with no pretending in it."
+        }
+      ]
     },
     {
       "author_username": "provingdrawer",
       "title": "The airing cupboard",
       "note": "for my nan",
-      "content": "<p>My nan proved her bread in the airing cupboard, on the shelf above the immersion heater, wrapped in a tea towel that had a picture of Tenby on it and had never once been to Tenby.</p><p>She didn't weigh anything. Flour was a handful, and her handful was law. Water was until it feels right, which is the most useless instruction in the world until suddenly, years later, standing in your own kitchen, it isn't, and your own hands tell you: there. That. Right.</p><p>I have a stand mixer and a set of scales accurate to the gram and a proving basket that cost more than her weekly shop ever did. My bread is fine. It is very fine. It is not her bread.</p><p>I think what's missing is the airing cupboard, and the heater ticking, and her in the doorway saying leave it alone now, you'll knock the air out. I still hear that. Every time. Leave it alone now. So I do.</p>"
+      "content": "<p>My nan proved her bread in the airing cupboard, on the shelf above the immersion heater, wrapped in a tea towel that had a picture of Tenby on it and had never once been to Tenby.</p><p>She didn't weigh anything. Flour was a handful, and her handful was law. Water was until it feels right, which is the most useless instruction in the world until suddenly, years later, standing in your own kitchen, it isn't, and your own hands tell you: there. That. Right.</p><p>I have a stand mixer and a set of scales accurate to the gram and a proving basket that cost more than her weekly shop ever did. My bread is fine. It is very fine. It is not her bread.</p><p>I think what's missing is the airing cupboard, and the heater ticking, and her in the doorway saying leave it alone now, you'll knock the air out. I still hear that. Every time. Leave it alone now. So I do.</p>",
+      "comments": [
+        {
+          "by": "harbourlight",
+          "body": "Leave it alone now, you'll knock the air out. My mother said nearly the same words about a different thing entirely. Maybe every family keeps one instruction that outlives its kitchen."
+        }
+      ]
     },
     {
       "author_username": "fieldnotes",
@@ -180,7 +249,13 @@
       "author_username": "oldgreenhouse",
       "title": "February on the allotment",
       "note": "nobody else was there. ideal.",
-      "content": "<img src=\"https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/-2022-03-27_Shed%2C_Overstrand_allotment_gardens%2C_Overstrand%2C_Norfolk.JPG/1920px--2022-03-27_Shed%2C_Overstrand_allotment_gardens%2C_Overstrand%2C_Norfolk.JPG\" alt=\"A weathered shed on an allotment garden\"><p>Nobody goes to the allotment in February, which is exactly why I go. The whole site to myself, every plot asleep under its blanket of muck and old carpet, the water trough wearing a lid of ice like a bad hat.</p><p>The shed needs a new hinge. The shed has needed a new hinge since 2019 and mentioning it annually is now part of the ritual, like the robin who turns up the moment a fork goes in, convinced I work for him.</p><p>There is nothing to do in February and that is the point. You walk the rows, you nod at the garlic coming up in its stiff green rows like a tiny army, you make a plan you will not follow. Then you stand in the cold with a flask and admire the emptiness you are personally responsible for.</p><p>Best hour of my week, most weeks.</p>"
+      "content": "<img src=\"https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/-2022-03-27_Shed%2C_Overstrand_allotment_gardens%2C_Overstrand%2C_Norfolk.JPG/1920px--2022-03-27_Shed%2C_Overstrand_allotment_gardens%2C_Overstrand%2C_Norfolk.JPG\" alt=\"A weathered shed on an allotment garden\"><p>Nobody goes to the allotment in February, which is exactly why I go. The whole site to myself, every plot asleep under its blanket of muck and old carpet, the water trough wearing a lid of ice like a bad hat.</p><p>The shed needs a new hinge. The shed has needed a new hinge since 2019 and mentioning it annually is now part of the ritual, like the robin who turns up the moment a fork goes in, convinced I work for him.</p><p>There is nothing to do in February and that is the point. You walk the rows, you nod at the garlic coming up in its stiff green rows like a tiny army, you make a plan you will not follow. Then you stand in the cold with a flask and admire the emptiness you are personally responsible for.</p><p>Best hour of my week, most weeks.</p>",
+      "comments": [
+        {
+          "by": "fieldnotes",
+          "body": "A plan you will not follow and an emptiness you are personally responsible for. That is the whole appeal of a shed in winter and nobody ever says it this plainly."
+        }
+      ]
     },
     {
       "author_username": "oldgreenhouse",
@@ -216,7 +291,13 @@
       "author_username": "deadlineadjacent",
       "title": "Out of office",
       "note": "draft one was honest. this is draft nine.",
-      "content": "<p>I am writing my out-of-office reply, which means I am writing fiction. 'I will have limited access to email.' I will have full access to email. I will have email in my pocket on a beach. The email and I will swim together in the sea like a man and his loyal, terrible dog.</p><p>Draft one said what I actually meant: I am going away specifically to not think about any of this, please treat my absence like weather, inevitable and nobody's fault. Legal would not love draft one.</p><p>So instead: limited access. Responses may be delayed. For urgent matters, contact Priya, who is on holiday the week after and is currently writing her own small novel about limited access.</p><p>The truest sentence in the whole reply is the dates. Everything else is a lullaby we sing to the calendar.</p>"
+      "content": "<p>I am writing my out-of-office reply, which means I am writing fiction. 'I will have limited access to email.' I will have full access to email. I will have email in my pocket on a beach. The email and I will swim together in the sea like a man and his loyal, terrible dog.</p><p>Draft one said what I actually meant: I am going away specifically to not think about any of this, please treat my absence like weather, inevitable and nobody's fault. Legal would not love draft one.</p><p>So instead: limited access. Responses may be delayed. For urgent matters, contact Priya, who is on holiday the week after and is currently writing her own small novel about limited access.</p><p>The truest sentence in the whole reply is the dates. Everything else is a lullaby we sing to the calendar.</p>",
+      "comments": [
+        {
+          "by": "fieldnotes",
+          "body": "The truest sentence is the dates. I am stealing that observation and I am not even sorry. Enjoy the sea with your loyal terrible dog."
+        }
+      ]
     },
     {
       "author_username": "smallhours",
@@ -234,7 +315,13 @@
       "author_username": "provingdrawer",
       "title": "Starter",
       "note": null,
-      "content": "<img src=\"https://upload.wikimedia.org/wikipedia/commons/thumb/9/9f/Sourdough_Loaf_%28217346645%29.jpeg/1920px-Sourdough_Loaf_%28217346645%29.jpeg\" alt=\"A scored sourdough loaf, flour still on the crust\"><p>The starter is nine years old this month. It has outlived two jobs, one relationship, three flats, and every houseplant I have ever owned, which tells you exactly what kind of dependent thrives in my care: one that shouts when it's hungry.</p><p>It came from my friend Dara, who got it from her landlady in Cork, who claimed it went back to her grandmother, which means when I feed it on a Sunday night I am possibly maintaining a small bubbling heirloom older than the house it lives in. No pressure.</p><p>People ask if it has a name. It doesn't. Naming it felt like tempting fate, like it would develop opinions. It already sulks when I switch flour.</p><p>Loaf number who-even-knows came out of the oven at six tonight, crackling to itself as it cooled, and the whole flat smelled like being looked after.</p>"
+      "content": "<img src=\"https://upload.wikimedia.org/wikipedia/commons/thumb/9/9f/Sourdough_Loaf_%28217346645%29.jpeg/1920px-Sourdough_Loaf_%28217346645%29.jpeg\" alt=\"A scored sourdough loaf, flour still on the crust\"><p>The starter is nine years old this month. It has outlived two jobs, one relationship, three flats, and every houseplant I have ever owned, which tells you exactly what kind of dependent thrives in my care: one that shouts when it's hungry.</p><p>It came from my friend Dara, who got it from her landlady in Cork, who claimed it went back to her grandmother, which means when I feed it on a Sunday night I am possibly maintaining a small bubbling heirloom older than the house it lives in. No pressure.</p><p>People ask if it has a name. It doesn't. Naming it felt like tempting fate, like it would develop opinions. It already sulks when I switch flour.</p><p>Loaf number who-even-knows came out of the oven at six tonight, crackling to itself as it cooled, and the whole flat smelled like being looked after.</p>",
+      "comments": [
+        {
+          "by": "keeps_receipts",
+          "body": "Nine years, two jobs, three flats. Your starter has a more stable housing history than most people I know. The landlady in Cork deserves a plaque."
+        }
+      ]
     },
     {
       "author_username": "fieldnotes",
@@ -246,7 +333,13 @@
       "author_username": "fieldnotes",
       "title": "The backs of towns",
       "note": null,
-      "content": "<p>Trains don't show you towns, they show you the backs of towns, which is better. The fronts are rehearsed. The backs are true: trampolines at angles, greenhouses leaning on fences, a rope swing over a stream that three generations of children have sworn is deeper than it looks.</p><p>Somewhere after the viaduct there's a garden with a full-size ship's figurehead in it, painted and proud, facing the railway like she's breasting a wave only she can see. I've passed her maybe thirty times. I have told nobody until now. Some sightings you hoard.</p><p>You could knock on that door and ask. You could ruin it completely with one fact. The whole discipline of the window seat is choosing the mystery, every time, at forty minutes past the hour, at speed.</p>"
+      "content": "<p>Trains don't show you towns, they show you the backs of towns, which is better. The fronts are rehearsed. The backs are true: trampolines at angles, greenhouses leaning on fences, a rope swing over a stream that three generations of children have sworn is deeper than it looks.</p><p>Somewhere after the viaduct there's a garden with a full-size ship's figurehead in it, painted and proud, facing the railway like she's breasting a wave only she can see. I've passed her maybe thirty times. I have told nobody until now. Some sightings you hoard.</p><p>You could knock on that door and ask. You could ruin it completely with one fact. The whole discipline of the window seat is choosing the mystery, every time, at forty minutes past the hour, at speed.</p>",
+      "comments": [
+        {
+          "by": "smallhours",
+          "body": "Choosing the mystery every time. I have a figurehead of my own on a night route, a lit window with a globe in it, and I have never once slowed down to learn the truth of it."
+        }
+      ]
     }
   ]
 }

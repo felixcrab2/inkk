@@ -645,8 +645,8 @@ function extractImages(html, max = 8) {
 // the reading view. The canvas page renderer is text-only, so images are
 // lifted out before pagination rather than dropped on the floor.
 function pieceCover(html) { return extractImages(html, 1)[0] || null; }
+function pieceImages(html) { return extractImages(html, 8); }
 function stripImgs(html) { return (html || "").replace(/<img[^>]*>/gi, ""); }
-function stripFirstImg(html) { return (html || "").replace(/<img[^>]*>/i, ""); }
 
 // Ask the server-side /api/moderate endpoint (OpenAI) to classify text and/or
 // images. stripHtml() (defined above) gives the classifier prose, not markup.
@@ -3253,7 +3253,9 @@ function ReadingView({ pub, user, isAdmin, dropCapImages, focus, onRequestAuth, 
   const [pagesLoading, setPagesLoading] = useState(true);
   const [zoom, setZoom]                 = useState(1.0);
   const [phone] = useState(isPhone);
-  const cover = pieceCover(pub.content);
+  const imgs = pieceImages(pub.content);
+  const cover = imgs[0] || null;
+  const gallery = imgs.slice(1);
   // An illuminated initial opens the piece, as it would open a manuscript.
   const initialSrc = phone ? dropCapSrc(openingLetter(pub.content), dropCapImages) : null;
 
@@ -3408,11 +3410,16 @@ function ReadingView({ pub, user, isAdmin, dropCapImages, focus, onRequestAuth, 
               {/* frontispiece: the author's cover if they placed one, else the plate */}
               <div className={"reading-plate" + (cover ? " is-photo" : "")}
                    style={{ backgroundImage: `url(${cover || `/backdrops/${imgForPub(pub.id)}.webp`})` }} />
+              {gallery.length > 0 && (
+                <div className="reading-gallery">
+                  {gallery.map((u, i) => <img key={i} src={u} alt="" loading="lazy" />)}
+                </div>
+              )}
               <h1 className="reading-reflow-title">{pub.title}</h1>
               {initialSrc && <img className="reading-initial" src={initialSrc} alt="" aria-hidden="true" />}
               <div className={"reading-reflow-body" + (initialSrc ? " has-initial" : "")}
                    dangerouslySetInnerHTML={{ __html: (() => {
-                     const src = cover ? stripFirstImg(pub.content) : pub.content;
+                     const src = stripImgs(pub.content);
                      return initialSrc
                        ? sanitizeForReading(stripOpeningLetter(src))
                        : sanitizeForReading(src);
@@ -3421,6 +3428,11 @@ function ReadingView({ pub, user, isAdmin, dropCapImages, focus, onRequestAuth, 
           ) : (
           <div id="reading-pages">
             {cover && <img className="reading-cover" src={cover} alt="" />}
+            {gallery.length > 0 && (
+              <div className="reading-gallery">
+                {gallery.map((u, i) => <img key={i} src={u} alt="" loading="lazy" />)}
+              </div>
+            )}
             {pagesLoading && pages.length === 0 && (
               <p className="reading-pages-loading">rendering…</p>
             )}
