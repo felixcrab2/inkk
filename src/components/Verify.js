@@ -41,14 +41,13 @@ function Certificate({ cert, onOpenPiece }) {
   return (
     <div className="verify-cert">
       <div className={`verify-cert-mark ${verified ? "is-verified" : ""}`}>
-        <span className="verify-cert-diamond" aria-hidden="true">◇</span>
         <span className="verify-cert-status">
           {verified ? "Human-verified" : "Recorded in inkk"}
         </span>
       </div>
       <p className="verify-cert-lead">
         {verified
-          ? "inkk recorded a strong human writing process for this piece — the rhythm, pauses and revisions of a person writing by hand."
+          ? "inkk recorded a strong human writing process for this piece: the rhythm, pauses and revisions of a person writing by hand."
           : "This piece was written in inkk, but its human signal didn’t reach the verified threshold."}
       </p>
 
@@ -71,7 +70,7 @@ function Certificate({ cert, onOpenPiece }) {
         </button>
       ) : (
         <p className="verify-cert-private">
-          This certificate isn’t linked to a piece on the public feed — it certifies the text
+          This certificate isn’t linked to a piece on the public feed. It certifies the text
           privately. Check it matches your copy below.
         </p>
       )}
@@ -80,7 +79,7 @@ function Certificate({ cert, onOpenPiece }) {
         <summary>Have a copy of the text? Check it matches.</summary>
         <p className="verify-match-hint">
           Paste the body text you’re holding. We compare its fingerprint to the certified
-          original — nothing you paste is stored or sent.
+          original. Nothing you paste is stored or sent.
         </p>
         <textarea
           className="verify-match-input"
@@ -91,7 +90,7 @@ function Certificate({ cert, onOpenPiece }) {
         />
         {checking && <p className="verify-match-result checking">checking…</p>}
         {!checking && match === "match"  && <p className="verify-match-result ok">✓ This text matches the certified original.</p>}
-        {!checking && match === "differ" && <p className="verify-match-result no">This text differs from the certified original — it may have been edited.</p>}
+        {!checking && match === "differ" && <p className="verify-match-result no">This text differs from the certified original. It may have been edited.</p>}
         {!checking && match === "unavailable" && <p className="verify-match-result no">Couldn’t compute a fingerprint in this browser.</p>}
       </details>
     </div>

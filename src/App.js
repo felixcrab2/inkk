@@ -3419,7 +3419,6 @@ function ReadingView({ pub, user, isAdmin, dropCapImages, focus, onRequestAuth, 
           {/* ── Verification colophon ──────────────────────────────────────── */}
           {pub.verify_code && (
             <div className={`reading-verify${isVerifiedTier(pub.score_tier) ? " is-verified" : ""}`}>
-              <span className="rv-mark" aria-hidden="true">◇</span>
               <div className="rv-body">
                 <span className="rv-status">
                   {isVerifiedTier(pub.score_tier) ? "Human-verified" : "Written in inkk"}
