@@ -2214,7 +2214,8 @@ function LivingExcerpt({ text, pub, className }) {
   );
 }
 
-function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, onLike, noAvatar }) {
+function FeedCard({ pub, index, featured, dropCapImages, avatarMap, onRead, onAuthorClick, onLike, noAvatar }) {
+  const authorAvatar = (avatarMap && avatarMap[pub.user_id]) || pub.avatar_data;
   const excerpt      = feedExcerpt(pub.content, featured ? 300 : 168);
   const cover        = pieceCover(pub.content);
   const likeCount    = getRelCount(pub.like_count);
@@ -2251,7 +2252,7 @@ function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, 
         <div className="feed-lead-byline">
           {!noAvatar && (
             <span className="feed-mark">
-              <DropCapAvatar letter={initial} avatarData={pub.avatar_data} dropCapImages={dropCapImages} size={44} />
+              <DropCapAvatar letter={initial} avatarData={authorAvatar} dropCapImages={dropCapImages} size={44} />
             </span>
           )}
           <div className="feed-lead-byline-text">
@@ -2272,7 +2273,7 @@ function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, 
     <article className="feed-entry" style={{ "--card-index": index }} onClick={() => onRead(pub)}>
       {!noAvatar && (
         <span className="feed-mark feed-mark-sm">
-          <DropCapAvatar letter={initial} avatarData={pub.avatar_data} dropCapImages={dropCapImages} size={34} />
+          <DropCapAvatar letter={initial} avatarData={authorAvatar} dropCapImages={dropCapImages} size={34} />
         </span>
       )}
       <div className="feed-entry-body">
@@ -2293,12 +2294,12 @@ function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, 
 
 // Renders a feed: the newest piece as the full-width lead sheet, the rest as
 // sheet cards. Containment does the separating — no interleaved devices.
-function FeedList({ pubs, onRead, onAuthorClick, onLike, dropCapImages }) {
+function FeedList({ pubs, onRead, onAuthorClick, onLike, dropCapImages, avatarMap }) {
   return (
     <>
       {pubs.map((pub, i) => (
         <FeedCard key={pub.id} pub={pub} index={i} featured={i === 0} dropCapImages={dropCapImages}
-          onRead={onRead} onAuthorClick={onAuthorClick} onLike={onLike} />
+          avatarMap={avatarMap} onRead={onRead} onAuthorClick={onAuthorClick} onLike={onLike} />
       ))}
     </>
   );
@@ -2391,6 +2392,27 @@ function Feed({ user, me, onRead, onAuthorClick, dropCapImages, onRequestAuth, o
       return true;
     });
   }, [pubs]);
+
+  // Publications don't carry avatar_data, so author pictures were invisible on
+  // every feed surface (cards, rail, writers) — only comment threads, which
+  // join profiles, ever showed them. One lookup hydrates the lot.
+  const [avatarByUser, setAvatarByUser] = useState({});
+  const avatarFetchedRef = useRef(new Set());
+  useEffect(() => {
+    if (!supabase) return;
+    const ids = [...new Set([...pubs, ...followingPubs].map(p => p.user_id).filter(Boolean))]
+      .filter(id => !avatarFetchedRef.current.has(id));
+    if (!ids.length) return;
+    ids.forEach(id => avatarFetchedRef.current.add(id));
+    supabase.from("profiles").select("id, avatar_data").in("id", ids).then(({ data }) => {
+      if (!data) return;
+      setAvatarByUser(prev => {
+        const next = { ...prev };
+        for (const r of data) if (r.avatar_data) next[r.id] = r.avatar_data;
+        return next;
+      });
+    });
+  }, [pubs, followingPubs]);
 
   // ── the social plumbing: who do I already follow, and real follow buttons ──
   const [followedIds, setFollowedIds] = useState(() => new Set());
@@ -2500,7 +2522,7 @@ function Feed({ user, me, onRead, onAuthorClick, dropCapImages, onRequestAuth, o
             <FeedEmpty title="Your feed is quiet" sub="Follow writers to see their latest work here." serif />
           )}
           {!followingLoading && (
-            <FeedList pubs={followingPubs} dropCapImages={dropCapImages}
+            <FeedList pubs={followingPubs} dropCapImages={dropCapImages} avatarMap={avatarByUser}
               onRead={onRead} onAuthorClick={onAuthorClick} onLike={handleFollowingLike} />
           )}
         </div>
@@ -2516,7 +2538,7 @@ function Feed({ user, me, onRead, onAuthorClick, dropCapImages, onRequestAuth, o
             const pieceCount = pubs.filter(p => p.user_id === w.user_id).length;
             return (
               <div key={w.user_id} className="writer-card" style={{ "--card-index": i }} onClick={() => w.user_id && onAuthorClick(w.user_id)}>
-                <DropCapAvatar letter={w.author_name?.[0] || "?"} avatarData={w.avatar_data} dropCapImages={dropCapImages} size={36} />
+                <DropCapAvatar letter={w.author_name?.[0] || "?"} avatarData={avatarByUser[w.user_id] || w.avatar_data} dropCapImages={dropCapImages} size={36} />
                 <div className="writer-card-info">
                   <span className="writer-card-name">{w.author_name}</span>
                   <span className="writer-card-meta">{pieceCount} {pieceCount === 1 ? "piece" : "pieces"} · {formatDate(w.published_at)}</span>
@@ -2535,7 +2557,7 @@ function Feed({ user, me, onRead, onAuthorClick, dropCapImages, onRequestAuth, o
             <FeedEmpty title="Nothing published yet" sub="Be the first to share something written by hand." />
           )}
           {!loading && (
-            <FeedList pubs={pubs} dropCapImages={dropCapImages}
+            <FeedList pubs={pubs} dropCapImages={dropCapImages} avatarMap={avatarByUser}
               onRead={onRead} onAuthorClick={onAuthorClick} onLike={handleLike} />
           )}
         </div>
@@ -2596,7 +2618,7 @@ function Feed({ user, me, onRead, onAuthorClick, dropCapImages, onRequestAuth, o
             {railWriters.map(w => (
               <div key={w.user_id} className="rail-writer">
                 <button className="rail-writer-id" onClick={() => onAuthorClick(w.user_id)}>
-                  <DropCapAvatar letter={(w.author_name || "?")[0]} avatarData={w.avatar_data}
+                  <DropCapAvatar letter={(w.author_name || "?")[0]} avatarData={avatarByUser[w.user_id] || w.avatar_data}
                     dropCapImages={dropCapImages} size={30} />
                   <span className="rail-writer-name">{w.author_name}</span>
                 </button>
