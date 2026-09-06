@@ -1783,6 +1783,23 @@ function AuthModal({ onClose, initialMode = "signin" }) {
     // Stash the acceptance across the OAuth redirect so the profile provisioned
     // on return records the Terms acceptance.
     try { localStorage.setItem("inkk_pending_tos", TOS_VERSION); } catch {}
+    if (window.Capacitor?.isNativePlatform?.()) {
+      // In the app, a plain redirect escapes to Safari and strands the session
+      // there. Run the flow in an in-app browser sheet and come home on the
+      // inkk:// deep link instead.
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: "inkk://auth-callback", skipBrowserRedirect: true },
+      });
+      if (error) { setError(error.message); return; }
+      try {
+        const { Browser } = await import("@capacitor/browser");
+        await Browser.open({ url: data.url, presentationStyle: "popover" });
+      } catch {
+        window.location.href = data.url;
+      }
+      return;
+    }
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: window.location.origin },
@@ -4005,7 +4022,26 @@ export default function App() {
     import("@capacitor/keyboard")
       .then(({ Keyboard }) => { if (!cancelled) Keyboard?.setAccessoryBarVisible?.({ isVisible: false }); })
       .catch(() => {});
-    return () => { cancelled = true; };
+    // OAuth comes home via inkk://auth-callback?code=…: exchange the code for a
+    // session inside THIS webview (the PKCE verifier lives in its storage), and
+    // close the in-app browser sheet the flow ran in.
+    let removeUrlListener = null;
+    if (window.Capacitor?.isNativePlatform?.()) {
+      import("@capacitor/app").then(({ App: CapApp }) => {
+        if (cancelled) return;
+        CapApp.addListener("appUrlOpen", async ({ url }) => {
+          try {
+            const u = new URL(url);
+            const code = u.searchParams.get("code");
+            if (code && supabase) {
+              await supabase.auth.exchangeCodeForSession(code);
+              import("@capacitor/browser").then(({ Browser }) => Browser.close().catch(() => {})).catch(() => {});
+            }
+          } catch { /* not an auth link */ }
+        }).then(h => { removeUrlListener = () => h.remove(); });
+      }).catch(() => {});
+    }
+    return () => { cancelled = true; removeUrlListener?.(); };
   }, []);
 
   // ── on-screen keyboard (phones) ──────────────────────────────────────────
