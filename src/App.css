@@ -5520,3 +5520,12 @@ body { font-variant-numeric: lining-nums tabular-nums; }
   border-radius: 12px;
   box-shadow: var(--card-shadow);
 }
+
+/* body copy inside the small confirm/edit modals */
+.pe-body {
+  font-family: var(--font-ui);
+  font-size: var(--t-sm);
+  color: var(--muted);
+  line-height: 1.55;
+  margin: 0 0 16px;
+}
