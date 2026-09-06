@@ -5493,13 +5493,26 @@ body { font-variant-numeric: lining-nums tabular-nums; }
   display: block;
   width: 100%;
   max-width: 700px;
-  margin: 4px auto 20px;
+  /* a cover is a frontispiece, not a wall: portraits crop rather than tower */
+  max-height: 340px;
+  object-fit: cover;
+  margin: 4px auto 14px;
   border-radius: 14px;
   box-shadow: var(--card-shadow);
 }
-.reading-reflow-body img {
+/* further images sit apart from the text as a quiet strip under the cover */
+.reading-gallery {
+  display: flex;
+  gap: 10px;
   width: 100%;
+  max-width: 700px;
+  margin: 0 auto 20px;
+}
+.reading-gallery img {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 132px;
+  object-fit: cover;
   border-radius: 12px;
-  margin: 14px 0 16px;
-  display: block;
+  box-shadow: var(--card-shadow);
 }

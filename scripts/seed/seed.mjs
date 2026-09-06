@@ -86,31 +86,9 @@ function sample(arr, n) {
 }
 const wordCount = (html) => ((html || "").replace(/<[^>]+>/g, " ").match(/\S+/g) || []).length;
 
-// Short, generic reader reactions — the one bit of written-by-us text. Kept
-// vague enough to fit any literary piece and varied enough not to read as a bot.
-// Disable entirely with --no-comments.
-const COMMENT_POOL = [
-  "Read this twice. The second time was better.",
-  "That last line has been following me around all day.",
-  "Quietly devastating.",
-  "The restraint here is the whole thing.",
-  "Saving this to reread on the train tomorrow.",
-  "I don't know how you do so much with so little.",
-  "Felt this one in my chest.",
-  "Perfect for a grey morning.",
-  "More of this, please.",
-  "The rhythm of it.",
-  "Sent it straight to my sister.",
-  "Beautiful, and a little cruel.",
-  "Underlined half of it in my head.",
-  "Came back to this twice today.",
-  "Something about the ending I can't shake.",
-  "You can hear the room go quiet.",
-  "This is the kind of thing I started reading here for.",
-  "Read it out loud. Worth it.",
-  "The small details are doing all the work.",
-  "Didn't expect that turn.",
-];
+// Comments are curated per piece in posts.json (piece.comments: [{by, body}]).
+// Most pieces have none, deliberately: sparse and specific beats a chatty pool
+// of interchangeable one-liners (which is what this used to be).
 
 // ── ledger ────────────────────────────────────────────────────────────────────
 function emptyLedger() {
@@ -241,6 +219,7 @@ async function main() {
     const profile = { id, username: p.username, research_opt_in: false };
     if (p.display_name) profile.display_name = p.display_name;
     if (p.bio) profile.bio = p.bio;
+    if (p.avatar) profile.avatar_data = p.avatar;
     let { error: pe } = await supa.from("profiles").upsert(profile, { onConflict: "id" });
     if (pe && /column/i.test(pe.message || "") && "bio" in profile) {
       delete profile.bio;
@@ -335,24 +314,24 @@ async function main() {
   }
   await saveLedger(ledger);
 
-  // ── 5. comments (skippable) ─────────────────────────────────────────────────
+  // ── 5. comments (curated per piece; skippable) ──────────────────────────────
   let comments = 0;
   if (!NO_COMMENTS) {
-    for (const pub of freshPubs) {                          // only new pubs — comments can't dedupe on re-run
-      if (rand() > 0.38) continue;                          // ~38% of pieces get any comments
-      const commenters = sample(ids.filter((x) => x !== pub.userId), randInt(1, 3));
-      const used = new Set();
-      for (const cid of commenters) {
-        let body = pick(COMMENT_POOL); let guard = 0;
-        while (used.has(body) && guard++ < 6) body = pick(COMMENT_POOL);
-        used.add(body);
+    for (const piece of pieces) {
+      if (!piece.comments?.length) continue;
+      const rec = pubByKey.get(piece);
+      if (!rec || !freshPubs.includes(rec)) continue;   // only pubs created this run
+      for (const c of piece.comments) {
+        const author = idByUsername.get(c.by);
+        if (!author || author.foreign || author.id === rec.userId) continue;
         if (DRY) { comments++; continue; }
         const id = randomUUID();
         const { error } = await supa.from("comments").insert({
-          id, user_id: cid, publication_id: pub.id, body, created_at: afterBy(pub.ts, 5), moderation_status: "ok",
+          id, user_id: author.id, publication_id: rec.id, body: c.body,
+          created_at: afterBy(rec.ts, 4), moderation_status: "ok",
         });
         if (error && /column/i.test(error.message || "")) {
-          const { error: e2 } = await supa.from("comments").insert({ id, user_id: cid, publication_id: pub.id, body, created_at: afterBy(pub.ts, 25) });
+          const { error: e2 } = await supa.from("comments").insert({ id, user_id: author.id, publication_id: rec.id, body: c.body, created_at: afterBy(rec.ts, 4) });
           if (e2) continue;
         } else if (error) continue;
         ledger.comments.push(id); comments++;
