@@ -2668,7 +2668,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms,   setShowTerms]   = useState(false);
   const [confirmDeleteId, setConfirmDeleteId]         = useState(null);
-  const [confirmUnpublishId, setConfirmUnpublishId]   = useState(null);
+  const [unpubConfirm, setUnpubConfirm] = useState(null);  // { pub, thenEdit }
   const [confirmDeletePubId, setConfirmDeletePubId]   = useState(null);
   const [copiedCode, setCopiedCode]                   = useState(null);
   const copyCode = (code) => {
@@ -2727,11 +2727,11 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
     fetchMyPublications(user.id).then(data => { setPubs(data); setLoading(false); });
   }, [user]);
 
-  const handleUnpublish = async (pub, e) => {
-    e.stopPropagation();
+  const handleUnpublish = async (pub, { thenEdit = false } = {}) => {
     await doUnpublish(pub.doc_id);
     setPubs(prev => prev.filter(p => p.id !== pub.id));
     if (onUnpublish) onUnpublish(pub.doc_id);
+    if (thenEdit) onEditDoc(pub.doc_id);
   };
 
   const handleDeletePub = async (pub) => {
@@ -2987,10 +2987,9 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
           <p className="feed-empty">Nothing published yet.</p>
         )}
         {pubs.map((pub, idx) => {
-          const confirmingUnpublish = confirmUnpublishId === pub.id;
-          const confirmingDelete    = confirmDeletePubId === pub.id;
+          const confirmingDelete = confirmDeletePubId === pub.id;
           return (
-            <article key={pub.id} className="profile-article-card" style={{ "--card-index": idx }} onClick={() => !confirmingUnpublish && !confirmingDelete && onEditDoc(pub.doc_id)}>
+            <article key={pub.id} className="profile-article-card" style={{ "--card-index": idx }} onClick={() => !confirmingDelete && onRead(pub)}>
               <div className="pac-main">
                 <span className="pac-title">{pub.title || "Untitled"}</span>
                 <span className="pac-meta">{readingTime(pub.content)} · {formatDate(pub.published_at)}</span>
@@ -3009,17 +3008,11 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
                   </div>
                 )}
               </div>
-              {!confirmingUnpublish && !confirmingDelete && (
+              {!confirmingDelete && (
                 <div className="pac-actions" onClick={e => e.stopPropagation()}>
-                  <button className="pac-btn" onClick={e => { e.stopPropagation(); onRead(pub); }}>Read</button>
-                  <button className="pac-btn pac-btn-danger" onClick={e => { e.stopPropagation(); setConfirmUnpublishId(pub.id); }}>Unpublish</button>
+                  <button className="pac-btn" onClick={e => { e.stopPropagation(); setUnpubConfirm({ pub, thenEdit: true }); }}>Edit</button>
+                  <button className="pac-btn pac-btn-danger" onClick={e => { e.stopPropagation(); setUnpubConfirm({ pub, thenEdit: false }); }}>Unpublish</button>
                   <button className="pac-btn pac-btn-danger" onClick={e => { e.stopPropagation(); setConfirmDeletePubId(pub.id); }}>Delete</button>
-                </div>
-              )}
-              {confirmingUnpublish && (
-                <div className="pac-confirm" onClick={e => e.stopPropagation()}>
-                  <button className="pac-btn" onClick={() => setConfirmUnpublishId(null)}>Cancel</button>
-                  <button className="pac-btn pac-btn-danger" onClick={async (e) => { await handleUnpublish(pub, e); setConfirmUnpublishId(null); }}>Remove</button>
                 </div>
               )}
               {confirmingDelete && (
@@ -3033,6 +3026,27 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
         })}
       </div>
       </section>
+
+      {unpubConfirm && (
+        <div className="pe-overlay" onClick={() => setUnpubConfirm(null)}>
+          <div className="pe-modal" onClick={e => e.stopPropagation()}>
+            <h2 className="pe-title">{unpubConfirm.thenEdit ? "Unpublish to edit?" : "Unpublish this piece?"}</h2>
+            <p className="pe-body">
+              "{unpubConfirm.pub.title || "Untitled"}" comes off the public feed, and its likes and
+              comments are removed for good. Your draft stays{unpubConfirm.thenEdit
+                ? ", and opens in the editor so you can rework and republish it."
+                : ", so you can edit and republish it later."}
+            </p>
+            <div className="pe-actions">
+              <button className="pe-btn" onClick={() => setUnpubConfirm(null)}>Cancel</button>
+              <button className="pe-btn pe-btn-primary" onClick={async () => {
+                const c = unpubConfirm; setUnpubConfirm(null);
+                await handleUnpublish(c.pub, { thenEdit: c.thenEdit });
+              }}>{unpubConfirm.thenEdit ? "Unpublish and edit" : "Unpublish"}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <section id="research-section">
         <div className="profile-section-head">
