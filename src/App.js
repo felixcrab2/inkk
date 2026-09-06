@@ -3796,6 +3796,7 @@ export default function App() {
   const [readingFocus, setReadingFocus] = useState(null);
   const [publishedDocIds, setPublishedDocIds] = useState(new Set());
   const [certMenuOpen, setCertMenuOpen] = useState(false);
+  const [certStale, setCertStale]       = useState(false);
   const [certConfirmOpen, setCertConfirmOpen] = useState(false); // mobile: explain Certify before acting
   const [publishConfirmOpen, setPublishConfirmOpen] = useState(false); // mobile: explain Publish before acting
   const [certifying, setCertifying]   = useState(false);
@@ -5175,6 +5176,21 @@ export default function App() {
   const activeCert     = activeDoc?.verifyCode || null;
   const activeCertOk   = isVerifiedTier(activeDoc?.scoreTier);
 
+  // A certificate binds one exact text. When the words move on, the button
+  // stops claiming "Certified" and offers to recertify instead — quietly,
+  // recomputed a beat after typing settles. Legacy docs without a stored
+  // hash can't be compared and keep today's behaviour.
+  useEffect(() => {
+    const doc = docsRef.current.find(d => d.id === activeId);
+    if (!doc?.verifyCode || !doc?.contentHash) { setCertStale(false); return; }
+    let live = true;
+    const t = setTimeout(async () => {
+      const h = await hashContent(contentRef.current || doc.content);
+      if (live) setCertStale(!!h && h !== doc.contentHash);
+    }, 600);
+    return () => { live = false; clearTimeout(t); };
+  }, [words, activeId, docs]);
+
   const openReading = useCallback((pub, opts = {}) => {
     setReadingFocus(opts.focus || null);
     navigate("reading", { pub });
@@ -5260,16 +5276,19 @@ export default function App() {
             <div id="cert-menu-wrap">
               <button
                 id="cert-btn"
-                className={`${menuClass}${activeCert ? " is-certified" : ""}`}
-                title={activeCert ? "Verification code" : "Get a human verification code. You do not need to publish to use this feature."}
+                className={`${menuClass}${activeCert && !certStale ? " is-certified" : ""}`}
+                title={activeCert
+                  ? (certStale ? "The text has changed since certification. Click to recertify." : "Verification code")
+                  : "Get a human verification code. You do not need to publish to use this feature."}
                 disabled={certifying}
                 onClick={() => {
-                  if (activeCert) setCertMenuOpen(v => !v);
+                  if (activeCert && certStale) certifyActiveDoc();
+                  else if (activeCert) setCertMenuOpen(v => !v);
                   else if (isMobileRef.current) setCertConfirmOpen(v => !v);
                   else certifyActiveDoc();
                 }}
               >
-                <span className="btn-label">{certifying ? "Certifying…" : activeCert ? "Certified" : "Certify"}</span>
+                <span className="btn-label">{certifying ? "Certifying…" : activeCert ? (certStale ? "Recertify" : "Certified") : "Certify"}</span>
               </button>
               {!activeCert && certConfirmOpen && (
                 <div id="cert-menu">
