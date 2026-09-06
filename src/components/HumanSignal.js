@@ -238,7 +238,7 @@ function CompositionBar({ typed, pasted, deleted }) {
       </div>
       <div className="hs-comp-churn">
         {deleted > 0
-          ? `${deleted.toLocaleString()} characters written then removed (${churnPct}% churn) — the visible trace of revising.`
+          ? `${deleted.toLocaleString()} characters written then removed (${churnPct}% churn). The visible trace of revising.`
           : "No deletions recorded yet."}
       </div>
     </div>
@@ -310,11 +310,11 @@ export function HumanSignalPanel({ score, onClose }) {
           {tab === "Signal" && (
             <div className="hs-tab-signal">
               <p className="hs-panel-blurb">
-                Built from rhythm, pauses, corrections, and revision behaviour, not the words themselves.
+                Built from the rhythm, pauses, corrections, and revision behaviour you display, but never the words themselves.
               </p>
               {showRadar
                 ? <RadarChart dims={dims} />
-                : <div className="hs-chart-empty">The fingerprint forms as a few signals become confident. Keep writing.</div>}
+                : <div className="hs-chart-empty">Keep writing for us to gain a bit more confidence on this score.</div>}
               {contributors.length === 0 && (
                 <div className="hs-panel-empty">Keep writing. The signal builds with a little more typing.</div>
               )}
@@ -340,7 +340,7 @@ export function HumanSignalPanel({ score, onClose }) {
           )}
           {tab === "Velocity" && (
             <div className="hs-tab-velocity">
-              <p className="hs-panel-blurb">Words per minute across the session. The red line is your average; the dot marks your peak.</p>
+              <p className="hs-panel-blurb">Your words per minute (wpm) across the writing session. The red line is your average and the dot is your peak speed.</p>
               <VelocityChart series={score.velocity_series} peakWpm={score.peak_wpm} avgWpm={score.avg_wpm} />
               <div className="hs-stat-row">
                 <StatChip label="avg speed" value={score.avg_wpm ? `${score.avg_wpm}` : "-"} sub="words / min" />
@@ -383,7 +383,7 @@ export function HumanSignalPanel({ score, onClose }) {
           {tab === "Method" && (
             <div className="hs-tab-method">
               <p className="hs-method-lead">
-                inkk measures nine dimensions of your writing process. None of them involve reading your words.
+                inkk measures nine signals from your writing process. None of them involve reading the words you write.
               </p>
               <div className="hs-method-list">
                 <div className="hs-method-item">
