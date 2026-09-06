@@ -5474,3 +5474,32 @@ body { font-variant-numeric: lining-nums tabular-nums; }
 
 /* inside a sheeted section the head needs no extra inset */
 #research-section .profile-section-head { padding-left: 0; padding-right: 0; }
+
+/* ─── Author images as covers ────────────────────────────────────────────────
+   When a piece carries a photo, the photo takes the plate's slots at full
+   strength; the engraving remains the mark of text-only pieces. */
+.feed-lead-art.is-photo { opacity: 1; }
+.feed-entry-plate.is-photo { opacity: 1; }
+.rail-piece-plate.is-photo { opacity: 1; }
+.reading-plate.is-photo {
+  opacity: 1 !important;
+  background-size: cover !important;
+  border-radius: 14px;
+  height: 200px !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+.reading-cover {
+  display: block;
+  width: 100%;
+  max-width: 700px;
+  margin: 4px auto 20px;
+  border-radius: 14px;
+  box-shadow: var(--card-shadow);
+}
+.reading-reflow-body img {
+  width: 100%;
+  border-radius: 12px;
+  margin: 14px 0 16px;
+  display: block;
+}

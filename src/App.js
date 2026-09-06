@@ -640,6 +640,14 @@ function extractImages(html, max = 8) {
   return out;
 }
 
+// The first image an author placed in a piece serves as its cover: shown on
+// the feed card in place of the engraving plate, and as the frontispiece of
+// the reading view. The canvas page renderer is text-only, so images are
+// lifted out before pagination rather than dropped on the floor.
+function pieceCover(html) { return extractImages(html, 1)[0] || null; }
+function stripImgs(html) { return (html || "").replace(/<img[^>]*>/gi, ""); }
+function stripFirstImg(html) { return (html || "").replace(/<img[^>]*>/i, ""); }
+
 // Ask the server-side /api/moderate endpoint (OpenAI) to classify text and/or
 // images. stripHtml() (defined above) gives the classifier prose, not markup.
 // Fail-open: returns null on any failure so a moderation outage never blocks
@@ -2208,6 +2216,7 @@ function LivingExcerpt({ text, pub, className }) {
 
 function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, onLike, noAvatar }) {
   const excerpt      = feedExcerpt(pub.content, featured ? 300 : 168);
+  const cover        = pieceCover(pub.content);
   const likeCount    = getRelCount(pub.like_count);
   const commentCount = getRelCount(pub.comment_count);
   const sc           = scoreFromRecord(pub);
@@ -2233,9 +2242,9 @@ function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, 
   if (featured) {
     return (
       <article className="feed-lead" style={{ "--card-index": index }} onClick={() => onRead(pub)}>
-        {/* the piece's own plate, as the sheet's art */}
-        <span className="feed-lead-art" aria-hidden="true"
-          style={{ backgroundImage: `url(/backdrops/${imgForPub(pub.id)}.webp)` }} />
+        {/* the piece's own art: the author's image if they placed one, else the plate */}
+        <span className={"feed-lead-art" + (cover ? " is-photo" : "")} aria-hidden="true"
+          style={{ backgroundImage: `url(${cover || `/backdrops/${imgForPub(pub.id)}.webp`})` }} />
         <span className="feed-lead-kicker">{fresh ? "Today's read" : "Latest"}</span>
         <h2 className="feed-lead-title">{pub.title || "Untitled"}</h2>
         {excerpt && <LivingExcerpt text={excerpt} pub={pub} className="feed-lead-excerpt" />}
@@ -2276,8 +2285,8 @@ function FeedCard({ pub, index, featured, dropCapImages, onRead, onAuthorClick, 
           <FeedActions pub={pub} sc={sc} likeCount={likeCount} commentCount={commentCount} onRead={onRead} onLike={onLike} />
         </div>
       </div>
-      <span className="feed-entry-plate" aria-hidden="true"
-        style={{ backgroundImage: `url(/backdrops/${imgForPub(pub.id)}.webp)` }} />
+      <span className={"feed-entry-plate" + (cover ? " is-photo" : "")} aria-hidden="true"
+        style={{ backgroundImage: `url(${cover || `/backdrops/${imgForPub(pub.id)}.webp`})` }} />
     </article>
   );
 }
@@ -2606,8 +2615,8 @@ function Feed({ user, me, onRead, onAuthorClick, dropCapImages, onRequestAuth, o
             <p className="rail-title">Most loved</p>
             {mostLoved.map(p => (
               <button key={p.id} className="rail-piece" onClick={() => onRead(p)}>
-                <span className="rail-piece-plate" aria-hidden="true"
-                  style={{ backgroundImage: `url(/backdrops/${imgForPub(p.id)}.webp)` }} />
+                <span className={"rail-piece-plate" + (pieceCover(p.content) ? " is-photo" : "")} aria-hidden="true"
+                  style={{ backgroundImage: `url(${pieceCover(p.content) || `/backdrops/${imgForPub(p.id)}.webp`})` }} />
                 <span className="rail-piece-info">
                   <span className="rail-piece-title">{p.title || "Untitled"}</span>
                   <span className="rail-piece-meta">
@@ -3244,6 +3253,7 @@ function ReadingView({ pub, user, isAdmin, dropCapImages, focus, onRequestAuth, 
   const [pagesLoading, setPagesLoading] = useState(true);
   const [zoom, setZoom]                 = useState(1.0);
   const [phone] = useState(isPhone);
+  const cover = pieceCover(pub.content);
   // An illuminated initial opens the piece, as it would open a manuscript.
   const initialSrc = phone ? dropCapSrc(openingLetter(pub.content), dropCapImages) : null;
 
@@ -3254,7 +3264,7 @@ function ReadingView({ pub, user, isAdmin, dropCapImages, focus, onRequestAuth, 
     renderBookPdfPages({
       title: pub.title || "",
       byline: pub.author_name || "",
-      html: pub.content || "",
+      html: stripImgs(pub.content || ""),
       options: { justify: !!pub.render_justify, paragraphIndent: !!pub.render_indent, paperTexture: true },
       async onPage(canvas) {
         const url = canvas.toDataURL("image/jpeg", 0.95);
@@ -3395,18 +3405,22 @@ function ReadingView({ pub, user, isAdmin, dropCapImages, focus, onRequestAuth, 
           )}
           {phone ? (
             <article id="reading-reflow">
-              {/* the piece's own plate, as a frontispiece */}
-              <div className="reading-plate"
-                   style={{ backgroundImage: `url(/backdrops/${imgForPub(pub.id)}.webp)` }} />
+              {/* frontispiece: the author's cover if they placed one, else the plate */}
+              <div className={"reading-plate" + (cover ? " is-photo" : "")}
+                   style={{ backgroundImage: `url(${cover || `/backdrops/${imgForPub(pub.id)}.webp`})` }} />
               <h1 className="reading-reflow-title">{pub.title}</h1>
               {initialSrc && <img className="reading-initial" src={initialSrc} alt="" aria-hidden="true" />}
               <div className={"reading-reflow-body" + (initialSrc ? " has-initial" : "")}
-                   dangerouslySetInnerHTML={{ __html: initialSrc
-                     ? sanitizeForReading(stripOpeningLetter(pub.content))
-                     : sanitizeForReading(pub.content) }} />
+                   dangerouslySetInnerHTML={{ __html: (() => {
+                     const src = cover ? stripFirstImg(pub.content) : pub.content;
+                     return initialSrc
+                       ? sanitizeForReading(stripOpeningLetter(src))
+                       : sanitizeForReading(src);
+                   })() }} />
             </article>
           ) : (
           <div id="reading-pages">
+            {cover && <img className="reading-cover" src={cover} alt="" />}
             {pagesLoading && pages.length === 0 && (
               <p className="reading-pages-loading">rendering…</p>
             )}
