@@ -5529,3 +5529,77 @@ body { font-variant-numeric: lining-nums tabular-nums; }
   line-height: 1.55;
   margin: 0 0 16px;
 }
+
+/* On touch there is no hover: a published/draft card's actions must simply
+   be there. Hover-reveal remains a desktop nicety. */
+@media (hover: none) {
+  .pac-actions { opacity: 1; }
+}
+
+/* ═══ Phone parity pass ══════════════════════════════════════════════════════
+   The photographs reach the phone: the lead wears its cover as a top band
+   (the engraving side-panel stays a wide-screen device), entries carry photo
+   thumbs, and the small furniture of a real social app arrives. */
+@media (max-width: 719px) {
+  .feed-lead { display: flex; flex-direction: column; }
+  .feed-lead-art.is-photo {
+    display: block;
+    position: static !important;
+    order: -1;
+    width: calc(100% + 44px);
+    margin: -24px -22px 18px;
+    height: 178px;
+    border-radius: 14px 14px 0 0;
+    -webkit-mask-image: none;
+    mask-image: none;
+    opacity: 1;
+  }
+  .feed-lead-title, .feed-lead-excerpt, .feed-lead-byline { padding-right: 0 !important; }
+}
+@media (max-width: 600px) {
+  /* photos only: engravings stay hidden at this size */
+  .feed-entry-plate.is-photo {
+    display: block;
+    width: 54px;
+    height: 54px;
+    border-radius: 10px;
+    opacity: 1;
+  }
+
+  /* profile head: the pill holds the card's corner; the words get the width */
+  #profile-header { position: relative; }
+  .profile-edit-btn { position: absolute; top: 20px; right: 20px; margin-left: 0; }
+  #profile-username { padding-right: 104px; }
+
+  /* toasts rise above the status line and the floating nav */
+  #toast-stack { bottom: calc(var(--bottom-nav, 64px) + 58px); }
+
+  /* small modals stay reachable when the keyboard stands up */
+  .pe-overlay {
+    align-items: flex-start;
+    padding: 36px 16px calc(24px + var(--kb-inset, 0px));
+    overflow-y: auto;
+  }
+}
+
+/* masthead: the dateline on the left, you on the right */
+#feed-masthead { display: flex; align-items: center; justify-content: space-between; }
+.masthead-me {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 50%;
+  line-height: 0;
+}
+
+/* pull-to-refresh: a quiet line of type, not a spinner */
+#feed-refresh {
+  width: 100%;
+  text-align: center;
+  padding: 10px 0 2px;
+  font-family: var(--font-ui);
+  font-size: var(--t-xs);
+  color: var(--subtle);
+  animation: hsFadeIn 0.2s ease;
+}
