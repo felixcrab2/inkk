@@ -512,6 +512,32 @@ async function fetchCloudDocs() {
   }));
 }
 
+// A published piece's backing draft may live on another device: pull it down
+// before editing rather than silently showing whatever draft was already open.
+async function fetchCloudDoc(docId) {
+  if (!supabase) return null;
+  const { data: r } = await supabase
+    .from("documents")
+    .select("id, content, updated_at, total_writing_secs, revision_count, keystrokes, deletions, pastes, human_score, score_tier, score_features, verify_code, content_hash")
+    .eq("id", docId).maybeSingle();
+  if (!r) return null;
+  return {
+    id: r.id,
+    content: r.content,
+    updatedAt: new Date(r.updated_at).getTime(),
+    writingTimeSecs: r.total_writing_secs ?? 0,
+    revisionCount: r.revision_count ?? 0,
+    keystrokes: r.keystrokes ?? 0,
+    deletions: r.deletions ?? 0,
+    pastes: r.pastes ?? 0,
+    humanScore: r.human_score,
+    scoreTier: r.score_tier,
+    scoreFeatures: r.score_features || null,
+    verifyCode: r.verify_code ?? null,
+    contentHash: r.content_hash ?? null,
+  };
+}
+
 async function pushDocToCloud(doc, userId) {
   if (!supabase || !userId) return;
   await supabase.from("documents").upsert({
@@ -998,8 +1024,9 @@ async function doPublish(doc, user, title, authorName, authorUsername, renderOpt
 }
 
 async function doUnpublish(docId) {
-  if (!supabase) return;
-  await supabase.from("publications").delete().eq("doc_id", docId);
+  if (!supabase) return "Not connected.";
+  const { error } = await supabase.from("publications").delete().eq("doc_id", docId);
+  return error?.message || null;
 }
 
 // ─── Profiles ─────────────────────────────────────────────────────────────────
@@ -2657,7 +2684,7 @@ function Feed({ user, me, onRead, onAuthorClick, dropCapImages, onRequestAuth, o
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
-function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapImages, onRead, onUnpublish, onSignIn, onCreateAccount, onSignOut, onAvatarChange, onEditDoc, onNewDoc, onDeleteDoc, onPublishDoc, researchOptIn, onToggleOptIn, onDownloadData, onDeleteData, onChangePassword, onProfileUpdate, onOpenVerify }) {
+function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapImages, onRead, onUnpublish, onSignIn, onCreateAccount, onSignOut, onAvatarChange, onEditDoc, onNewDoc, onDeleteDoc, onPublishDoc, researchOptIn, onToggleOptIn, onDownloadData, onDeleteData, onChangePassword, onProfileUpdate, onOpenVerify, onToast }) {
   const [pubs, setPubs]           = useState([]);
   const [loading, setLoading]     = useState(!!user);
   const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
@@ -2728,10 +2755,12 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
   }, [user]);
 
   const handleUnpublish = async (pub, { thenEdit = false } = {}) => {
-    await doUnpublish(pub.doc_id);
+    const err = await doUnpublish(pub.doc_id);
+    if (err) { onToast?.("Couldn't unpublish. Try again."); return; }
     setPubs(prev => prev.filter(p => p.id !== pub.id));
     if (onUnpublish) onUnpublish(pub.doc_id);
     if (thenEdit) onEditDoc(pub.doc_id);
+    else onToast?.("Unpublished. The draft stays with you.");
   };
 
   const handleDeletePub = async (pub) => {
@@ -5712,7 +5741,24 @@ export default function App() {
           onCreateAccount={() => openAuth("signup")}
           onSignOut={signOut}
           onAvatarChange={handleAvatarChange}
-          onEditDoc={(id) => { switchDoc(id); navigate("editor"); }}
+          onEditDoc={async (id) => {
+            if (!docsRef.current.some(d => d.id === id)) {
+              const cloud = await fetchCloudDoc(id);
+              if (cloud) {
+                setDocs(prev => {
+                  const next = [cloud, ...prev.filter(d => d.id !== cloud.id)];
+                  saveState(next, id);
+                  return next;
+                });
+              } else {
+                addToast("Couldn't find that draft on this device or in your account.");
+                return;
+              }
+            }
+            switchDoc(id);
+            navigate("editor");
+          }}
+          onToast={addToast}
           onNewDoc={() => { newDoc(); navigate("editor"); }}
           onDeleteDoc={(id) => deleteDoc(id, { stopPropagation: () => {} })}
           onPublishDoc={(d) => openPublishModal(d)}

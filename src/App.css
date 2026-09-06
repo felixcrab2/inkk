@@ -5529,3 +5529,9 @@ body { font-variant-numeric: lining-nums tabular-nums; }
   line-height: 1.55;
   margin: 0 0 16px;
 }
+
+/* On touch there is no hover: a published/draft card's actions must simply
+   be there. Hover-reveal remains a desktop nicety. */
+@media (hover: none) {
+  .pac-actions { opacity: 1; }
+}
