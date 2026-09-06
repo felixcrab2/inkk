@@ -47,7 +47,7 @@ function Certificate({ cert, onOpenPiece }) {
       </div>
       <p className="verify-cert-lead">
         {verified
-          ? "inkk recorded a strong human writing process for this piece: the rhythm, pauses and revisions of a person writing by hand."
+          ? "inkk recorded a strong human writing process for this piece. The rhythm, pauses and revisions were those of a person typing by hand."
           : "This piece was written in inkk, but its human signal didn’t reach the verified threshold."}
       </p>
 
@@ -78,8 +78,8 @@ function Certificate({ cert, onOpenPiece }) {
       <details className="verify-match">
         <summary>Have a copy of the text? Check it matches.</summary>
         <p className="verify-match-hint">
-          Paste the body text you’re holding. We compare its fingerprint to the certified
-          original. Nothing you paste is stored or sent.
+          Paste the body of text here. We compare it to the certified original. Nothing
+          you paste is ever stored or shared.
         </p>
         <textarea
           className="verify-match-input"
@@ -132,8 +132,8 @@ export function VerifyView({ initialCode = "", onOpenPiece, onStatus }) {
           <span className="verify-eyebrow">Authenticity</span>
           <h1 className="verify-title">Verify a piece</h1>
           <p className="verify-sub">
-            Every piece written in inkk carries a code. Paste it below to see what inkk
-            recorded about how it was written.
+            Every piece written in inkk carries a human-signal verification code. Paste it
+            below to see the signal.
           </p>
         </div>
 

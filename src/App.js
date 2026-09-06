@@ -1691,14 +1691,14 @@ function AuthModal({ onClose, initialMode = "signin" }) {
 
     // signup
     const u = username.trim();
-    if (!USERNAME_RE.test(u)) { setError("Username must be 3–20 characters — letters, numbers, or underscores."); return; }
+    if (!USERNAME_RE.test(u)) { setError("Username must be 3–20 characters."); return; }
     if (!pwOk)                { setError(`Password needs at least ${PW_MIN} characters, a letter, and a number.`); return; }
     if (!accepted)            { setError("Please accept the Terms & Privacy Policy to continue."); return; }
 
     setLoading(true);
     // Final availability check right before we commit.
     const existing = await fetchProfileByUsername(u);
-    if (existing) { setUnameStatus("taken"); setError("That username is taken — try another."); setLoading(false); return; }
+    if (existing) { setUnameStatus("taken"); setError("That username is already taken. Please try another."); setLoading(false); return; }
 
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -1776,7 +1776,7 @@ function AuthModal({ onClose, initialMode = "signin" }) {
             {needsConfirm && sentEmailRef.current && (
               <div className="auth-resend">
                 {resend === "sent"
-                  ? <span className="auth-resend-done">Sent again — check your inbox and spam folder.</span>
+                  ? <span className="auth-resend-done">Sent again. Please check your inbox and spam folder.</span>
                   : <>Didn't get it? <button type="button" onClick={resendConfirmation} disabled={resend === "sending"}>{resend === "sending" ? "sending…" : "resend confirmation email"}</button></>}
                 <button type="button" className="auth-back" onClick={() => { setMessage(""); setResend(""); }}>← back</button>
               </div>
@@ -1988,7 +1988,7 @@ function PublishModal({ doc, user, profile, onConfirm, onClose, titleCapsOn }) {
           <div className="dl-section-label">Note (optional)</div>
           <textarea
             className="publish-note-input"
-            placeholder="a line of context: who you are, what this is about"
+            placeholder="write a line of context such as who you are, or what your work is about"
             value={note}
             onChange={e => setNote(e.target.value)}
             maxLength={200}
@@ -2488,7 +2488,7 @@ function Feed({ user, me, onRead, onAuthorClick, dropCapImages, onRequestAuth, o
         <div id="feed-list">
           {followingLoading && <FeedSkeleton />}
           {!followingLoading && followingFetched && followingPubs.length === 0 && (
-            <FeedEmpty title="Your feed is quiet" sub="Follow writers and their newest work gathers here." serif />
+            <FeedEmpty title="Your feed is quiet" sub="Follow writers to see their latest work here." serif />
           )}
           {!followingLoading && (
             <FeedList pubs={followingPubs} dropCapImages={dropCapImages}
@@ -2726,7 +2726,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
         <div id="profile-signin">
           <div id="profile-signin-mark">Inkk</div>
           <h2 id="profile-signin-title">Join the conversation</h2>
-          <p id="profile-signin-sub">Write privately, or publish to the feed, all with Human&nbsp;Signal tracking.</p>
+          <p id="profile-signin-sub">Write privately, or publish to the feed.</p>
           <div id="profile-signin-actions">
             <button className="profile-cta" onClick={onSignIn}>Sign in</button>
             <button className="profile-cta-ghost" onClick={onCreateAccount || onSignIn}>Create account</button>
@@ -2898,7 +2898,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
               <h2 className="profile-section-label">Drafts<span className="section-count">{drafts.length}</span></h2>
               <button className="section-action" onClick={onNewDoc}>New draft</button>
             </div>
-            <p className="profile-section-sub">Saved on your device and synced to your account. Only you can see them.</p>
+            <p className="profile-section-sub">Drafts are only visible to you.</p>
 
             <div className="profile-list">
               {drafts.length === 0 && (
@@ -3008,7 +3008,7 @@ function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapIma
           <h2 className="profile-section-label">Research</h2>
         </div>
         <p id="research-blurb">
-          When you write in Inkk, your text and the rhythm of your typing (pauses, revisions, bursts) are captured as part of a study into human writing. We use this to study what distinguishes human writing from machine-generated text. You can turn this off at any time, and the editor keeps working exactly as before.
+          When you write in Inkk, your text and the rhythm of your typing (pauses, revisions, bursts) are captured as part of a study into human writing. We use this to study what distinguishes human writing from machine-generated text. You can turn this off at any time.
         </p>
 
         {researchOptIn && ((Number(contribution?.event_count) || 0) + pendingLocal) > 0 && (() => {
@@ -3555,7 +3555,7 @@ function ReportControl({ targetType, targetId, targetUserId, user, onRequestAuth
   // You can't report your own content.
   if (user && targetUserId && user.id === targetUserId) return null;
 
-  if (done) return <span className={`report-done ${className}`}>Reported — thank you.</span>;
+  if (done) return <span className={`report-done ${className}`}>Reported. Thank you.</span>;
 
   if (!open) {
     return (
@@ -3671,7 +3671,7 @@ function AdminView({ profile, onOpenPiece }) {
       <header className="admin-masthead"><span className="admin-dateline">Moderation</span></header>
 
       <section className="admin-section">
-        <h2 className="admin-section-title">Reports — {reports.length} open</h2>
+        <h2 className="admin-section-title">Reports: {reports.length} open</h2>
         {loading && <p className="feed-empty">loading…</p>}
         {!loading && reports.length === 0 && <p className="feed-empty">No open reports.</p>}
         {reports.map(r => (
@@ -3693,7 +3693,7 @@ function AdminView({ profile, onOpenPiece }) {
       </section>
 
       <section className="admin-section">
-        <h2 className="admin-section-title">Auto-flagged — {flagged.length}</h2>
+        <h2 className="admin-section-title">Auto-flagged: {flagged.length}</h2>
         {!loading && flagged.length === 0 && <p className="feed-empty">Nothing auto-flagged.</p>}
         {flagged.map(item => {
           const text = item._kind === "comment" ? item.body : (item.title || "Untitled");
@@ -4923,7 +4923,7 @@ export default function App() {
             author:  byline || "inkk",
             creator: "inkk",
             subject: verify
-              ? `${verify.verified ? "Human-verified" : "Written"} in inkk · verify at ${verify.host}/verify · ${verify.code}`
+              ? `${verify.verified ? "Human-signal verified on inkk" : "Written in inkk"}. Verify at ${verify.host}/verify. ${verify.code}`
               : "Written in inkk",
             keywords: ["inkk", verify ? (verify.verified ? "human-verified" : "written-in-inkk") : null, verify?.code]
               .filter(Boolean).join(", "),
@@ -5202,7 +5202,7 @@ export default function App() {
       {/* ── offline banner ── */}
       {!online && (
         <div id="offline-banner" role="status">
-          Offline · changes are saved on this device and will sync when you reconnect.
+          Offline. Changes are saved locally on this device and will sync when you reconnect.
         </div>
       )}
 
@@ -5235,7 +5235,7 @@ export default function App() {
               <button
                 id="cert-btn"
                 className={`${menuClass}${activeCert ? " is-certified" : ""}`}
-                title={activeCert ? "Verification code" : "Get a verification code — no need to publish"}
+                title={activeCert ? "Verification code" : "Get a human verification code. You do not need to publish to use this feature."}
                 disabled={certifying}
                 onClick={() => {
                   if (activeCert) setCertMenuOpen(v => !v);
@@ -5267,7 +5267,7 @@ export default function App() {
                     onClick={() => navigator.clipboard?.writeText(activeCert).then(() => addToast("Code copied."))}
                   >{activeCert}</button>
                   <p className="cert-menu-note">
-                    Proof this piece was written by hand. Share the code anywhere — anyone can check it.
+                    Proof this piece displays human signal. Share the code and the recipient can check this.
                     {!isPublished && " It stays private to you until you publish."}
                   </p>
                   <button
@@ -5350,8 +5350,8 @@ export default function App() {
               className={`icon-btn title-caps-btn ${menuClass}${titleCapsOn ? " active" : ""}`}
               onClick={() => setTitleCapsOn(v => !v)}
               title={titleCapsOn
-                ? "Title capitalization is on — titles auto-capitalize. Click to turn off."
-                : "Title capitalization is off — titles stay exactly as typed. Click to turn on."}
+                ? "Title auto-capitalisation is on. Click to turn off."
+                : "Title capitalisation is off. Click to turn on."}
             >
               <span className="title-caps-glyph">Aa</span>
             </button>
@@ -5512,7 +5512,7 @@ export default function App() {
           className={menuClass}
           onClick={() => setHsModalOpen(true)}
           aria-label="About inkk research"
-          title="Click for info. Your writing contributes to a study of human writing"
+          title="Click for info. Your writing signatures contribute to a study of human writing."
         >
           <span className="research-pulse" aria-hidden="true" />
           <span className="research-strip-text">
