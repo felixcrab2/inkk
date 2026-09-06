@@ -1217,9 +1217,13 @@ body.focus-mode #text-container.writing-started { padding-top: 16vh; }
 .feed-lead-byline-text {
   display: flex;
   flex-direction: column;
+  /* children hug the left: the author is a <button> (shared .feed-entry-author
+     markup), and a stretched button centres its text by default */
+  align-items: flex-start;
   gap: 2px;
   min-width: 0;
 }
+.feed-lead-byline-text .feed-entry-author { text-align: left; }
 .feed-lead-author {
   background: none; border: none; padding: 0;
   font-family: var(--font-serif);
