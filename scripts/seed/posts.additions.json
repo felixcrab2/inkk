@@ -1,0 +1,63 @@
+{
+  "_note": "STAGED seed additions for review. Not read by seed.mjs yet — merge into posts.json only on approval. 8 new personas, one sample piece each (batch 1 of ~20). Voices deliberately distinct.",
+  "personas": [
+    { "username": "oldgreenhouse", "display_name": "Marion Fell", "bio": "Retired, mostly. Two greenhouses, one knee that forecasts rain. I write down what the plants are doing because no one at home will listen." },
+    { "username": "nightbus", "display_name": "Night Bus", "bio": "I clean offices while the city sleeps and I take the last bus home. Things look different at that hour. I write some of them down." },
+    { "username": "keeps_receipts", "display_name": "Keeps Receipts", "bio": "Lists, grievances, and small victories over machines. If it beeped at me unfairly, it's probably in here." },
+    { "username": "harbourlight", "display_name": "Harbour Light", "bio": "Grew up in a fishing town, live in a city now. Most of what I write is trying to get back to the water." },
+    { "username": "deadlineadjacent", "display_name": "Deadline Adjacent", "bio": "I attend meetings about meetings. Writing here to remember I have a personality outside the calendar invite." },
+    { "username": "smallhours", "display_name": "Small Hours", "bio": "Insomniac. Everything here was written between two and five in the morning, which is its own kind of honesty." },
+    { "username": "provingdrawer", "display_name": "The Proving Drawer", "bio": "Bread, mostly, and the people who taught me. Flour on the keyboard is a permanent feature now." },
+    { "username": "fieldnotes", "display_name": "Field Notes", "bio": "I travel for dull reasons and pay attention for interesting ones. Notebooks, launderettes, the backs of towns." }
+  ],
+  "pieces": [
+    {
+      "author_username": "oldgreenhouse",
+      "title": "The tomatoes have opinions",
+      "note": "greenhouse log, tuesday",
+      "content": "<p>The tomatoes have decided they don't like the new watering can. I know how this sounds. But I changed cans on Sunday and by Tuesday two of the plants had gone sulky at the tips, and the only thing different in their small green lives is the can.</p><p>Forty years of this and I still can't tell you where instinct ends and superstition begins. You learn a plant the way you learn a person: not all at once, and mostly through your mistakes. The one in the corner wants more water than the book says. The book has never met this tomato.</p><p>I went back to the old can. We'll see. If they perk up by Friday I'll have proved nothing and I'll do it again anyway.</p>"
+    },
+    {
+      "author_username": "nightbus",
+      "title": "The 03:40",
+      "note": null,
+      "content": "<p>There's a man who gets the same night bus as me on Thursdays. Suit, no tie, shoes that were expensive a while ago. He falls asleep before we clear the second stop and he always wakes up exactly one before his, like his body keeps a timetable his face has given up on.</p><p>I've never spoken to him. On the night bus you don't. There's an agreement nobody signed: we are all just getting home, we all look worse than we'd like, and we will grant each other the enormous kindness of not noticing.</p><p>Tonight he woke up, checked the window, and smiled at nothing. Just a small private smile at whatever he'd been dreaming. Then the doors hissed and he was gone into the dark and the bus carried the rest of us onward, lighter by one.</p>"
+    },
+    {
+      "author_username": "keeps_receipts",
+      "title": "Things the self-checkout has accused me of",
+      "note": "a partial list",
+      "content": "<p>An unexpected item in the bagging area. There was no item. The area was empty. I showed it my empty hands like a man being searched at a border.</p><p>Not scanning when I had scanned. It heard the beep. We both heard the beep. It chose to gaslight me in front of a queue.</p><p>Needing approval for a birthday card, as though I might be twelve and buying a card is the gateway to harder crimes.</p><p>Placing my own bag in the bagging area, which is the bagging area, whose entire job is bags. It summoned a human to confirm the bag was a bag. The human sighed the sigh of someone who has confirmed a great many bags today.</p><p>I have started using the staffed till again. She doesn't accuse me of anything. She just says have a good one, and somehow I believe her.</p>"
+    },
+    {
+      "author_username": "harbourlight",
+      "title": "My father's knots",
+      "note": null,
+      "content": "<p>My father could tie a bowline in the dark, in the rain, with cold hands, without looking. I watched him do it a thousand times on the deck of a boat that smelled of diesel and fish and the particular wet rope smell I have never found anywhere since.</p><p>He tried to teach me. The rabbit comes out of the hole, round the tree, back down the hole. I could do it slowly, on the kitchen table, in good light, with him narrating. I could never do it the way he did, which was not really tying at all but something his hands simply knew, the way you know your own name.</p><p>He's been gone six years. Last week I found an old length of rope in a box of his things and I sat on the floor and tried, and my hands remembered more than I expected. Not all of it. But the rabbit found the hole. Round the tree. Back down.</p><p>I cried, a bit, on the kitchen floor, holding a knot my father taught me. Then I made tea, because that is the other thing he taught me: after the hard feeling, you make tea.</p>"
+    },
+    {
+      "author_username": "deadlineadjacent",
+      "title": "Let's circle back",
+      "note": "written in a meeting about a meeting",
+      "content": "<p>We are going to circle back. We circle back so often I've started to feel dizzy. We are a company of satellites, orbiting decisions we will never actually land on, waving at each other on each pass.</p><p>Someone said let's take this offline, which meant let's never speak of this again. Someone said let's park it, and I pictured a car lot the size of a county, full of parked ideas quietly rusting, doors unlocked, keys in the ignition, going nowhere.</p><p>I have a real thought somewhere. I had it this morning in the shower, fully formed and useful, and by the time I reached my desk it had been replaced by an invite to a pre-meeting for the meeting where we align on the agenda for the actual meeting.</p><p>Anyway. Circling back now. Let me know your thoughts, no rush, EOD would be great.</p>"
+    },
+    {
+      "author_username": "smallhours",
+      "title": "Four a.m. is a country",
+      "note": null,
+      "content": "<p>Four a.m. is a country and I have a passport now. Everyone here is very quiet. The fridge hums the national anthem.</p><p>Things that are true at four a.m. and false by nine: that I should reorganise my entire life. That the text I sent in 2019 is still being discussed by a committee somewhere. That I am the only person awake on the whole turning earth, which is lonely, and also, briefly, a kind of throne.</p><p>The heating clicks. A car goes past, someone else exiled here, headlights sweeping the ceiling like a lighthouse checking on me. There, there. Still awake. Noted.</p><p>I don't fight it the way I used to. I've learned the border guards can smell fear. I just wait, and read the walls, and eventually the sky goes the colour of dishwater and the birds start up and the country quietly annexes itself back into ordinary morning, and I am, at last, allowed to sleep.</p>"
+    },
+    {
+      "author_username": "provingdrawer",
+      "title": "The airing cupboard",
+      "note": "for my nan",
+      "content": "<p>My nan proved her bread in the airing cupboard, on the shelf above the immersion heater, wrapped in a tea towel that had a picture of Tenby on it and had never once been to Tenby.</p><p>She didn't weigh anything. Flour was a handful, and her handful was law. Water was until it feels right, which is the most useless instruction in the world until suddenly, years later, standing in your own kitchen, it isn't, and your own hands tell you: there. That. Right.</p><p>I have a stand mixer and a set of scales accurate to the gram and a proving basket that cost more than her weekly shop ever did. My bread is fine. It is very fine. It is not her bread.</p><p>I think what's missing is the airing cupboard, and the heater ticking, and her in the doorway saying leave it alone now, you'll knock the air out. I still hear that. Every time. Leave it alone now. So I do.</p>"
+    },
+    {
+      "author_username": "fieldnotes",
+      "title": "Launderette, town I won't name",
+      "note": "waiting for a spin cycle to end, so, notes",
+      "content": "<p>Every launderette in the country is the same launderette. The same fluorescent hum, the same laminated sign about not overloading the machines, the same lone sock that has clearly been under the bench since before the sign was laminated.</p><p>A woman is folding sheets alone, and folding a fitted sheet alone is one of the small quiet dignities of a life, that battle with the elastic corners that everyone loses privately. She loses it too, balls it up, presses it flat with both hands as if calming an animal, and moves on. No witnesses. Except me, apparently, writing it down.</p><p>The dryers here charge in twenty-minute increments that are actually seventeen. I've timed it in three towns now. Somewhere there is a man who knows exactly why, and I would very much like to buy him a pint and hear the whole boring story.</p><p>My spin cycle's done. That's the thing about a launderette: it always, eventually, tells you it's time to go.</p>"
+    }
+  ]
+}
