@@ -51,6 +51,8 @@ async function main() {
   for (const [user_id, publication_id] of l.likes) await supa.from("likes").delete().eq("user_id", user_id).eq("publication_id", publication_id);
   // follows
   for (const [follower_id, following_id] of l.follows) await supa.from("follows").delete().eq("follower_id", follower_id).eq("following_id", following_id);
+  // verification certificates (present when seeded with --with-certs)
+  if (l.verifications?.length) await del("verifications", (q) => q.in("code", l.verifications));
   // publications
   if (l.publications.length) await del("publications", (q) => q.in("id", l.publications));
   // documents (only present if the doc_id fallback was used)
