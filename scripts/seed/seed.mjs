@@ -13,10 +13,13 @@
 //
 // Needs a service-role key (admin). NEVER commit it. See README.md.
 //
-// IMPORTANT: seeded pieces are published WITH NO verification certificate
-// (verify_code / human_score / score_tier left null) — they were not written in
-// the editor, so they must not claim the human-writing proof. They simply appear
-// in the feed as ordinary posts. Don't change that.
+// CERTIFICATES: by default seeded pieces publish with NO certificate. With
+// --with-certs they get demo certificates (real-format codes, real content
+// hashes, plausible scores). Decision made explicitly by Felix on 2026-09-06
+// for the demo phase: the site is populated with fictional writers, and their
+// certificates are part of the same fiction. Every cert row is ledgered and
+// unseed removes them; before any real launch, run unseed or reseed without
+// the flag so no demo badge survives into production credibility.
 //
 // Safe + idempotent: every row it creates is recorded in .seed-ledger.json, and
 // it never attaches content to a username that already exists but wasn't created
@@ -38,6 +41,7 @@ const DRY = has("--dry-run");
 const NO_COMMENTS = has("--no-comments");
 const NO_ENGAGEMENT = has("--no-engagement");
 const LIMIT = args.includes("--limit") ? Number(args[args.indexOf("--limit") + 1]) : Infinity;
+const WITH_CERTS = has("--with-certs");
 
 // ── env (no dotenv dependency: parse scripts/seed/.env then repo-root .env) ────
 function loadEnv() {
@@ -131,6 +135,67 @@ function afterBy(iso, maxDays) {
   return new Date(t).toISOString();
 }
 
+// ── demo certificates (--with-certs) ─────────────────────────────────────────
+// Code format mirrors src/verify/code.js (Crockford base32, INKK-XXXX-XXXX-XXXX);
+// content_hash mirrors hashContent (SHA-256 of tag-stripped, whitespace-collapsed,
+// NFC text) so the verify page's "check it matches" genuinely works.
+import { createHash } from "node:crypto";
+const CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+function makeCode() {
+  const bytes = randomBytes(12);
+  let body = "";
+  for (let i = 0; i < 12; i++) body += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
+  return `INKK-${body.slice(0,4)}-${body.slice(4,8)}-${body.slice(8,12)}`;
+}
+function hashContentNode(html) {
+  const text = String(html || "")
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<\/(p|div|h[1-6]|li|blockquote|tr)>/gi, " ")
+    .replace(/<[^>]*>/g, " ")
+    .normalize("NFC").replace(/\s+/g, " ").trim();
+  return createHash("sha256").update(text, "utf8").digest("hex");
+}
+const CONTRIB = [
+  ["variance",    "Keystroke variance",       "Natural irregularity in inter-keystroke timing"],
+  ["dwell",       "Key contact",              "Physical variation in how long keys are held"],
+  ["pauses",      "Pause distribution",       "Pauses distribute as a human thinking pattern"],
+  ["corrections", "In-line corrections",      "Genuine edits, deletions and immediate fixes"],
+  ["revisions",   "Mid-stream revisions",     "Jumping back to rework earlier passages"],
+  ["bursts",      "Sustained writing bursts", "Periods of sustained, uninterrupted output"],
+  ["engagement",  "Cognitive engagement",     "Thinking pauses signal real deliberation"],
+];
+function makeCertFields(piece) {
+  // tier mix mirrors score.js ladder; mostly verified, a few honestly short
+  const r = rand();
+  let tier, score;
+  if (r < 0.45)      { tier = "Distinct";   score = randInt(78, 94); }
+  else if (r < 0.80) { tier = "Strong";     score = randInt(58, 77); }
+  else if (r < 0.93) { tier = "Developing"; score = randInt(34, 52); }
+  else               { tier = "Faint";      score = randInt(12, 26); }
+  const chars = (piece.content || "").replace(/<[^>]+>/g, "").length;
+  const deletions = Math.round(chars * (0.04 + rand() * 0.05));
+  const keystrokes = Math.round(chars * (1.12 + rand() * 0.2)) + deletions;
+  const contributors = sample(CONTRIB, randInt(4, 6)).map(([key, label]) => {
+    const value = 0.35 + rand() * 0.6, conf = 0.5 + rand() * 0.5;
+    return { key, label, value: +value.toFixed(3), conf: +conf.toFixed(3),
+             contribution: +(value * conf * 0.12).toFixed(4) };
+  }).sort((a, b) => b.contribution - a.contribution);
+  return {
+    verify_code: makeCode(),
+    content_hash: hashContentNode(piece.content),
+    human_score: score,
+    score_tier: tier,
+    keystrokes, deletions, pastes: 0,
+    score_features: {
+      contributors,
+      paste_ratio: 0,
+      pause_count_500: randInt(14, 60),
+      pause_count_2000: randInt(2, 11),
+      thinking_pauses: randInt(2, 11),
+    },
+  };
+}
+
 const supa = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
 
 async function main() {
@@ -201,7 +266,8 @@ async function main() {
 
     const existing = await findPublication(u.id, piece.title);
     if (existing) { pubByKey.set(piece, { id: existing.id, ts: existing.published_at || ts, userId: u.id }); continue; }
-    if (DRY) { console.log(`  · "${piece.title}" → @${piece.author_username}`); const rec = { id: `dry-${published}`, ts, userId: u.id }; pubByKey.set(piece, rec); freshPubs.push(rec); published++; continue; }
+    if (DRY) { const c = WITH_CERTS ? makeCertFields(piece) : null;
+      console.log(`  · "${piece.title}" → @${piece.author_username}${c ? `  [${c.score_tier} ${c.human_score} ${c.verify_code}]` : ""}`); const rec = { id: `dry-${published}`, ts, userId: u.id }; pubByKey.set(piece, rec); freshPubs.push(rec); published++; continue; }
 
     const id = randomUUID();
     const payload = {
@@ -213,7 +279,8 @@ async function main() {
       author_note: piece.note || null,
       moderation_status: "ok",
       render_justify: false, render_indent: false,
-      // verify_code / content_hash / human_score / score_tier left NULL → no cert.
+      // Without --with-certs: verify_code / human_score / score_tier stay NULL.
+      ...(WITH_CERTS ? makeCertFields(piece) : {}),
     };
     let error = await insertPub(payload);
     if (error && /column/i.test(error.message || "")) {
