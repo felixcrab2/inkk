@@ -1,27 +1,59 @@
 {
-  "_note": "STAGED seed additions for review. Not read by seed.mjs yet — merge into posts.json only on approval. 8 new personas, one sample piece each (batch 1 of ~20). Voices deliberately distinct.",
+  "_note": "STAGED seed additions: 8 personas, 20 pieces (10 with embedded images from Wikimedia Commons, CC/PD licensed). Merge into posts.json for seeding.",
   "personas": [
-    { "username": "oldgreenhouse", "display_name": "Marion Fell", "bio": "Retired, mostly. Two greenhouses, one knee that forecasts rain. I write down what the plants are doing because no one at home will listen." },
-    { "username": "nightbus", "display_name": "Night Bus", "bio": "I clean offices while the city sleeps and I take the last bus home. Things look different at that hour. I write some of them down." },
-    { "username": "keeps_receipts", "display_name": "Keeps Receipts", "bio": "Lists, grievances, and small victories over machines. If it beeped at me unfairly, it's probably in here." },
-    { "username": "harbourlight", "display_name": "Harbour Light", "bio": "Grew up in a fishing town, live in a city now. Most of what I write is trying to get back to the water." },
-    { "username": "deadlineadjacent", "display_name": "Deadline Adjacent", "bio": "I attend meetings about meetings. Writing here to remember I have a personality outside the calendar invite." },
-    { "username": "smallhours", "display_name": "Small Hours", "bio": "Insomniac. Everything here was written between two and five in the morning, which is its own kind of honesty." },
-    { "username": "provingdrawer", "display_name": "The Proving Drawer", "bio": "Bread, mostly, and the people who taught me. Flour on the keyboard is a permanent feature now." },
-    { "username": "fieldnotes", "display_name": "Field Notes", "bio": "I travel for dull reasons and pay attention for interesting ones. Notebooks, launderettes, the backs of towns." }
+    {
+      "username": "oldgreenhouse",
+      "display_name": "Marion Fell",
+      "bio": "Retired, mostly. Two greenhouses, one knee that forecasts rain. I write down what the plants are doing because no one at home will listen."
+    },
+    {
+      "username": "nightbus",
+      "display_name": "Night Bus",
+      "bio": "I clean offices while the city sleeps and I take the last bus home. Things look different at that hour. I write some of them down."
+    },
+    {
+      "username": "keeps_receipts",
+      "display_name": "Keeps Receipts",
+      "bio": "Lists, grievances, and small victories over machines. If it beeped at me unfairly, it's probably in here."
+    },
+    {
+      "username": "harbourlight",
+      "display_name": "Harbour Light",
+      "bio": "Grew up in a fishing town, live in a city now. Most of what I write is trying to get back to the water."
+    },
+    {
+      "username": "deadlineadjacent",
+      "display_name": "Deadline Adjacent",
+      "bio": "I attend meetings about meetings. Writing here to remember I have a personality outside the calendar invite."
+    },
+    {
+      "username": "smallhours",
+      "display_name": "Small Hours",
+      "bio": "Insomniac. Everything here was written between two and five in the morning, which is its own kind of honesty."
+    },
+    {
+      "username": "provingdrawer",
+      "display_name": "The Proving Drawer",
+      "bio": "Bread, mostly, and the people who taught me. Flour on the keyboard is a permanent feature now."
+    },
+    {
+      "username": "fieldnotes",
+      "display_name": "Field Notes",
+      "bio": "I travel for dull reasons and pay attention for interesting ones. Notebooks, launderettes, the backs of towns."
+    }
   ],
   "pieces": [
     {
       "author_username": "oldgreenhouse",
       "title": "The tomatoes have opinions",
       "note": "greenhouse log, tuesday",
-      "content": "<p>The tomatoes have decided they don't like the new watering can. I know how this sounds. But I changed cans on Sunday and by Tuesday two of the plants had gone sulky at the tips, and the only thing different in their small green lives is the can.</p><p>Forty years of this and I still can't tell you where instinct ends and superstition begins. You learn a plant the way you learn a person: not all at once, and mostly through your mistakes. The one in the corner wants more water than the book says. The book has never met this tomato.</p><p>I went back to the old can. We'll see. If they perk up by Friday I'll have proved nothing and I'll do it again anyway.</p>"
+      "content": "<img src=\"https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/-2019-07-29_Ripening_fruit_on_variety_%27Sub_Arctic_Plenty%27_Tomato_Plants%2C_Trimingham.JPG/1920px--2019-07-29_Ripening_fruit_on_variety_%27Sub_Arctic_Plenty%27_Tomato_Plants%2C_Trimingham.JPG\" alt=\"Tomatoes ripening on the vine in a greenhouse\"><p>The tomatoes have decided they don't like the new watering can. I know how this sounds. But I changed cans on Sunday and by Tuesday two of the plants had gone sulky at the tips, and the only thing different in their small green lives is the can.</p><p>Forty years of this and I still can't tell you where instinct ends and superstition begins. You learn a plant the way you learn a person: not all at once, and mostly through your mistakes. The one in the corner wants more water than the book says. The book has never met this tomato.</p><p>I went back to the old can. We'll see. If they perk up by Friday I'll have proved nothing and I'll do it again anyway.</p>"
     },
     {
       "author_username": "nightbus",
       "title": "The 03:40",
       "note": null,
-      "content": "<p>There's a man who gets the same night bus as me on Thursdays. Suit, no tie, shoes that were expensive a while ago. He falls asleep before we clear the second stop and he always wakes up exactly one before his, like his body keeps a timetable his face has given up on.</p><p>I've never spoken to him. On the night bus you don't. There's an agreement nobody signed: we are all just getting home, we all look worse than we'd like, and we will grant each other the enormous kindness of not noticing.</p><p>Tonight he woke up, checked the window, and smiled at nothing. Just a small private smile at whatever he'd been dreaming. Then the doors hissed and he was gone into the dark and the bus carried the rest of us onward, lighter by one.</p>"
+      "content": "<img src=\"https://upload.wikimedia.org/wikipedia/commons/thumb/9/92/GD_%E5%BB%A3%E6%9D%B1_Guangdong_%E4%B8%AD%E5%B1%B1_Zhongshan_Bus_003_tour_interior_door_night_August_2024_R12S.jpg/1920px-GD_%E5%BB%A3%E6%9D%B1_Guangdong_%E4%B8%AD%E5%B1%B1_Zhongshan_Bus_003_tour_interior_door_night_August_2024_R12S.jpg\" alt=\"The interior of a bus at night, empty seats under white light\"><p>There's a man who gets the same night bus as me on Thursdays. Suit, no tie, shoes that were expensive a while ago. He falls asleep before we clear the second stop and he always wakes up exactly one before his, like his body keeps a timetable his face has given up on.</p><p>I've never spoken to him. On the night bus you don't. There's an agreement nobody signed: we are all just getting home, we all look worse than we'd like, and we will grant each other the enormous kindness of not noticing.</p><p>Tonight he woke up, checked the window, and smiled at nothing. Just a small private smile at whatever he'd been dreaming. Then the doors hissed and he was gone into the dark and the bus carried the rest of us onward, lighter by one.</p>"
     },
     {
       "author_username": "keeps_receipts",
@@ -33,7 +65,7 @@
       "author_username": "harbourlight",
       "title": "My father's knots",
       "note": null,
-      "content": "<p>My father could tie a bowline in the dark, in the rain, with cold hands, without looking. I watched him do it a thousand times on the deck of a boat that smelled of diesel and fish and the particular wet rope smell I have never found anywhere since.</p><p>He tried to teach me. The rabbit comes out of the hole, round the tree, back down the hole. I could do it slowly, on the kitchen table, in good light, with him narrating. I could never do it the way he did, which was not really tying at all but something his hands simply knew, the way you know your own name.</p><p>He's been gone six years. Last week I found an old length of rope in a box of his things and I sat on the floor and tried, and my hands remembered more than I expected. Not all of it. But the rabbit found the hole. Round the tree. Back down.</p><p>I cried, a bit, on the kitchen floor, holding a knot my father taught me. Then I made tea, because that is the other thing he taught me: after the hard feeling, you make tea.</p>"
+      "content": "<img src=\"https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Mooring_ropes%2C_Boscastle_Harbour_-_geograph.org.uk_-_7049868.jpg/1920px-Mooring_ropes%2C_Boscastle_Harbour_-_geograph.org.uk_-_7049868.jpg\" alt=\"Coiled mooring ropes at a small harbour\"><p>My father could tie a bowline in the dark, in the rain, with cold hands, without looking. I watched him do it a thousand times on the deck of a boat that smelled of diesel and fish and the particular wet rope smell I have never found anywhere since.</p><p>He tried to teach me. The rabbit comes out of the hole, round the tree, back down the hole. I could do it slowly, on the kitchen table, in good light, with him narrating. I could never do it the way he did, which was not really tying at all but something his hands simply knew, the way you know your own name.</p><p>He's been gone six years. Last week I found an old length of rope in a box of his things and I sat on the floor and tried, and my hands remembered more than I expected. Not all of it. But the rabbit found the hole. Round the tree. Back down.</p><p>I cried, a bit, on the kitchen floor, holding a knot my father taught me. Then I made tea, because that is the other thing he taught me: after the hard feeling, you make tea.</p>"
     },
     {
       "author_username": "deadlineadjacent",
@@ -57,7 +89,79 @@
       "author_username": "fieldnotes",
       "title": "Launderette, town I won't name",
       "note": "waiting for a spin cycle to end, so, notes",
-      "content": "<p>Every launderette in the country is the same launderette. The same fluorescent hum, the same laminated sign about not overloading the machines, the same lone sock that has clearly been under the bench since before the sign was laminated.</p><p>A woman is folding sheets alone, and folding a fitted sheet alone is one of the small quiet dignities of a life, that battle with the elastic corners that everyone loses privately. She loses it too, balls it up, presses it flat with both hands as if calming an animal, and moves on. No witnesses. Except me, apparently, writing it down.</p><p>The dryers here charge in twenty-minute increments that are actually seventeen. I've timed it in three towns now. Somewhere there is a man who knows exactly why, and I would very much like to buy him a pint and hear the whole boring story.</p><p>My spin cycle's done. That's the thing about a launderette: it always, eventually, tells you it's time to go.</p>"
+      "content": "<img src=\"https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Interior_view_of_laundromat.jpg/1920px-Interior_view_of_laundromat.jpg\" alt=\"Rows of machines inside a laundromat\"><p>Every launderette in the country is the same launderette. The same fluorescent hum, the same laminated sign about not overloading the machines, the same lone sock that has clearly been under the bench since before the sign was laminated.</p><p>A woman is folding sheets alone, and folding a fitted sheet alone is one of the small quiet dignities of a life, that battle with the elastic corners that everyone loses privately. She loses it too, balls it up, presses it flat with both hands as if calming an animal, and moves on. No witnesses. Except me, apparently, writing it down.</p><p>The dryers here charge in twenty-minute increments that are actually seventeen. I've timed it in three towns now. Somewhere there is a man who knows exactly why, and I would very much like to buy him a pint and hear the whole boring story.</p><p>My spin cycle's done. That's the thing about a launderette: it always, eventually, tells you it's time to go.</p>"
+    },
+    {
+      "author_username": "oldgreenhouse",
+      "title": "February on the allotment",
+      "note": "nobody else was there. ideal.",
+      "content": "<img src=\"https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/-2022-03-27_Shed%2C_Overstrand_allotment_gardens%2C_Overstrand%2C_Norfolk.JPG/1920px--2022-03-27_Shed%2C_Overstrand_allotment_gardens%2C_Overstrand%2C_Norfolk.JPG\" alt=\"A weathered shed on an allotment garden\"><p>Nobody goes to the allotment in February, which is exactly why I go. The whole site to myself, every plot asleep under its blanket of muck and old carpet, the water trough wearing a lid of ice like a bad hat.</p><p>The shed needs a new hinge. The shed has needed a new hinge since 2019 and mentioning it annually is now part of the ritual, like the robin who turns up the moment a fork goes in, convinced I work for him.</p><p>There is nothing to do in February and that is the point. You walk the rows, you nod at the garlic coming up in its stiff green rows like a tiny army, you make a plan you will not follow. Then you stand in the cold with a flask and admire the emptiness you are personally responsible for.</p><p>Best hour of my week, most weeks.</p>"
+    },
+    {
+      "author_username": "oldgreenhouse",
+      "title": "Pricking out",
+      "note": null,
+      "content": "<img src=\"https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Goodnestone_House_and_Garden%2C_Greenhouse_interior_2_-_geograph.org.uk_-_7427220.jpg/1920px-Goodnestone_House_and_Garden%2C_Greenhouse_interior_2_-_geograph.org.uk_-_7427220.jpg\" alt=\"Inside an old greenhouse, staging benches full of pots\"><p>Spent the morning pricking out seedlings, which is the garden's way of teaching you to be gentle when you are in a hurry. Two hundred small lives, each with one root like a thread of cotton, and every single one has to be held by a leaf, never the stem. A stem doesn't grow back. A leaf they can spare.</p><p>My mother taught me that, in a greenhouse that smelled exactly like this one: wet compost, warm glass, the green smell tomatoes leave on your fingers. Hold them by the leaf. She said it about the seedlings and then, when I was older and made a mess of something, she said it about people.</p><p>Anyway. Two hundred lettuces, twelve trays, one radio playing quietly on the bench. Nobody held me by the stem today either.</p>"
+    },
+    {
+      "author_username": "nightbus",
+      "title": "What the city puts out for morning",
+      "note": null,
+      "content": "<img src=\"https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Street_lamps_in_a_foggy_night%2C_Alameda_Dom_Afonso_Henriques%2C_Lisbon%2C_Portugal_julesvernex2.jpg/1920px-Street_lamps_in_a_foggy_night%2C_Alameda_Dom_Afonso_Henriques%2C_Lisbon%2C_Portugal_julesvernex2.jpg\" alt=\"Street lamps glowing in fog at night\"><p>By four the city has finished with itself and starts setting up for the next one. I see it from the top deck: the fog around the street lamps, bakery lights coming on one by one like somebody checking the house before bed, except backwards.</p><p>A fox crossed at the lights on the high street. It waited. I want to be clear about that. The road was empty in both directions for a mile and the fox sat at the crossing and waited, then trotted over on the green like a commuter with somewhere to be.</p><p>The driver saw it too. Our eyes met in his mirror and he shook his head slowly, and that was the whole conversation, and it was enough. Some things you just need one other witness for.</p>"
+    },
+    {
+      "author_username": "keeps_receipts",
+      "title": "My washing machine sends its regards",
+      "note": "error code E-18, if you're wondering",
+      "content": "<p>The washing machine stopped mid-cycle and displayed E-18, a code which the manual does not contain. The manual lists E-01 through E-17 and then, presumably, ran out of imagination before the machine did.</p><p>The internet says E-18 is a blocked filter. The internet also says E-18 is a drainage fault, a door sensor, and in one forum post from 2011 that has haunted me ever since, 'the board going, mate. start saying your goodbyes.'</p><p>I cleaned the filter. Inside: forty pence, a hair clip belonging to nobody in this house, and a button from a shirt I threw away two flats ago. My washing machine has been running a small museum of my life and charging me for the privilege in error codes.</p><p>It works now. I put the forty pence on top of it. Tip jar. We understand each other.</p>"
+    },
+    {
+      "author_username": "keeps_receipts",
+      "title": "Return policy",
+      "note": null,
+      "content": "<p>Took the kettle back. The one that whistled at a pitch the manufacturer described as 'gentle' and I would describe as 'a fire drill inside a headache.'</p><p>I had the receipt. I want you to understand what that means. I am the person who kept the receipt, in the drawer, in the envelope marked KETTLE, because thirty years of being alive has taught me that all electronics are on loan from chaos.</p><p>The man at the counter looked at the receipt like I'd handed him a unicorn. 'Not many people have these,' he said, with respect, and processed the refund in ninety seconds flat.</p><p>I floated home. New kettle boils in silence. The envelope in the drawer now says KETTLE 2. I am ready. I am always ready.</p>"
+    },
+    {
+      "author_username": "harbourlight",
+      "title": "The gutting table",
+      "note": null,
+      "content": "<p>My mother could gut and fillet a mackerel in under a minute and she did it while holding a conversation over her shoulder, the knife moving like it was reading braille. I used to sit on the harbour wall and watch the gulls watch her, everybody in that scene a professional.</p><p>She never once called it a skill. Skills were things other people had, in offices. This was just Tuesday, and forty fish, and her hands too cold to feel, and the radio on the windowsill getting the shipping forecast wrong about weather she could read off the water without looking up.</p><p>I type for a living. My hands are warm all day. I don't know what my daughter will watch me do and think: there, that, that's what those hands know. Spreadsheets, probably. God.</p><p>Sea's flat calm tonight, says the app. My mother would have looked at the water.</p>"
+    },
+    {
+      "author_username": "deadlineadjacent",
+      "title": "Out of office",
+      "note": "draft one was honest. this is draft nine.",
+      "content": "<p>I am writing my out-of-office reply, which means I am writing fiction. 'I will have limited access to email.' I will have full access to email. I will have email in my pocket on a beach. The email and I will swim together in the sea like a man and his loyal, terrible dog.</p><p>Draft one said what I actually meant: I am going away specifically to not think about any of this, please treat my absence like weather, inevitable and nobody's fault. Legal would not love draft one.</p><p>So instead: limited access. Responses may be delayed. For urgent matters, contact Priya, who is on holiday the week after and is currently writing her own small novel about limited access.</p><p>The truest sentence in the whole reply is the dates. Everything else is a lullaby we sing to the calendar.</p>"
+    },
+    {
+      "author_username": "smallhours",
+      "title": "Frost reads the window",
+      "note": null,
+      "content": "<img src=\"https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/Frost_on_the_window_01.jpg/1920px-Frost_on_the_window_01.jpg\" alt=\"Frost patterns spread across a window pane\"><p>Cold snap, so the window has grown its ferns again. Frost only writes on glass when the night is long enough, which means I get to see it and the well-slept don't. Small compensations. This country has few exports but the light at this hour is one of them.</p><p>I pressed a thumb to the pane and melted a clean dark hole in the pattern, the way I did when I was eight, and looked through it at the garden holding absolutely still. Everything out there frozen mid-sentence. The rotary line. The fence. One magpie on the shed roof like a full stop that landed early.</p><p>The thumb-hole iced over again within the hour. The window heals faster than I do. By morning there was no evidence either of us had been awake.</p>"
+    },
+    {
+      "author_username": "smallhours",
+      "title": "The shipping forecast",
+      "note": "radio on low, house asleep",
+      "content": "<p>At half past five the radio reads the shipping forecast, and I listen the way some people go to church. Dogger, Fisher, German Bight. I have no boat. I will never have a boat. It is the most soothing thing broadcast in this or any country and it is not close.</p><p>Somebody out there in an actual gale, force nine, veering westerly, actually needs this. And here I am under a blanket receiving the same message, eavesdropping on the sea's weather like a landlocked spy.</p><p>Cromarty, Forth, Tyne. Occasionally poor, becoming good later.</p><p>Becoming good later. See, they can't help it. Even the forecast believes in something. I turned the radio off and slept like the dead until eight.</p>"
+    },
+    {
+      "author_username": "provingdrawer",
+      "title": "Starter",
+      "note": null,
+      "content": "<img src=\"https://upload.wikimedia.org/wikipedia/commons/thumb/9/9f/Sourdough_Loaf_%28217346645%29.jpeg/1920px-Sourdough_Loaf_%28217346645%29.jpeg\" alt=\"A scored sourdough loaf, flour still on the crust\"><p>The starter is nine years old this month. It has outlived two jobs, one relationship, three flats, and every houseplant I have ever owned, which tells you exactly what kind of dependent thrives in my care: one that shouts when it's hungry.</p><p>It came from my friend Dara, who got it from her landlady in Cork, who claimed it went back to her grandmother, which means when I feed it on a Sunday night I am possibly maintaining a small bubbling heirloom older than the house it lives in. No pressure.</p><p>People ask if it has a name. It doesn't. Naming it felt like tempting fate, like it would develop opinions. It already sulks when I switch flour.</p><p>Loaf number who-even-knows came out of the oven at six tonight, crackling to itself as it cooled, and the whole flat smelled like being looked after.</p>"
+    },
+    {
+      "author_username": "fieldnotes",
+      "title": "Interchange",
+      "note": "forty minutes between trains",
+      "content": "<img src=\"https://upload.wikimedia.org/wikipedia/commons/a/ac/Escalator%2C_Clapham_Common_Underground_Station_-_geograph.org.uk_-_3739488.jpg\" alt=\"A long escalator descending into an underground station\"><p>Forty minutes between trains, so I rode the escalator down and watched the city come up the other side. Everyone ascending is finishing a story I'll never hear the start of. The man with the enormous bunch of flowers, holding them face-out like a shield. The two kids in matching football shirts, asleep on their father in stereo.</p><p>An escalator is the only place strangers agree to stand still and be looked at. Thirty seconds of enforced museum. Then the top, and everyone becomes weather again.</p><p>I write in the notebook: flowers, shield, why face-out? And underneath, because the spin cycle of the mind never quite stops: buy flowers sometime. For the flat. No occasion.</p><p>Train's boarding. More from wherever I end up.</p>"
+    },
+    {
+      "author_username": "fieldnotes",
+      "title": "The backs of towns",
+      "note": null,
+      "content": "<p>Trains don't show you towns, they show you the backs of towns, which is better. The fronts are rehearsed. The backs are true: trampolines at angles, greenhouses leaning on fences, a rope swing over a stream that three generations of children have sworn is deeper than it looks.</p><p>Somewhere after the viaduct there's a garden with a full-size ship's figurehead in it, painted and proud, facing the railway like she's breasting a wave only she can see. I've passed her maybe thirty times. I have told nobody until now. Some sightings you hoard.</p><p>You could knock on that door and ask. You could ruin it completely with one fact. The whole discipline of the window seat is choosing the mystery, every time, at forty minutes past the hour, at speed.</p>"
     }
   ]
 }
