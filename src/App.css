@@ -401,6 +401,7 @@ body.is-mobile .focus-btn {       /* Fullscreen */
   display: flex;
   z-index: 1000;
   padding-bottom: env(safe-area-inset-bottom, 0px);
+  touch-action: manipulation;
 }
 
 .nav-tab {
@@ -417,8 +418,16 @@ body.is-mobile .focus-btn {       /* Fullscreen */
   color: var(--subtle);
   transition: color 0.15s;
   position: relative;
+  /* Kill the 300ms tap delay and the double-tap-zoom gesture so a single tap
+     switches tabs immediately on touch. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
-.nav-tab:hover { color: #666; }
+/* Only real pointers hover. On touch the first tap would otherwise land as a
+   hover state and swallow the click, so the tab needed a second tap to switch. */
+@media (hover: hover) {
+  .nav-tab:hover { color: #666; }
+}
 .nav-tab.active { color: var(--text); }
 
 .nav-label {
@@ -452,6 +461,30 @@ body.is-mobile .focus-btn {       /* Fullscreen */
   line-height: 1;
   background: none;
   color: var(--muted);
+}
+
+/* The done-typing tick: a single quiet control in the top corner while the
+   keyboard is up (the Notes gesture). Soft filled circle, no ring, ink mark. */
+#kb-done {
+  position: fixed;
+  top: calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + 8px);
+  right: 12px;
+  z-index: 1200;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 999px;
+  background: rgba(62, 50, 36, 0.07);
+  color: var(--text);
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  animation: viewIn 0.2s ease forwards;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* ─── Focus mode ──────────────────────────────────────────────────────────── */
@@ -3490,6 +3523,23 @@ body.is-mobile #auth-modal input { font-size: 16px; }
     line-height: 1.65;
     padding: 0 0 8px;
   }
+  /* A drag over editable text defaults to selecting it, which left the editor
+     unscrollable on the phone: there was nowhere to grab that wasn't text.
+     pan-y hands a vertical drag to the container's scroll instead (a word is
+     still selectable with a long-press). */
+  #text, #title-input, #writing-area, #text-container { touch-action: pan-y; }
+
+  /* The fade system: the first keystroke sends every piece of furniture away —
+     top bar (drafts, download, publish), the studying strip, the signal chip —
+     and reading keeps them away. The corner control is the one way back:
+     a tick while the keyboard is up, ⋯ once it is down. */
+  body.chrome-hidden #top-bar,
+  body.chrome-hidden #hs-editor-status,
+  body.chrome-hidden #research-strip {
+    opacity: 0;
+    pointer-events: none;
+  }
+  #top-bar, #research-strip { transition: opacity 0.25s ease; }
 
   /* ── Reading ── */
   #reading-inner { padding: 8px 0 40px; }
@@ -4234,8 +4284,19 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   body.keyboard-open #text-container {
     bottom: var(--kb-inset, 0px);
     padding-top: 7vh;
+    /* Room to scroll well past the last line (the Notes move), so text the
+       keyboard would cover can always be pulled up into the visible strip. */
+    padding-bottom: 45vh;
   }
   body.keyboard-open #text-container.writing-started { padding-top: 4vh; }
+  /* While the keyboard is up the tick owns the top corner; the editor's
+     cert/publish glyphs would collide with it, and mid-composition they are
+     not the point anyway. */
+  body.keyboard-open #top-bar-right {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
   body.keyboard-open #bottom-nav,
   body.keyboard-open #research-strip { opacity: 0; pointer-events: none; }
 
@@ -4356,8 +4417,11 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   #bottom-nav {
     left: 14px;
     right: 14px;
-    bottom: calc(var(--sab) + 10px);
-    height: 54px;
+    /* Tucked low: clear of the home indicator by a hair, not floating a full
+       safe-area above it. On an indicator phone this lands ~16px off the edge;
+       on a button phone, 12px. */
+    bottom: max(12px, calc(var(--sab) - 18px));
+    height: 46px;
     padding-bottom: 0;
     border: 1px solid var(--border);
     border-radius: 999px;
@@ -4375,7 +4439,7 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   .nav-tab {
     border-radius: 999px;
     padding: 0;
-    margin: 5px 0;
+    margin: 4px 0;
     transition: background 0.22s ease, color 0.22s ease;
   }
   .nav-tab.active {
@@ -4385,8 +4449,10 @@ body.is-mobile #auth-modal input { font-size: 16px; }
   #bottom-nav .nav-label { font-size: var(--t-sm); }
 
   /* The strip has to clear the floating bar rather than a flush one. */
-  #text-container { bottom: calc(64px + var(--sab) + var(--kb-inset, 0px)); }
-  body.keyboard-open #bottom-nav { transform: translateY(120%); opacity: 0; }
+  #text-container { bottom: calc(70px + var(--kb-inset, 0px)); }
+  /* Off-screen while the keyboard is up, so it must not catch the tap that is
+     meant for the text or a scroll under it. */
+  body.keyboard-open #bottom-nav { transform: translateY(120%); opacity: 0; pointer-events: none; }
 }
 
 /* ─── Phone: the research pass ───────────────────────────────────────────────

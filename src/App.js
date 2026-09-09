@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import "./App.css";
 import "@fontsource/eb-garamond/400.css";
 import "@fontsource/eb-garamond/500.css";
@@ -12,7 +13,7 @@ import { supabase } from "./supabase";
 import { renderBookPdfPages, PAGE_PRESETS } from "./pdf/bookPage";
 import {
   Menu, ArrowLeft, Share2, Check, Download, Maximize2, Minimize2,
-  Copy, CheckCheck, Plus, Trash2, Type, Search,
+  Copy, CheckCheck, Plus, Trash2, Type, Search, MoreHorizontal,
   Heart, Eye, EyeOff,
   AlignLeft, AlignCenter, AlignRight,
 } from "lucide-react";
@@ -4049,7 +4050,56 @@ export default function App() {
   // keyboard is covering. Publish it as --kb-inset so the editor can sit above
   // the keyboard, and flag body.keyboard-open for the typewriter scroll rule.
   // No-ops on desktop: the inset stays 0 and the class is never added.
+  const [kbOpen, setKbOpen] = useState(false);
+  // Phone editor modes. editArmed: the body is only contenteditable while
+  // actually writing — in read mode it is plain text, so drags scroll it
+  // exactly like the feed instead of fighting WKWebView's text-interaction
+  // gestures. chromeHidden: the first keystroke fades ALL the furniture (top
+  // bar, drafts, studying strip) and it stays away while reading; the corner
+  // control (tick while writing, ⋯ while reading) is the one obvious way back.
+  const [editArmed, setEditArmed]       = useState(false);
+  const [chromeHidden, setChromeHidden] = useState(false);
+  const editorTapRef = useRef(null);
   useEffect(() => {
+    if (kbOpen && isMobile()) setChromeHidden(true);
+    if (!kbOpen) setEditArmed(false);
+  }, [kbOpen]);
+  useEffect(() => {
+    document.body.classList.toggle("chrome-hidden", view === "editor" && chromeHidden);
+    return () => document.body.classList.remove("chrome-hidden");
+  }, [view, chromeHidden]);
+  useEffect(() => {
+    const setInset = (inset) => {
+      document.documentElement.style.setProperty("--kb-inset", `${Math.round(inset)}px`);
+      document.body.classList.toggle("keyboard-open", inset > 80);
+      setKbOpen(inset > 80);
+    };
+
+    // Native app: the keyboard events come from the OS and are the ground
+    // truth. visualViewport is NOT reliable here — with Keyboard.resize "none"
+    // the WKWebView's viewport never changes when the keyboard rises, so the
+    // web-side listener below would simply never fire (the app carried on as
+    // if the keyboard didn't exist: no typewriter scroll, nav not hidden,
+    // text left covered).
+    if (window.Capacitor?.isNativePlatform?.()) {
+      let handles = [];
+      let cancelled = false;
+      import("@capacitor/keyboard").then(({ Keyboard }) => {
+        if (cancelled) return;
+        Keyboard.addListener("keyboardWillShow", info => setInset(info?.keyboardHeight || 0))
+          .then(h => handles.push(h));
+        Keyboard.addListener("keyboardWillHide", () => setInset(0))
+          .then(h => handles.push(h));
+      }).catch(() => {});
+      return () => {
+        cancelled = true;
+        handles.forEach(h => h.remove());
+        document.body.classList.remove("keyboard-open");
+        setKbOpen(false);
+      };
+    }
+
+    // Mobile web: visualViewport does shrink for the keyboard in Safari.
     const vv = window.visualViewport;
     // Phones only. On desktop, browser zoom also shrinks the visual viewport,
     // which would otherwise look exactly like a keyboard appearing.
@@ -4059,8 +4109,7 @@ export default function App() {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
         const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-        document.documentElement.style.setProperty("--kb-inset", `${Math.round(inset)}px`);
-        document.body.classList.toggle("keyboard-open", inset > 80);
+        setInset(inset);
       });
     };
     apply();
@@ -4071,7 +4120,20 @@ export default function App() {
       vv.removeEventListener("resize", apply);
       vv.removeEventListener("scroll", apply);
       document.body.classList.remove("keyboard-open");
+      setKbOpen(false);
     };
+  }, []);
+
+  // ── done writing, for now (phones) ──────────────────────────────────────────
+  // The iOS Done bar was removed by design, so while the keyboard is up the
+  // editor shows a single tick in the top corner (the Notes gesture): tap it
+  // to put the keyboard down and read. Tapping the text just moves the caret,
+  // and a drag scrolls with the keyboard staying up. Blur releases web focus;
+  // Keyboard.hide() is the native belt-and-braces because a bare blur() does
+  // not always lower the keyboard in WKWebView.
+  const dismissKeyboard = useCallback(() => {
+    document.activeElement?.blur?.();
+    import("@capacitor/keyboard").then(({ Keyboard }) => Keyboard.hide()).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -4354,6 +4416,27 @@ export default function App() {
     if (newView === "verify") setVerifyCode(code || "");
   }, []);
 
+  // Nav-tab taps go straight from touchend to navigate. WKWebView's
+  // synthesized click was arriving unreliably on the floating bar, which is
+  // what made tabs take two or three presses; a real touchend never misses.
+  // The distance check keeps a scroll-drag across the bar from navigating,
+  // and preventDefault suppresses the late synthetic click that would follow.
+  const tabTouchStart = useRef({ x: 0, y: 0 });
+  const tabTouch = useCallback(go => ({
+    onTouchStart: e => {
+      const t = e.touches[0];
+      if (t) tabTouchStart.current = { x: t.clientX, y: t.clientY };
+    },
+    onTouchEnd: e => {
+      const t = e.changedTouches[0];
+      if (t && Math.hypot(t.clientX - tabTouchStart.current.x, t.clientY - tabTouchStart.current.y) < 12) {
+        e.preventDefault();
+        go();
+      }
+    },
+    onClick: go,
+  }), []);
+
   useEffect(() => {
     const handler = async (e) => {
       const s = e.state || {};
@@ -4396,12 +4479,18 @@ export default function App() {
     writingBaseRef.current = doc.writingTimeSecs || 0;
     writingFlushRef.current = 0;
     writingSessionStartRef.current = null;
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    range.collapse(false);
-    const sel = window.getSelection();
-    if (sel) { sel.removeAllRanges(); sel.addRange(range); }
-    el.focus();
+    // Desktop lands the caret at the end, ready to type. On a phone, planting
+    // a selection in an editable is itself enough to raise the keyboard (iOS
+    // focuses whatever holds the selection), so skip the whole gesture: the
+    // keyboard should only appear when the writer taps the body.
+    if (!isMobile()) {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      const sel = window.getSelection();
+      if (sel) { sel.removeAllRanges(); sel.addRange(range); }
+      el.focus();
+    }
   }, []);
 
   // Wipe device-local writing state back to a single empty draft. Called on sign
@@ -5374,7 +5463,7 @@ export default function App() {
         setShowLanding(false);
         // Hand the blinking caret to the body: the landing's deleted headline
         // resolves into the cursor waiting on the first line.
-        setTimeout(() => { if (view === "editor") editorRef.current?.focus(); }, 120);
+        setTimeout(() => { if (view === "editor" && !isMobileRef.current) editorRef.current?.focus(); }, 120);
       }} />}
 
       {/* ── top bar ── */}
@@ -5713,11 +5802,36 @@ export default function App() {
         onDrop={handleEditorDrop}
         onDragEnter={e => { if (Array.from(e.dataTransfer?.types || []).includes("Files")) e.preventDefault(); }}
         onDragOver={e => { if (Array.from(e.dataTransfer?.types || []).includes("Files")) e.preventDefault(); }}
+        onTouchStart={e => { const t = e.touches[0]; editorTapRef.current = t ? { x: t.clientX, y: t.clientY } : null; }}
+        onTouchEnd={e => {
+          // Read mode → write mode: a still tap arms editing and puts the
+          // caret under the finger. flushSync so the div is editable before
+          // focus() runs, still inside the user gesture.
+          if (editArmed || !isMobile()) return;
+          const t = e.changedTouches[0], s = editorTapRef.current;
+          if (!t || !s || Math.hypot(t.clientX - s.x, t.clientY - s.y) > 12) return;
+          const isTitle = !!e.target.closest?.("#title-input");
+          const { clientX: x, clientY: y } = t;
+          flushSync(() => setEditArmed(true));
+          const el = isTitle ? titleEditorRef.current : editorRef.current;
+          if (!el) return;
+          el.focus();
+          const sel = window.getSelection();
+          const r = document.caretRangeFromPoint?.(x, y);
+          if (sel && r && el.contains(r.startContainer)) {
+            sel.removeAllRanges(); sel.addRange(r);
+          } else if (sel) {
+            const range = document.createRange();
+            range.selectNodeContents(el);
+            range.collapse(false);
+            sel.removeAllRanges(); sel.addRange(range);
+          }
+        }}
       >
         <div
           id="title-input"
           ref={titleEditorRef}
-          contentEditable
+          contentEditable={editArmed || !isMobile()}
           suppressContentEditableWarning
           spellCheck={false}
           data-placeholder="Title"
@@ -5732,7 +5846,7 @@ export default function App() {
             id="text"
             ref={editorRef}
             className={font === "garamond" ? "" : "font-sans"}
-            contentEditable
+            contentEditable={editArmed || !isMobile()}
             suppressContentEditableWarning
             spellCheck={false}
             autoCorrect="off"
@@ -5744,6 +5858,17 @@ export default function App() {
           />
         </div>
       </div>
+
+      {/* ── corner control (phone): tick = done typing, ⋯ = bring the chrome back ── */}
+      {isEditor && (kbOpen || chromeHidden) && (
+        <button
+          id="kb-done"
+          aria-label={kbOpen ? "Done writing for now" : "Show controls"}
+          {...tabTouch(kbOpen ? dismissKeyboard : () => setChromeHidden(false))}
+        >
+          {kbOpen ? <Check size={16} strokeWidth={2} /> : <MoreHorizontal size={16} strokeWidth={2} />}
+        </button>
+      )}
 
       {imgTool && (
         <ImageToolbar
@@ -5880,29 +6005,33 @@ export default function App() {
       )}
 
       {/* ── bottom nav ── */}
+      {/* The nav is its own furniture, not part of the editor toolbar: it must
+          not inherit menu-hidden (pointer-events:none), which made a tap on a
+          tab do nothing for ~1.2s after typing. keyboard-open still hides it
+          while the writer is actually composing. */}
       {view !== "reading" && view !== "userProfile" && (
-        <nav id="bottom-nav" className={isEditor ? menuClass : ""}>
-          <button className={`nav-tab ${isEditor ? "active" : ""}`} onClick={() => navigate("editor")}>
+        <nav id="bottom-nav">
+          <button className={`nav-tab ${isEditor ? "active" : ""}`} {...tabTouch(() => navigate("editor"))}>
             <PPen size={19} weight="light" />
             <span className="nav-label">Write</span>
           </button>
-          <button className={`nav-tab ${view === "feed" ? "active" : ""}`} onClick={() => navigate("feed")}>
+          <button className={`nav-tab ${view === "feed" ? "active" : ""}`} {...tabTouch(() => navigate("feed"))}>
             <PGlobe size={19} weight="light" />
             <span className="nav-label">Feed</span>
           </button>
-          <button className={`nav-tab ${view === "verify" ? "active" : ""}`} onClick={() => navigate("verify")}>
+          <button className={`nav-tab ${view === "verify" ? "active" : ""}`} {...tabTouch(() => navigate("verify"))}>
             <span className="nav-diamond" aria-hidden="true">◇</span>
             <span className="nav-label">Verify</span>
           </button>
           {profile?.is_admin && (
-            <button className={`nav-tab ${view === "admin" ? "active" : ""}`} onClick={() => navigate("admin")}>
+            <button className={`nav-tab ${view === "admin" ? "active" : ""}`} {...tabTouch(() => navigate("admin"))}>
               <Eye size={18} strokeWidth={1.75} />
               <span className="nav-label">Mod</span>
             </button>
           )}
           <button
             className={`nav-tab ${view === "profile" ? "active" : ""}`}
-            onClick={() => navigate("profile")}
+            {...tabTouch(() => navigate("profile"))}
           >
             {user ? (
               <DropCapAvatar
