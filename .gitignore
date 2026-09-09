@@ -25,9 +25,9 @@ font-previews/
 /ios/DerivedData
 /ios/App/App/capacitor.config.json
 
-# Local companion build output and its env file; the app source lives on the
-# mac-companion branch, and this directory is only ever a build product.
-companion/
+# The companion app's source is tracked; its build output, node_modules and env
+# files are handled by companion/.gitignore, which git can only read if this
+# directory is not ignored wholesale.
 
 # Carousel source images and rendered output, both large and regenerable
 scripts/assets/
