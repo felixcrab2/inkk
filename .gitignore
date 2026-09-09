@@ -24,3 +24,11 @@ font-previews/
 /ios/App/Pods
 /ios/DerivedData
 /ios/App/App/capacitor.config.json
+
+# Local companion build output and its env file; the app source lives on the
+# mac-companion branch, and this directory is only ever a build product.
+companion/
+
+# Carousel source images and rendered output, both large and regenerable
+scripts/assets/
+tiktok-carousels/
