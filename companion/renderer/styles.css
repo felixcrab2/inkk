@@ -1,0 +1,83 @@
+/* inkk companion — editorial-minimal, matching the app's paper-and-ink voice. */
+:root {
+  --bg: #faf8f4;
+  --text: #1a1a1a;
+  --muted: #6b6862;
+  --subtle: #a6a29b;
+  --border: #e6e2da;
+  --gold: #9a7b3f;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%;
+  background: var(--bg); color: var(--text);
+  font-family: "EB Garamond", Georgia, serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+#bar {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: 14px 18px 10px;
+}
+#brand { font-size: 1.15rem; font-weight: 500; letter-spacing: 0.01em; }
+#brand .dot { color: var(--gold); }
+#version { font-size: 0.68rem; color: var(--subtle); }
+
+.phase { padding: 6px 18px 20px; }
+.lead { font-size: 0.96rem; line-height: 1.5; color: var(--text); margin: 6px 0 16px; }
+.who-line { font-size: 0.8rem; color: var(--muted); margin: 0 0 10px; }
+.hint { font-size: 0.78rem; color: var(--subtle); line-height: 1.45; margin-top: 14px; }
+
+input, textarea {
+  width: 100%; margin-bottom: 10px; padding: 10px 12px;
+  background: #fff; border: 1px solid var(--border); border-radius: 8px;
+  font-family: inherit; font-size: 0.9rem; color: var(--text);
+  outline: none; resize: none;
+}
+input:focus, textarea:focus { border-color: var(--subtle); }
+
+button { font-family: inherit; cursor: pointer; border-radius: 8px; }
+.primary {
+  width: 100%; padding: 11px; margin-top: 4px;
+  background: var(--text); color: var(--bg); border: 1px solid var(--text);
+  font-size: 0.88rem; letter-spacing: 0.01em;
+}
+.primary:hover { opacity: 0.9; }
+.primary:disabled { opacity: 0.55; cursor: default; }
+.ghost {
+  flex: 1; padding: 9px; background: none; color: var(--muted);
+  border: 1px solid var(--border); font-size: 0.8rem;
+}
+.ghost:hover { color: var(--text); border-color: var(--subtle); }
+.row { display: flex; gap: 8px; }
+
+.watch {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 12px 14px; background: #fff; border: 1px solid var(--border);
+  border-radius: 8px; font-size: 0.85rem;
+}
+.watch-label { color: var(--subtle); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.12em; }
+#watch-app { color: var(--text); font-weight: 500; }
+.watch-status { margin-left: auto; font-size: 0.76rem; }
+.watch-status.on { color: #2e7d32; }
+.watch-status.off { color: var(--subtle); }
+
+.rec { display: flex; align-items: center; gap: 8px; font-size: 1rem; font-weight: 500; }
+.rec-dot {
+  width: 9px; height: 9px; border-radius: 50%; background: #c0392b;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.stat { font-size: 1.6rem; margin: 14px 0 2px; }
+.stat span { font-variant-numeric: tabular-nums; }
+
+.code {
+  font-family: "SF Mono", ui-monospace, monospace;
+  font-size: 1.15rem; letter-spacing: 0.06em; text-align: center;
+  padding: 14px; margin: 8px 0 8px; background: #fff;
+  border: 1px solid var(--border); border-radius: 8px;
+}
+.tier { text-align: center; font-size: 0.82rem; color: var(--gold); margin: 0 0 14px; }
+
+.err-line { color: #c0392b; font-size: 0.78rem; min-height: 1em; margin: 6px 0 0; }
+.banner { background: #c0392b; color: #fff; font-size: 0.78rem; padding: 8px 18px; }

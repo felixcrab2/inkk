@@ -1,0 +1,7 @@
+node_modules/
+dist/
+renderer/bundle.js
+renderer/bundle.js.map
+.env
+.env.local
+.env.signing
