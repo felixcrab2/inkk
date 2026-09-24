@@ -1,3896 +1,42 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { flushSync } from "react-dom";
-import "./App.css";
+import "./styles/index.css";
 import "@fontsource/eb-garamond/400.css";
 import "@fontsource/eb-garamond/500.css";
 import "@fontsource/cormorant-garamond/400.css";
 import "@fontsource/cormorant-garamond/500.css";
 import "@fontsource/cormorant-garamond/600.css";
 import "@fontsource/cormorant-garamond/700.css";
-import "@fontsource-variable/work-sans";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import { Menu, Check, Download, Maximize2, Minimize2, Plus, Trash2, Type, MoreHorizontal, Eye, EyeOff } from "lucide-react";
+import { PenNib as PPen, Notebook as PNotes, SealCheck as PSeal } from "@phosphor-icons/react";
 import { jsPDF } from "jspdf";
 import { supabase } from "./supabase";
 import { renderBookPdfPages, PAGE_PRESETS } from "./pdf/bookPage";
-import {
-  Menu, ArrowLeft, Share2, Check, Download, Maximize2, Minimize2,
-  Copy, CheckCheck, Plus, Trash2, Type, Search, MoreHorizontal,
-  Heart, Eye, EyeOff,
-  AlignLeft, AlignCenter, AlignRight,
-} from "lucide-react";
 import { createRecorder } from "./telemetry/recorder";
 import { extractFeatures } from "./telemetry/features";
 import { computeScore } from "./telemetry/score";
-import {
-  startSync, stopSync,
-  setResearchOptIn as remoteSetResearchOptIn,
-  deleteMyEvents, dumpMyEvents,
-  flushNow as syncFlushNow,
-} from "./telemetry/sync";
-import { claimAnonymous as claimAnonymousEvents, clearForUser as clearLocalForUser, countForUser as countLocalEvents, dumpForUser as dumpLocalForUser } from "./telemetry/store";
-import {
-  Heart as PHeart, ChatCircle as PChat, Export as PShare,
-  PenNib as PPen,
-  Globe as PGlobe, UserCircle as PUser,
-} from "@phosphor-icons/react";
-import { HumanSignalBadge, HumanSignalPanel } from "./components/HumanSignal";
-import { PrivacyModal, TermsModal, TOS_VERSION } from "./components/Legal";
-import { VerifyView } from "./components/Verify";
-import { makeVerifyCode, hashContent, isVerifiedTier } from "./verify/code";
-
-// ─── local storage ────────────────────────────────────────────────────────────
-
-// crypto.randomUUID only exists in a secure context, so it is missing whenever
-// the app is served over plain http — a LAN address during device testing, for
-// instance. Falling back keeps documents creatable there instead of taking the
-// whole editor down with a TypeError.
-export function uid() {
-  try {
-    if (window.crypto?.randomUUID) return window.crypto.randomUUID();
-  } catch { /* fall through */ }
-  const r = (n) => Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join("");
-  return `${r(8)}-${r(4)}-4${r(3)}-${((Math.random() * 4) | 8).toString(16)}${r(3)}-${r(12)}`;
-}
-
-function createDoc() {
-  const now = Date.now();
-  return {
-    id: uid(), title: "", content: "",
-    updatedAt: now, createdAt: now,
-    writingTimeSecs: 0, revisionCount: 0,
-    keystrokes: 0, deletions: 0, pastes: 0,
-    humanScore: null, scoreTier: null, scoreFeatures: null,
-    verifyCode: null, contentHash: null,
-  };
-}
-
-const DOC_DEFAULTS = {
-  title: "", writingTimeSecs: 0, revisionCount: 0,
-  keystrokes: 0, deletions: 0, pastes: 0,
-  humanScore: null, scoreTier: null, scoreFeatures: null,
-  verifyCode: null, contentHash: null,
-};
-
-function normaliseDoc(d) {
-  return {
-    ...DOC_DEFAULTS, ...d,
-    createdAt: d.createdAt || d.updatedAt || Date.now(),
-  };
-}
-
-function loadState() {
-  try {
-    const raw = localStorage.getItem("inkk_v1");
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
-
-function saveState(docs, activeId) {
-  try { localStorage.setItem("inkk_v1", JSON.stringify({ docs, activeId })); } catch {}
-}
-
-// Which signed-in user the on-device docs belong to (null = anonymous). Used to
-// stop one account's drafts from being merged into another on a shared device.
-function loadOwner() {
-  try { return localStorage.getItem("inkk_owner") || null; } catch { return null; }
-}
-function saveOwner(id) {
-  try {
-    if (id) localStorage.setItem("inkk_owner", id);
-    else localStorage.removeItem("inkk_owner");
-  } catch {}
-}
-
-function initState() {
-  const saved = loadState();
-  if (!saved?.docs?.length) {
-    const doc = createDoc();
-    return { docs: [doc], activeId: doc.id };
-  }
-  const docs = saved.docs.map(normaliseDoc);
-  const validId = docs.find(d => d.id === saved.activeId) ? saved.activeId : docs[0].id;
-  return { docs, activeId: validId };
-}
-
-// In-place smart typography on the contenteditable. Looks at the text around
-// the caret and rewrites common ASCII sequences into proper book glyphs.
-// Invisible to the user — no toolbar, no shortcuts.
-function applySmartTypography() {
-  const sel = window.getSelection();
-  if (!sel || !sel.rangeCount) return;
-  const range = sel.getRangeAt(0);
-  if (!range.collapsed) return;
-  const node = range.startContainer;
-  if (!node || node.nodeType !== Node.TEXT_NODE) return;
-  const offset = range.startOffset;
-  const text = node.nodeValue;
-  if (!text) return;
-  const before = text.slice(0, offset);
-  const after  = text.slice(offset);
-  const setCaret = (n, off) => { try { sel.collapse(n, off); } catch {} };
-
-  // Auto-list: "- " or "N. " at the very start of a paragraph.
-  // Chrome sometimes places a <br> placeholder before the text node in a new
-  // div, so we allow that as "first in paragraph" too.
-  if (before === "- " || /^\d+\. $/.test(before)) {
-    const parent = node.parentElement;
-    const prevSib = node.previousSibling;
-    const isFirstInPara = !prevSib ||
-      (prevSib.nodeType === Node.ELEMENT_NODE && prevSib.tagName === "BR" && !prevSib.previousSibling);
-    if (isFirstInPara && parent) {
-      let listDiv = null;
-      if (parent.id === "text") {
-        // Bare text node directly in #text — wrap it in a div first
-        const wrapper = document.createElement("div");
-        parent.insertBefore(wrapper, node);
-        wrapper.appendChild(node);
-        listDiv = wrapper;
-      } else if (["DIV","P"].includes(parent.tagName) && parent.parentElement?.id === "text") {
-        listDiv = parent;
-      }
-      if (listDiv) {
-        // Remove any <br> placeholder that was inside the div
-        listDiv.querySelectorAll("br").forEach(br => br.remove());
-        if (before === "- ") {
-          node.nodeValue = "\u2022 " + after;
-          listDiv.setAttribute("data-list", "bullet");
-        } else {
-          const num = before.match(/^(\d+)\. $/)[1];
-          node.nodeValue = num + ". " + after;
-          listDiv.setAttribute("data-list", "ordered");
-        }
-        setCaret(node, before.length);
-        return;
-      }
-    }
-  }
-
-  // Em dash: -- → —
-  if (before.endsWith("--")) {
-    node.nodeValue = before.slice(0, -2) + "—" + after;
-    setCaret(node, offset - 1);
-    return;
-  }
-  // Ellipsis: ... → …
-  if (before.endsWith("...")) {
-    node.nodeValue = before.slice(0, -3) + "…" + after;
-    setCaret(node, offset - 2);
-    return;
-  }
-  // Curly double quote.
-  if (before.endsWith('"')) {
-    const prev = before.length >= 2 ? before[before.length - 2] : "";
-    const opening = !prev || /[\s([{—–]/.test(prev);
-    const glyph = opening ? "“" : "”";
-    node.nodeValue = before.slice(0, -1) + glyph + after;
-    setCaret(node, offset);
-    return;
-  }
-  // Curly single quote / apostrophe.
-  if (before.endsWith("'")) {
-    const prev = before.length >= 2 ? before[before.length - 2] : "";
-    const opening = !prev || /[\s([{—–]/.test(prev);
-    const glyph = opening ? "‘" : "’";
-    node.nodeValue = before.slice(0, -1) + glyph + after;
-    setCaret(node, offset);
-    return;
-  }
-
-  // Markdown emphasis on close: *word*/_word_ → italic, **word**/__word__ → bold.
-  // The opening marker must sit at a word boundary, so snake_case, file_names and
-  // "2 * 3" are left alone.
-  const lastCh = before.slice(-1);
-  if ((lastCh === "_" || lastCh === "*") && node.parentNode) {
-    const mBold = before.match(/(^|[\s([{“‘"'—–])(\*\*|__)([^\s*_][^*_\n]*?)\2$/);
-    const mItal = before.match(/(^|[\s([{“‘"'—–])([*_])([^\s*_][^*_\n]*?)\2$/);
-    const m = mBold || mItal;
-    if (m) {
-      const pre = m[1], inner = m[3];
-      const startIdx = offset - (m[0].length - pre.length);   // index of the opening marker
-      node.nodeValue = text.slice(0, startIdx);               // keep text before it (incl. pre)
-      const el = document.createElement(mBold ? "strong" : "em");
-      el.textContent = inner;
-      const afterNode = document.createTextNode(after);
-      node.parentNode.insertBefore(afterNode, node.nextSibling);
-      node.parentNode.insertBefore(el, afterNode);
-      setCaret(afterNode, 0);
-      return;
-    }
-  }
-}
-
-function stripHtml(html) {
-  if (!html) return "";
-  return html
-    .replace(/<\/div>/gi, "\n").replace(/<\/p>/gi, "\n")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<img[^>]*>/gi, " ")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-    .replace(/\n{3,}/g, "\n\n").trim();
-}
-
-// Defence-in-depth: strip script-bearing markup before HTML is placed into a
-// live editable node. Parses in an inert <template> (no execution), removes
-// <script>/<iframe>/etc, on* handlers and javascript: URLs, and keeps all
-// formatting and data:image content intact.
-function sanitizeContentHtml(html) {
-  if (!html) return "";
-  const tpl = document.createElement("template");
-  tpl.innerHTML = html;
-  tpl.content.querySelectorAll("script,style,iframe,object,embed,link,meta,base,form,svg").forEach(n => n.remove());
-  tpl.content.querySelectorAll("*").forEach(el => {
-    for (const attr of [...el.attributes]) {
-      const name = attr.name.toLowerCase();
-      if (name.startsWith("on")) el.removeAttribute(attr.name);
-      else if ((name === "href" || name === "src" || name === "xlink:href") && /^\s*javascript:/i.test(attr.value)) el.removeAttribute(attr.name);
-    }
-  });
-  return tpl.innerHTML;
-}
-
-function setEditorHtml(el, content) {
-  if (!content) { el.innerHTML = ""; return; }
-  if (/<(div|br|img|p)\b/i.test(content)) { el.innerHTML = sanitizeContentHtml(content); }
-  else { el.innerText = content; }
-}
-
-function setTitleHtml(el, content) {
-  if (!content) { el.innerHTML = ""; return; }
-  if (/<\w+/.test(content) || /&\w+;/.test(content)) { el.innerHTML = sanitizeContentHtml(content); }
-  else { el.innerText = content; }
-}
-
-function caretRangeAt(x, y) {
-  if (document.caretRangeFromPoint) return document.caretRangeFromPoint(x, y);
-  const pos = document.caretPositionFromPoint?.(x, y);
-  if (!pos) return null;
-  const r = document.createRange();
-  r.setStart(pos.offsetNode, pos.offset);
-  r.collapse(true);
-  return r;
-}
-
-async function compressImage(file, maxDim = 2600) {
-  return new Promise(resolve => {
-    const reader = new FileReader();
-    reader.onerror = () => resolve(null);
-    reader.onload = e => {
-      const img = new window.Image();
-      img.onerror = () => resolve(null);   // undecodable format (e.g. HEIC)
-      img.onload = () => {
-        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-        const w = Math.round(img.width * scale);
-        const h = Math.round(img.height * scale);
-        const canvas = document.createElement("canvas");
-        canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";   // crisper downscaling
-        ctx.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL("image/jpeg", 0.9));
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
-function docTitle(content) {
-  const first = stripHtml(content || "").trim().split("\n")[0].trim();
-  return first.length > 0 ? first : "Untitled";
-}
-
-function wordCount(content) {
-  const t = stripHtml(content || "").trim();
-  return t ? t.split(/\s+/).length : 0;
-}
-
-// ── Title case ────────────────────────────────────────────────────────────────
-// Capitalize a title the conventional way: the first and last word always go up,
-// and the first word after a colon (subtitle); short "minor" words (articles,
-// coordinating conjunctions, short prepositions) stay down in between. Acronyms
-// and intentional mixed-case (NASA, iPhone) are preserved.
-const TITLE_MINOR_WORDS = new Set([
-  "a", "an", "and", "as", "at", "but", "by", "en", "for", "if", "in", "nor",
-  "of", "on", "or", "per", "so", "the", "to", "v", "vs", "via", "yet",
-]);
-
-function capitalizeTitleWord(word) {
-  // Capitalize each hyphen-separated part: "self-portrait" -> "Self-Portrait".
-  return word.split("-").map(part => {
-    if (!part) return part;
-    // Preserve acronyms (NASA) and intentional inner caps (iPhone, McCoy).
-    if (/[A-Z]/.test(part.slice(1)) || (part.length > 1 && part === part.toUpperCase())) return part;
-    return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
-  }).join("-");
-}
-
-function titleCase(input) {
-  const str = (input || "").replace(/\s+/g, " ").trim();
-  if (!str) return str;
-  const words = str.split(" ");
-  const last = words.length - 1;
-  let capNext = true;   // first word always capitalized
-  return words.map((word, i) => {
-    const forceCap = capNext || i === last;
-    capNext = /:$/.test(word);   // word after a colon starts a subtitle
-    const bare = word.toLowerCase().replace(/[^a-z]/g, "");
-    if (!forceCap && TITLE_MINOR_WORDS.has(bare)) return word.toLowerCase();
-    return capitalizeTitleWord(word);
-  }).join(" ");
-}
-
-// Title-case the words the user has already finished (those followed by
-// whitespace), leaving the word currently being typed alone — except the first
-// word, which is always capitalized. Last-word/minor-word fixes happen in the
-// full titleCase() pass on blur/Enter. Case-only, so caret offsets stay valid.
-function liveTitleCase(text) {
-  if (!text) return text;
-  const trailingWS = /\s$/.test(text);
-  const parts = text.split(/(\s+)/);   // words at even indices, whitespace at odd
-  let lastWordIdx = -1;
-  for (let i = 0; i < parts.length; i++) if (i % 2 === 0 && parts[i] !== "") lastWordIdx = i;
-  let firstSeen = false;
-  let capNext = true;
-  return parts.map((tok, i) => {
-    if (i % 2 === 1 || tok === "") return tok;
-    const isFirst = !firstSeen; firstSeen = true;
-    const inProgress = i === lastWordIdx && !trailingWS;
-    const forceCap = capNext;
-    capNext = /:$/.test(tok);
-    if (inProgress && !isFirst) return tok;   // don't touch the word being typed
-    const bare = tok.toLowerCase().replace(/[^a-z]/g, "");
-    if (!forceCap && TITLE_MINOR_WORDS.has(bare)) return tok.toLowerCase();
-    return capitalizeTitleWord(tok);
-  }).join("");
-}
-
-// Caret offset (character count from start) within a single-line editable.
-function titleCaretOffset(el) {
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0) return null;
-  const range = sel.getRangeAt(0);
-  const pre = range.cloneRange();
-  pre.selectNodeContents(el);
-  pre.setEnd(range.endContainer, range.endOffset);
-  return pre.toString().length;
-}
-
-function setTitleCaret(el, offset) {
-  const node = el.firstChild;
-  if (!node) return;
-  const len = (node.textContent || "").length;
-  const range = document.createRange();
-  range.setStart(node, Math.min(offset, len));
-  range.collapse(true);
-  const sel = window.getSelection();
-  sel.removeAllRanges();
-  sel.addRange(range);
-}
-
-function isMobile() {
-  if (typeof navigator === "undefined") return false;
-  // Direct signals.
-  if (navigator.maxTouchPoints > 0) return true;
-  if (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "")) return true;
-  // A phone with "Request Desktop Site" on sends a desktop user-agent and can
-  // report maxTouchPoints as 0 — but its primary pointer is still a finger and
-  // the physical screen stays small. Without catching this it would wrongly get
-  // the in-page Google button, which dead-ends on mobile (gsi/transform), so we
-  // treat a coarse-pointer or small-screen device as mobile too.
-  try {
-    if (window.matchMedia && window.matchMedia("(pointer: coarse)").matches) return true;
-    const w = window.screen && window.screen.width;
-    if (w && w <= 820) return true;
-  } catch {}
-  return false;
-}
-
-function dropCapSrc(letter, images) {
-  if (!letter || !images) return null;
-  const l = letter.toLowerCase();
-  const list = images[l];
-  return list?.length ? `/drop_caps/${l}/${list[0]}.png` : null;
-}
-
-// Store avatars at high resolution so they stay razor-sharp in a small circle
-// (and on high-DPI screens): the physical display size is small, the source
-// image is large. Never upscale past the original.
-async function compressAvatar(file, size = 512) {
-  return new Promise(resolve => {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const img = new window.Image();
-      img.onload = () => {
-        const s = Math.min(img.width, img.height);
-        const out = Math.min(size, s); // don't upscale a small source
-        const canvas = document.createElement("canvas");
-        canvas.width = out; canvas.height = out;
-        const ctx = canvas.getContext("2d");
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, out, out);
-        resolve(canvas.toDataURL("image/jpeg", 0.95));
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
-// ─── helpers ──────────────────────────────────────────────────────────────────
-
-function formatWritingTime(secs) {
-  if (!secs || secs < 60) return secs ? `${Math.round(secs)}s` : "0s";
-  return `${Math.round(secs / 60)} min`;
-}
-
-
-function readingTime(content) {
-  const mins = Math.ceil(wordCount(content) / 220);
-  return `${mins} min read`;
-}
-
-function formatDate(iso) {
-  const diffDays = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return `${diffDays}d ago`;
-  const weeks = Math.floor(diffDays / 7);
-  if (weeks < 5) return `${weeks}w ago`;
-  const months = Math.floor(diffDays / 30);
-  if (months < 12) return `${months}mo ago`;
-  return new Date(iso).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
-}
-
-
-function formatJoined(isoOrDate) {
-  if (!isoOrDate) return "";
-  return new Date(isoOrDate).toLocaleDateString("en-GB", { month: "long", year: "numeric" });
-}
-
-// ─── streak ───────────────────────────────────────────────────────────────────
-
-function loadStreak() {
-  try {
-    const raw = localStorage.getItem("inkk_streak");
-    return raw ? JSON.parse(raw) : { count: 0, lastDate: null };
-  } catch { return { count: 0, lastDate: null }; }
-}
-
-function touchStreak() {
-  const today = new Date().toDateString();
-  const s = loadStreak();
-  if (s.lastDate === today) return s.count;
-  const yesterday = new Date(Date.now() - 86400000).toDateString();
-  const count = s.lastDate === yesterday ? s.count + 1 : 1;
-  try { localStorage.setItem("inkk_streak", JSON.stringify({ count, lastDate: today })); } catch {}
-  return count;
-}
-
-// ─── cloud sync ───────────────────────────────────────────────────────────────
-
-async function fetchCloudDocs() {
-  if (!supabase) return [];
-  const { data, error } = await supabase
-    .from("documents")
-    .select("id, content, updated_at, total_writing_secs, revision_count, keystrokes, deletions, pastes, human_score, score_tier, score_features, verify_code, content_hash");
-  if (error || !data) return [];
-  return data.map(r => ({
-    id: r.id,
-    content: r.content,
-    updatedAt: new Date(r.updated_at).getTime(),
-    writingTimeSecs: r.total_writing_secs ?? 0,
-    revisionCount: r.revision_count ?? 0,
-    keystrokes: r.keystrokes ?? 0,
-    deletions: r.deletions ?? 0,
-    pastes: r.pastes ?? 0,
-    humanScore: r.human_score,
-    scoreTier: r.score_tier,
-    scoreFeatures: r.score_features || null,
-    verifyCode: r.verify_code ?? null,
-    contentHash: r.content_hash ?? null,
-  }));
-}
-
-// A published piece's backing draft may live on another device: pull it down
-// before editing rather than silently showing whatever draft was already open.
-async function fetchCloudDoc(docId) {
-  if (!supabase) return null;
-  const { data: r } = await supabase
-    .from("documents")
-    .select("id, content, updated_at, total_writing_secs, revision_count, keystrokes, deletions, pastes, human_score, score_tier, score_features, verify_code, content_hash")
-    .eq("id", docId).maybeSingle();
-  if (!r) return null;
-  return {
-    id: r.id,
-    content: r.content,
-    updatedAt: new Date(r.updated_at).getTime(),
-    writingTimeSecs: r.total_writing_secs ?? 0,
-    revisionCount: r.revision_count ?? 0,
-    keystrokes: r.keystrokes ?? 0,
-    deletions: r.deletions ?? 0,
-    pastes: r.pastes ?? 0,
-    humanScore: r.human_score,
-    scoreTier: r.score_tier,
-    scoreFeatures: r.score_features || null,
-    verifyCode: r.verify_code ?? null,
-    contentHash: r.content_hash ?? null,
-  };
-}
-
-async function pushDocToCloud(doc, userId) {
-  if (!supabase || !userId) return;
-  await supabase.from("documents").upsert({
-    id: doc.id, user_id: userId,
-    content: doc.content,
-    updated_at: new Date(doc.updatedAt).toISOString(),
-    total_writing_secs: doc.writingTimeSecs || 0,
-    revision_count:     doc.revisionCount  || 0,
-    keystrokes:         doc.keystrokes     || 0,
-    deletions:          doc.deletions      || 0,
-    pastes:             doc.pastes         || 0,
-    human_score:        doc.humanScore     ?? null,
-    score_tier:         doc.scoreTier      ?? null,
-    score_features:     doc.scoreFeatures  ?? null,
-    verify_code:        doc.verifyCode     ?? null,
-    content_hash:       doc.contentHash    ?? null,
-  });
-}
-
-async function deleteDocFromCloud(docId) {
-  if (!supabase) return;
-  await supabase.from("documents").delete().eq("id", docId);
-}
-
-function mergeDocs(local, cloud) {
-  const map = new Map();
-  for (const doc of local) map.set(doc.id, doc);
-  for (const doc of cloud) {
-    const existing = map.get(doc.id);
-    if (!existing || doc.updatedAt > existing.updatedAt) map.set(doc.id, doc);
-  }
-  return [...map.values()].sort((a, b) => b.updatedAt - a.updatedAt);
-}
-
-// ─── publications ─────────────────────────────────────────────────────────────
-
-const PUB_SELECT = "id, title, content, published_at, author_name, author_username, user_id, writing_time_seconds, revision_count, human_score, score_tier, score_features, keystrokes, deletions, pastes, verify_code, content_hash";
-const PUB_SELECT_WITH_COUNTS = PUB_SELECT + ", author_note, moderation_status, render_justify, render_indent, like_count:likes(count), comment_count:comments(count)";
-
-function getRelCount(rel) {
-  if (!rel) return 0;
-  if (Array.isArray(rel)) return rel[0]?.count ?? 0;
-  return rel?.count ?? 0;
-}
-
-// ─── Browser fullscreen ──────────────────────────────────────────────────────
-// Genuine fullscreen (hides the browser's tab strip / address bar). Must be
-// called from a user gesture; silently no-ops where unsupported (e.g. iOS Safari).
-function enterBrowserFullscreen() {
-  const el = document.documentElement;
-  const req = el.requestFullscreen || el.webkitRequestFullscreen;
-  if (req) { try { Promise.resolve(req.call(el)).catch(() => {}); } catch {} }
-}
-function exitBrowserFullscreen() {
-  if (!(document.fullscreenElement || document.webkitFullscreenElement)) return;
-  const exit = document.exitFullscreen || document.webkitExitFullscreen;
-  if (exit) { try { Promise.resolve(exit.call(document)).catch(() => {}); } catch {} }
-}
-
-// ─── Likes ─────────────────────────────────────────────────────────────────
-async function togglePubLike(pubId, userId, currentlyLiked) {
-  if (!supabase || !userId) return "Not signed in.";
-  if (currentlyLiked) {
-    const { error } = await supabase.from("likes").delete().eq("user_id", userId).eq("publication_id", pubId);
-    return error?.message || null;
-  }
-  const { error } = await supabase.from("likes").insert({ user_id: userId, publication_id: pubId });
-  return error?.message || null;
-}
-
-// ─── Comments ──────────────────────────────────────────────────────────────
-async function fetchComments(pubId) {
-  if (!supabase || !pubId) return [];
-  const { data } = await supabase
-    .from("comments")
-    .select("id, user_id, body, created_at, updated_at, profiles!user_id(username, display_name, avatar_data)")
-    .eq("publication_id", pubId)
-    .order("created_at", { ascending: true });
-  return data || [];
-}
-
-async function addComment(pubId, userId, body) {
-  if (!supabase || !userId) return "Not signed in.";
-  const trimmed = (body || "").trim();
-  if (!trimmed) return "Empty comment.";
-  if (trimmed.length > 2000) return "Comment is too long (max 2000 chars).";
-  const mod = await moderateText(trimmed);
-  const row = withModeration({ user_id: userId, publication_id: pubId, body: trimmed }, mod);
-  let { error } = await supabase.from("comments").insert(row);
-  // Backward-compat: retry plain if the moderation columns aren't migrated yet.
-  if (error && /column/i.test(error.message || "") && mod) {
-    ({ error } = await supabase.from("comments").insert(stripModeration(row)));
-  }
-  return error?.message || null;
-}
-
-// ─── Research contribution stats ───────────────────────────────────────────
-async function fetchMyContribution(userId) {
-  if (!supabase || !userId) return null;
-  const { data, error } = await supabase
-    .from("my_writing_event_counts")
-    .select("event_count, first_t, last_t")
-    .maybeSingle();
-  if (error) return null;
-  return data || null;
-}
-
-async function deleteCommentRow(commentId) {
-  if (!supabase || !commentId) return "Not signed in.";
-  const { error } = await supabase.from("comments").delete().eq("id", commentId);
-  return error?.message || null;
-}
-
-// ─── Content moderation ──────────────────────────────────────────────────────
-// Pull embedded image sources (data URLs or http) from HTML so they can be
-// moderated alongside the prose — omni-moderation scores images too.
-function extractImages(html, max = 8) {
-  if (!html) return [];
-  const out = [];
-  const re = /<img[^>]+src=["']([^"']+)["']/gi;
-  let m;
-  while ((m = re.exec(html)) && out.length < max) {
-    const src = m[1];
-    if (src.startsWith("data:image") || src.startsWith("http")) out.push(src);
-  }
-  return out;
-}
-
-// The first image an author placed in a piece serves as its cover: shown on
-// the feed card in place of the engraving plate, and as the frontispiece of
-// the reading view. The canvas page renderer is text-only, so images are
-// lifted out before pagination rather than dropped on the floor.
-function pieceCover(html) { return extractImages(html, 1)[0] || null; }
-function pieceImages(html) { return extractImages(html, 8); }
-function stripImgs(html) { return (html || "").replace(/<img[^>]*>/gi, ""); }
-
-// Ask the server-side /api/moderate endpoint (OpenAI) to classify text and/or
-// images. stripHtml() (defined above) gives the classifier prose, not markup.
-// Fail-open: returns null on any failure so a moderation outage never blocks
-// the user. On success returns { status: 'ok' | 'flagged', scores }.
-async function moderateText(text, images) {
-  try {
-    const headers = { "Content-Type": "application/json" };
-    if (supabase) {
-      const { data: s } = await supabase.auth.getSession();
-      if (s?.session?.access_token) headers.Authorization = `Bearer ${s.session.access_token}`;
-    }
-    const res = await fetch("/api/moderate", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ text: stripHtml(text), images: images || [] }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data || data.ok === false) return null;
-    return { status: data.flagged ? "flagged" : "ok", scores: data.scores || null };
-  } catch { return null; }
-}
-
-// Ask the server-side /api/certify endpoint to recompute the human-signal score
-// from the doc's keystroke trace and write the certificate. The browser is NOT
-// trusted to assert its own score (the columns are locked in schema.sql §13), so
-// this is the only path that yields a *verified* certificate. Returns the
-// server's verdict, or null when the route is unavailable — the caller then
-// falls back to the legacy direct write (unverified once the lock is applied).
-async function certifyViaServer({ docId, code, events, contentHash, wordCount: wc, title, authorName, authorUsername }) {
-  if (!supabase) return null;
-  try {
-    const { data: s } = await supabase.auth.getSession();
-    const token = s?.session?.access_token;
-    if (!token) return null;
-    const res = await fetch("/api/certify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ docId, code, events: events || [], contentHash, wordCount: wc, title, authorName, authorUsername }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return (data && data.ok !== false) ? data : null;
-  } catch { return null; }
-}
-
-// Fallback for when /api/certify is unreachable: the previous client-side write.
-// Pre-migration this still records the client's score; once schema.sql §13 is
-// applied the score/verified columns are forced null/false on a client insert,
-// so a route outage degrades to an UNVERIFIED certificate rather than a forgeable
-// one. Idempotent (the ledger row for a code is immutable).
-async function writeCertFallback({ code, doc, user, title, authorName, authorUsername, contentHash }) {
-  const verified = isVerifiedTier(doc.scoreTier);
-  const { error } = await supabase.from("verifications").upsert({
-    code, doc_id: doc.id, user_id: user.id,
-    title: title ?? null, author_name: authorName ?? null, author_username: authorUsername || null,
-    content_hash: contentHash, word_count: wordCount(doc.content),
-    human_score: doc.humanScore ?? null, score_tier: doc.scoreTier ?? null, verified,
-  }, { onConflict: "code", ignoreDuplicates: true });
-  return { error, verified };
-}
-
-// Merge a moderation verdict into a content-row payload. When unchecked
-// (mod === null) the row keeps its column default ('pending').
-function withModeration(payload, mod) {
-  if (!mod) return payload;
-  return {
-    ...payload,
-    moderation_status: mod.status,
-    moderation_scores: mod.scores,
-    moderation_checked_at: new Date().toISOString(),
-  };
-}
-
-// Drop the newer optional columns (moderation + render flags) — used to retry
-// writes on databases not yet migrated.
-function stripModeration(p) {
-  const {
-    moderation_status, moderation_scores, moderation_checked_at,
-    render_justify, render_indent, author_note,
-    ...rest
-  } = p;
-  return rest;
-}
-
-// Statuses hidden from every public surface (feed, following feed, search,
-// other people's profiles, and the read-by-code path). 'flagged' is held for
-// review — silently, so the author is never told it's waiting — and 'removed'
-// has been taken down by an admin. The author still sees their own held pieces
-// (so the hold stays invisible); only 'removed' also leaves the author's page.
-const PUBLIC_HIDDEN_STATUSES = ["flagged", "removed"];
-function isPubliclyVisible(p) {
-  return !PUBLIC_HIDDEN_STATUSES.includes(p && p.moderation_status);
-}
-
-// Highest-scoring moderation category, as a human label (for the admin queue).
-function topCategory(scores) {
-  if (!scores) return null;
-  let best = null, bestV = 0;
-  for (const [k, v] of Object.entries(scores)) {
-    if (typeof v === "number" && v > bestV) { bestV = v; best = k; }
-  }
-  return best ? best.replace(/[/_]/g, " ") : null;
-}
-
-// ─── Reports ─────────────────────────────────────────────────────────────────
-const REPORT_REASONS = [
-  ["spam",       "Spam or scam"],
-  ["harassment", "Harassment or bullying"],
-  ["hate",       "Hate or discrimination"],
-  ["sexual",     "Sexual or explicit"],
-  ["violence",   "Violence or threats"],
-  ["self_harm",  "Self-harm"],
-  ["illegal",    "Illegal content"],
-  ["other",      "Something else"],
-];
-
-async function reportContent({ targetType, targetId, targetUserId, reason, note, userId }) {
-  if (!supabase) return "Reporting unavailable.";
-  if (!userId) return "Not signed in.";
-  const { error } = await supabase.from("reports").upsert(
-    {
-      reporter_id:    userId,
-      target_type:    targetType,
-      target_id:      targetId,
-      target_user_id: targetUserId || null,
-      reason,
-      note: (note || "").trim() || null,
-    },
-    // Re-reporting the same target is a no-op (keeps the first report). DO
-    // NOTHING avoids needing an update-own RLS policy on reports.
-    { onConflict: "reporter_id,target_type,target_id", ignoreDuplicates: true },
-  );
-  return error?.message || null;
-}
-
-// ─── Follows ──────────────────────────────────────────────────────────────────
-
-async function fetchFollowCounts(userId) {
-  if (!supabase || !userId) return { followers: 0, following: 0 };
-  try {
-    const [frs, fng] = await Promise.all([
-      supabase.from("follows").select("*", { count: "exact", head: true }).eq("following_id", userId),
-      supabase.from("follows").select("*", { count: "exact", head: true }).eq("follower_id", userId),
-    ]);
-    return { followers: frs.count || 0, following: fng.count || 0 };
-  } catch { return { followers: 0, following: 0 }; }
-}
-
-async function fetchIsFollowing(followerId, followingId) {
-  if (!supabase || !followerId || !followingId) return false;
-  try {
-    const { count } = await supabase.from("follows")
-      .select("*", { count: "exact", head: true })
-      .eq("follower_id", followerId).eq("following_id", followingId);
-    return (count || 0) > 0;
-  } catch { return false; }
-}
-
-async function toggleFollow(followerId, followingId, currentlyFollowing) {
-  if (!supabase || !followerId) return "Not signed in.";
-  try {
-    if (currentlyFollowing) {
-      const { error } = await supabase.from("follows").delete()
-        .eq("follower_id", followerId).eq("following_id", followingId);
-      return error?.message || null;
-    }
-    const { error } = await supabase.from("follows")
-      .insert({ follower_id: followerId, following_id: followingId });
-    return error?.message || null;
-  } catch (e) { return e.message || "Error"; }
-}
-
-async function fetchFollowingFeed(userId) {
-  if (!supabase || !userId) return [];
-  try {
-    const { data: follows } = await supabase.from("follows")
-      .select("following_id").eq("follower_id", userId);
-    const ids = (follows || []).map(f => f.following_id);
-    if (!ids.length) return [];
-    const { data } = await pubQuery(
-      PUB_SELECT_WITH_COUNTS, PUB_SELECT,
-      (sel) => supabase.from("publications").select(sel)
-        .in("user_id", ids)
-        .order("published_at", { ascending: false })
-        .limit(50),
-    );
-    return (data || []).filter(isPubliclyVisible);
-  } catch { return []; }
-}
-
-// Retry without the relation-count joins (likes/comments) if the schema
-// hasn't been migrated yet — so the feed keeps working.
-async function pubQuery(selectWithCounts, selectFallback, builderFn) {
-  let { data, error } = await builderFn(selectWithCounts);
-  if (error && /relation|schema|join|relationship|column/i.test(error.message || "")) {
-    ({ data, error } = await builderFn(selectFallback));
-  }
-  return { data, error };
-}
-
-async function fetchFeed() {
-  if (!supabase) return [];
-  const { data, error } = await pubQuery(
-    PUB_SELECT_WITH_COUNTS, PUB_SELECT,
-    (sel) => supabase
-      .from("publications")
-      .select(sel)
-      .order("published_at", { ascending: false })
-      .limit(50),
-  );
-  if (error || !data) return [];
-  return data.filter(isPubliclyVisible);
-}
-
-async function fetchMyPublications(userId) {
-  if (!supabase || !userId) return [];
-  const { data, error } = await pubQuery(
-    "id, doc_id, " + PUB_SELECT_WITH_COUNTS.replace(/^id, /, ""),
-    "id, doc_id, " + PUB_SELECT.replace(/^id, /, ""),
-    (sel) => supabase
-      .from("publications")
-      .select(sel)
-      .eq("user_id", userId)
-      .order("published_at", { ascending: false }),
-  );
-  if (error || !data) return [];
-  // The author sees their own held (flagged) pieces — the review hold is silent
-  // — but a removed piece drops off their published page entirely.
-  return data.filter(p => p.moderation_status !== "removed");
-}
-
-// Ensure the document's current text has a certificate, minting one if needed.
-// This is the verification primitive — it does NOT publish. Returns
-// { code, verified, contentHash, isNew } (code null when hashing is unavailable).
-//
-// The code is bound to the text: if the doc already carries a code for this
-// exact hash we reuse it; otherwise we mint a fresh one and append an immutable
-// row to the ledger, so old codes keep verifying the older text.
-// Shared certificate write: ask /api/certify to (re)compute the score from the
-// keystroke trace and write the ledger row + stamp the live publication, with the
-// legacy client write as the offline fallback. The caller passes the already-
-// resolved code (reused or freshly minted) and content hash.
-async function issueCert({ doc, user, code, reuse, events, contentHash, title, authorName, authorUsername }) {
-  // The server recomputes the score and writes the ledger row — the browser never
-  // gets to assert its own number.
-  const server = await certifyViaServer({
-    docId: doc.id, code, events, contentHash,
-    wordCount: wordCount(doc.content), title, authorName, authorUsername,
-  });
-  if (server) {
-    return { code, verified: !!server.verified, contentHash, isNew: !reuse };
-  }
-  // Route unavailable. A reused code's ledger row already exists; for a new one,
-  // fall back to the legacy direct write (forced unverified once §13 is applied).
-  if (reuse) {
-    return { code, verified: isVerifiedTier(doc.scoreTier), contentHash, isNew: false };
-  }
-  const { error, verified } = await writeCertFallback({ code, doc, user, title, authorName, authorUsername, contentHash });
-  if (error) return { code: doc.verifyCode || null, verified: isVerifiedTier(doc.scoreTier), contentHash: doc.contentHash || null, isNew: false, error: error.message };
-  return { code, verified, contentHash, isNew: true };
-}
-
-async function ensureCertificate(doc, user, { title, authorName, authorUsername }, events) {
-  const contentHash = await hashContent(doc.content);
-  if (!contentHash) {
-    // No Web Crypto (e.g. insecure context) — can't bind a certificate.
-    return { code: doc.verifyCode || null, verified: isVerifiedTier(doc.scoreTier), contentHash: doc.contentHash || null, isNew: false };
-  }
-  // Unchanged text reuses its existing code; new/changed text mints a fresh one.
-  const reuse = !!(doc.verifyCode && doc.contentHash && doc.contentHash === contentHash);
-  const code = reuse ? doc.verifyCode : makeVerifyCode();
-  return issueCert({ doc, user, code, reuse, events, contentHash, title, authorName, authorUsername });
-}
-
-// Publish (or re-publish) a document to the feed. Publishing certifies the
-// piece too — reusing the document's existing code when the text is unchanged.
-// Returns { error, code, verified }.
-async function doPublish(doc, user, title, authorName, authorUsername, renderOpts = {}, events = []) {
-  if (!supabase || !user) return { error: "Not signed in." };
-
-  // Resolve the code up front so the publication row carries it. The certificate
-  // itself is written once, AFTER the publication exists, so a single /api/certify
-  // call both records the ledger row and stamps this piece's badge.
-  const contentHash = await hashContent(doc.content);
-  const reuse = !!(contentHash && doc.verifyCode && doc.contentHash && doc.contentHash === contentHash);
-  const code = contentHash ? (reuse ? doc.verifyCode : makeVerifyCode()) : (doc.verifyCode || null);
-
-  const { data: existing, error: fetchErr } = await supabase
-    .from("publications").select("id").eq("doc_id", doc.id).maybeSingle();
-  if (fetchErr) return { error: fetchErr.message };
-
-  const payload = {
-    title, content: doc.content, author_name: authorName,
-    author_username: authorUsername || null,
-    published_at: new Date().toISOString(),
-    writing_time_seconds: Math.round(doc.writingTimeSecs || 0),
-    revision_count: doc.revisionCount || 0,
-    keystrokes:     doc.keystrokes     || 0,
-    deletions:      doc.deletions      || 0,
-    pastes:         doc.pastes         || 0,
-    human_score:    doc.humanScore     ?? null,
-    score_tier:     doc.scoreTier      ?? null,
-    score_features: doc.scoreFeatures  ?? null,
-    render_justify: !!renderOpts.justify,
-    render_indent:  !!renderOpts.indent,
-    author_note:    renderOpts.note ? renderOpts.note : null,
-  };
-  // Auto-triage the publication's text (title + body) before writing it.
-  // Fail-open: an outage leaves moderation_status at its 'pending' default.
-  const mod = await moderateText((title ? title + "\n\n" : "") + (doc.content || ""), extractImages(doc.content));
-  if (mod) {
-    payload.moderation_status     = mod.status;
-    payload.moderation_scores     = mod.scores;
-    payload.moderation_checked_at = new Date().toISOString();
-  }
-  if (code) {
-    payload.verify_code  = code;
-    payload.content_hash = contentHash ?? doc.contentHash ?? null;
-  }
-
-  let error;
-  if (existing) {
-    ({ error } = await supabase.from("publications").update(payload).eq("id", existing.id));
-    if (error && /column/i.test(error.message || "")) {
-      ({ error } = await supabase.from("publications").update(stripModeration(payload)).eq("id", existing.id));
-    }
-  } else {
-    ({ error } = await supabase.from("publications").insert({ ...payload, doc_id: doc.id, user_id: user.id }));
-    if (error && /column/i.test(error.message || "")) {
-      ({ error } = await supabase.from("publications").insert({ ...stripModeration(payload), doc_id: doc.id, user_id: user.id }));
-    }
-  }
-  if (error) return { error: error.message };
-
-  // The publication now exists: write the certificate once. The server recomputes
-  // the score, records the ledger row, and stamps this piece's badge in a single
-  // call. Falls back to the legacy client write (→ unverified once §13 is applied)
-  // if the route is down — the payload above already carried the fallback score.
-  let verified = isVerifiedTier(doc.scoreTier);
-  let outHash = contentHash ?? doc.contentHash ?? null;
-  if (contentHash && code) {
-    const cert = await issueCert({ doc, user, code, reuse, events, contentHash, title, authorName, authorUsername });
-    verified = cert.verified;
-    outHash = cert.contentHash ?? outHash;
-  }
-  return { error: null, code, verified, contentHash: outHash };
-}
-
-async function doUnpublish(docId) {
-  if (!supabase) return "Not connected.";
-  const { error } = await supabase.from("publications").delete().eq("doc_id", docId);
-  return error?.message || null;
-}
-
-// ─── Profiles ─────────────────────────────────────────────────────────────────
-
-async function fetchProfile(userId) {
-  if (!supabase || !userId) return null;
-  let { data, error } = await supabase
-    .from("profiles").select("id, username, display_name, avatar_data, research_opt_in, tos_accepted_at, is_admin, bio").eq("id", userId).maybeSingle();
-  // Graceful fallback if the bio column hasn't been migrated yet.
-  if (error && /column/i.test(error.message || "")) {
-    ({ data } = await supabase
-      .from("profiles").select("id, username, display_name, avatar_data, research_opt_in, tos_accepted_at, is_admin").eq("id", userId).maybeSingle());
-  }
-  return data || null;
-}
-
-async function upsertProfile(userId, username, displayName, { tosAccepted = false, tosVersion = null, bio } = {}) {
-  if (!supabase || !userId) return "Not signed in.";
-  const row = { id: userId, username, display_name: displayName || null };
-  if (bio !== undefined) row.bio = bio || null;
-  if (tosAccepted) {
-    row.research_opt_in = true;
-    row.tos_accepted_at = new Date().toISOString();
-    row.tos_version     = tosVersion;
-  }
-  let { error } = await supabase.from("profiles").upsert(row);
-  // Graceful fallback if the bio column hasn't been migrated yet.
-  if (error && /column/i.test(error.message || "") && "bio" in row) {
-    delete row.bio;
-    ({ error } = await supabase.from("profiles").upsert(row));
-  }
-  return error ? error.message : null;
-}
-
-async function updateAvatar(userId, avatarData) {
-  if (!supabase || !userId) return "Not signed in.";
-  const { error } = await supabase
-    .from("profiles").update({ avatar_data: avatarData }).eq("id", userId);
-  return error ? error.message : null;
-}
-
-async function fetchPublicationById(id) {
-  if (!supabase || !id) return null;
-  const { data } = await pubQuery(
-    PUB_SELECT_WITH_COUNTS, PUB_SELECT,
-    (sel) => supabase.from("publications").select(sel).eq("id", id).maybeSingle(),
-  );
-  return data || null;
-}
-
-// The author's note already on a published piece, so re-publishing pre-fills it
-// (and doesn't wipe it). Returns "" when there's no publication / no note.
-async function fetchPublicationNote(docId) {
-  if (!supabase || !docId) return "";
-  const { data } = await supabase.from("publications").select("author_note").eq("doc_id", docId).maybeSingle();
-  return data?.author_note || "";
-}
-
-async function fetchProfileByUsername(username) {
-  if (!supabase || !username) return null;
-  let { data, error } = await supabase
-    .from("profiles").select("id, username, display_name, avatar_data, bio")
-    .eq("username", username).maybeSingle();
-  if (error && /column/i.test(error.message || "")) {
-    ({ data } = await supabase
-      .from("profiles").select("id, username, display_name, avatar_data")
-      .eq("username", username).maybeSingle());
-  }
-  return data || null;
-}
-
-// Build a valid, unused username from a free-form base (a Google display name,
-// an email local-part, or a handle that was claimed between signup and
-// confirmation). Sanitises to the allowed charset, pads to the 3-char minimum,
-// and suffixes digits until the handle is free. Used so accounts that arrive
-// without a chosen username (e.g. Google sign-in) are never blocked — the handle
-// is editable afterwards from the Profile tab.
-async function generateUniqueUsername(base) {
-  let root = (base || "").toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 16);
-  if (root.length < 3) root = `${root}writer`.slice(0, 16);
-  for (let i = 0; i < 10; i++) {
-    const suffix = i === 0 ? "" : String(Math.floor(1000 + Math.random() * 9000));
-    const candidate = `${root}${suffix}`.slice(0, 20);
-    if (!(await fetchProfileByUsername(candidate))) return candidate;
-  }
-  return `${root}${Date.now().toString().slice(-6)}`.slice(0, 20);
-}
-
-function viewToPath(view, pub, userProfile, code) {
-  if (view === "feed")        return "/feed";
-  if (view === "search")      return "/people";
-  if (view === "profile")     return "/profile";
-  if (view === "admin")       return "/admin";
-  if (view === "verify")      return code ? `/v/${code}` : "/verify";
-  if (view === "reading" && pub)          return `/read/${pub.id}`;
-  if (view === "userProfile" && userProfile) return `/u/${userProfile.username}`;
-  return "/";
-}
-
-function pathToView(path) {
-  if (path.startsWith("/read/"))  return "reading";
-  if (path.startsWith("/u/"))     return "userProfile";
-  if (path.startsWith("/v/") || path === "/verify") return "verify";
-  if (path === "/feed")   return "feed";
-  if (path === "/people") return "search";
-  if (path === "/profile") return "profile";
-  if (path === "/admin")   return "admin";
-  return "editor";
-}
-
-// Strip characters that are significant in a PostgREST filter string, so a search
-// term can't break out of the ilike pattern and inject extra filter conditions.
-function sanitizeSearch(query) {
-  return (query || "").replace(/[,()*:%\\]/g, " ").replace(/\s+/g, " ").trim();
-}
-
-async function searchProfiles(query) {
-  const q = sanitizeSearch(query);
-  if (!supabase || !q) return [];
-  let { data, error } = await supabase
-    .from("profiles")
-    .select("id, username, display_name, avatar_data, bio")
-    .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
-    .limit(20);
-  if (error && /column/i.test(error.message || "")) {
-    ({ data, error } = await supabase
-      .from("profiles")
-      .select("id, username, display_name, avatar_data")
-      .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
-      .limit(20));
-  }
-  if (error || !data) return [];
-  return data;
-}
-
-async function searchPublications(query) {
-  const q = sanitizeSearch(query);
-  if (!supabase || !q) return [];
-  const { data, error } = await supabase
-    .from("publications")
-    .select(PUB_SELECT_WITH_COUNTS)
-    .or(`title.ilike.%${q}%,author_name.ilike.%${q}%`)
-    .not("moderation_status", "in", "(flagged,removed)")
-    .order("published_at", { ascending: false })
-    .limit(10);
-  if (error || !data) return [];
-  return data;
-}
-
-async function fetchUserPublications(userId) {
-  if (!supabase || !userId) return [];
-  const { data, error } = await pubQuery(
-    PUB_SELECT_WITH_COUNTS, PUB_SELECT,
-    (sel) => supabase
-      .from("publications")
-      .select(sel)
-      .eq("user_id", userId)
-      .order("published_at", { ascending: false }),
-  );
-  if (error || !data) return [];
-  return data.filter(isPubliclyVisible);
-}
-
-// ─── Toast ────────────────────────────────────────────────────────────────────
-
-// ─── DropCapAvatar ────────────────────────────────────────────────────────────
-
-function DropCapAvatar({ letter, avatarData, dropCapImages, size = 36 }) {
-  const [imgErr, setImgErr] = useState(false);
-  const src = !imgErr ? dropCapSrc(letter, dropCapImages) : null;
-  const circleStyle = {
-    width: size, height: size, borderRadius: "50%", overflow: "hidden",
-    flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-  };
-  if (avatarData) {
-    return (
-      <div style={circleStyle}>
-        <img src={avatarData} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-      </div>
-    );
-  }
-  if (src) {
-    return (
-      <div style={{ ...circleStyle, background: "#f0ece6" }}>
-        <img src={src} alt={letter?.toUpperCase()} onError={() => setImgErr(true)}
-          style={{ width: "72%", height: "72%", objectFit: "contain" }} />
-      </div>
-    );
-  }
-  return (
-    <div style={{ ...circleStyle, background: "var(--text)", color: "var(--bg)",
-      fontFamily: '"Cormorant Garamond", serif', fontSize: size * 0.44 }}>
-      {(letter || "?").toUpperCase()}
-    </div>
-  );
-}
-
-function Toasts({ toasts }) {
-  if (!toasts.length) return null;
-  return (
-    <div id="toast-stack">
-      {toasts.map(t => (
-        <div key={t.id} className={t.type === "hint" ? "toast toast-hint" : "toast"}>{t.message}</div>
-      ))}
-    </div>
-  );
-}
-
-// ─── LandingScreen ────────────────────────────────────────────────────────────
-
-// Reflowed reading (phones). A fixed book page on a 390px screen is measurably
-// worse to read than reflowed text — slower, and worse for retention — so the
-// canvas pages stay the artifact (download, desktop, the thing certified) and
-// the phone gets the words at its own measure.
-//
-// The HTML is a published piece, so it is parsed in an inert <template> and
-// stripped to a small tag whitelist before it is ever inserted: no scripts, no
-// event handlers, no <img onerror>.
-const READ_TAGS = new Set(["P","BR","EM","I","STRONG","B","U","BLOCKQUOTE","H1","H2","H3","UL","OL","LI","A","IMG","DIV","SPAN"]);
-function sanitizeForReading(html) {
-  const tpl = document.createElement("template");
-  tpl.innerHTML = html || "";
-  const walk = (node) => {
-    [...node.children].forEach(el => {
-      if (!READ_TAGS.has(el.tagName)) { el.replaceWith(...el.childNodes); return; }
-      [...el.attributes].forEach(a => {
-        const keep = (el.tagName === "IMG" && a.name === "src") || (el.tagName === "A" && a.name === "href");
-        if (!keep) el.removeAttribute(a.name);
-      });
-      if (el.tagName === "A") { el.setAttribute("rel", "noopener noreferrer"); el.setAttribute("target", "_blank"); }
-      walk(el);
-    });
-  };
-  walk(tpl.content);
-  return tpl.innerHTML;
-}
-
-// The opening letter, and the same string with that letter lifted out — an
-// illuminated initial replaces it rather than sitting next to a duplicate.
-function openingLetter(html) {
-  const tpl = document.createElement("template");
-  tpl.innerHTML = html || "";
-  const t = (tpl.content.textContent || "").trim();
-  const m = t.match(/[A-Za-z]/);
-  return m ? m[0] : null;
-}
-function stripOpeningLetter(html) {
-  const tpl = document.createElement("template");
-  tpl.innerHTML = html || "";
-  const walker = document.createTreeWalker(tpl.content, NodeFilter.SHOW_TEXT);
-  let n;
-  while ((n = walker.nextNode())) {
-    const i = n.textContent.search(/[A-Za-z]/);
-    if (i !== -1) { n.textContent = n.textContent.slice(0, i) + n.textContent.slice(i + 1); break; }
-  }
-  return tpl.innerHTML;
-}
-
-const isPhone = () => typeof window !== "undefined"
-  && window.matchMedia("(max-width: 600px)").matches;
-
-// ─── Engraving backdrop ───────────────────────────────────────────────────────
-// A pool of faded public-domain plates, some at more than one framing. The
-// plate advances (randomly, never repeating itself) each time the backdrop
-// reappears or the view changes, so the site never shows the same wall twice
-// in a row.
-const BACKDROP_PLATES = [
-  // Dürer (Christie's photographs of the plates)
-  { img: "jerome",        pos: "center 28%" }, // St Jerome writing in his study
-  { img: "jerome",        pos: "center 68%" }, // …the lion at his feet
-  { img: "melencolia",    pos: "center 24%" }, // Melencolia I
-  { img: "four-horsemen", pos: "center 35%" }, // The Four Horsemen of the Apocalypse
-  { img: "four-horsemen", pos: "28% center" },
-  { img: "prodigal-son",  pos: "center 42%" }, // The Prodigal Son
-  { img: "st-eustace",    pos: "center 45%" }, // Saint Eustace, the knight and his horse
-  { img: "whore-babylon", pos: "center 38%" }, // The Whore of Babylon
-  { img: "rhinoceros",    pos: "center 45%" }, // The Rhinoceros
-  { img: "rhinoceros",    pos: "80% center" },
-  // the Flammarion engraving (high-res scan)
-  { img: "flammarion",    pos: "center 30%" },
-  { img: "flammarion",    pos: "24% 22%" },
-  // cosmos (Merian) and destillatio (van der Straet) are cut: their source
-  // scans are softer than the Christie's photographs and read muddy keyed.
-];
-
-// A published piece keeps one plate for life: hash its id into the pool, so
-// the reading view always frames a piece with the same engraving.
-const BACKDROP_IMGS = [...new Set(BACKDROP_PLATES.map(p => p.img))];
-function imgForPub(id) {
-  let h = 0;
-  for (const c of String(id || "")) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return BACKDROP_IMGS[h % BACKDROP_IMGS.length];
-}
-
-// How long the backdrop takes to clear before the plate is swapped on a
-// view change. Must match the .bd-veil transition-duration in App.css.
-const BACKDROP_VEIL_MS = 700;
-
-function Backdrop({ view, hidden, override, ringed }) {
-  const [shown, setShown]   = useState(() => BACKDROP_PLATES[Math.floor(Math.random() * BACKDROP_PLATES.length)]);
-  const [ready, setReady]   = useState(false);  // first plate decoded — nothing shows before this
-  const [veiled, setVeiled] = useState(false);
-  const prevRef  = useRef({ view, hidden: true });
-  const shownRef = useRef(shown);
-  const genRef   = useRef(0);
-  const timerRef = useRef(null);
-  const oimg = override ? override.img : null;
-  shownRef.current = shown;
-
-  useEffect(() => {
-    const prev = prevRef.current;
-    const appearing = !hidden && prev.hidden;
-    const switched  = !hidden && !prev.hidden && view !== prev.view;
-    prevRef.current = { view, hidden };
-    if (!appearing && !switched) return;
-
-    // Pick the next plate: the override wins; otherwise random, no repeat.
-    let next;
-    if (oimg) {
-      next = { img: oimg, pos: "center 30%" };
-    } else {
-      next = BACKDROP_PLATES[Math.floor(Math.random() * BACKDROP_PLATES.length)];
-      if (next === shownRef.current) next = BACKDROP_PLATES[(BACKDROP_PLATES.indexOf(next) + 1) % BACKDROP_PLATES.length];
-    }
-
-    // Never point the layer at an image that isn't ready: a plate whose data
-    // arrives mid-transition pops in at the layer's current opacity instead
-    // of fading from clear. Preload and decode first — the swap waits for
-    // BOTH the pixels and (on view changes) the exhale, so a slow network
-    // just means the wall stays clear a moment longer, never a pop.
-    const gen = ++genRef.current;
-    const img = new Image();
-    img.src = `/backdrops/${next.img}.webp`;
-    const decoded = (img.decode ? img.decode() : Promise.resolve()).catch(() => {});
-    let waited = Promise.resolve();
-    if (switched) {
-      setVeiled(true);
-      waited = new Promise(res => {
-        clearTimeout(timerRef.current);
-        timerRef.current = setTimeout(res, BACKDROP_VEIL_MS);
-      });
-    }
-    Promise.all([decoded, waited]).then(() => {
-      if (genRef.current !== gen) return;   // a newer change took over
-      setShown(next);
-      setVeiled(false);
-      setReady(true);
-    });
-  }, [view, hidden, oimg]);
-  useEffect(() => () => clearTimeout(timerRef.current), []);
-
-  return (
-    <div
-      id="backdrop"
-      data-view={view}
-      className={(hidden || veiled || !ready ? "" : "bd-on") + (veiled ? " bd-veil" : "") + (ringed ? " bd-ring" : "")}
-      style={{
-        backgroundImage: `url(/backdrops/${shown.img}.webp)`,
-        backgroundPosition: shown.pos,
-      }}
-    />
-  );
-}
-
-function LandingScreen({ onDone }) {
-  // Choreography: type "Write Human" slowly → the full stop lands and blinks
-  // three times → the headline glides up into the document-title position
-  // (the overlay turning transparent so the editor appears around it) → it
-  // deletes itself backwards → the caret is handed to the body, blinking,
-  // waiting for the visitor's own words.
-  const FULL = "Write Human";
-  const [display, setDisplay] = useState("");
-  const [dotOn, setDotOn]     = useState(false);
-  const [blink, setBlink]     = useState(0);
-  const [phase, setPhase]     = useState("type");  // type | blink | rise | del
-  const [rise, setRise]       = useState(null);    // { dy, scale } once measured
-  const [bgReady, setBgReady] = useState(false);
-  const headRef = useRef(null);
-
-  // Same rule as the main backdrop: the plate only fades in once its pixels
-  // are decoded, so a slow first load can never pop.
-  useEffect(() => {
-    let live = true;
-    const img = new Image();
-    img.src = "/backdrops/jerome.webp";
-    (img.decode ? img.decode() : Promise.resolve())
-      .catch(() => {})
-      .then(() => { if (live) setBgReady(true); });
-    return () => { live = false; };
-  }, []);
-
-  const finish = useCallback(() => {
-    localStorage.setItem("inkk_visited", "1");
-    onDone();
-  }, [onDone]);
-
-  // Glide the headline from centre screen onto the editor's title line.
-  // The editor is already mounted beneath the overlay, so the real title
-  // input can be measured; scale matches its type size.
-  const startRise = useCallback(() => {
-    const head  = headRef.current;
-    const title = document.getElementById("title-input");
-    if (head && title) {
-      const hr = head.getBoundingClientRect();
-      const tr = title.getBoundingClientRect();
-      const scale = parseFloat(getComputedStyle(title).fontSize) / parseFloat(getComputedStyle(head).fontSize) || 0.55;
-      setRise({ dy: (tr.top + tr.height / 2) - (hr.top + hr.height / 2), scale });
-    } else {
-      setRise({ dy: -Math.round(window.innerHeight * 0.26), scale: 0.55 });
-    }
-    setPhase("rise");
-  }, []);
-
-  // While the headline occupies the title line, hide the real title's
-  // placeholder underneath it (it returns when the overlay unmounts).
-  useEffect(() => {
-    const on = phase === "rise" || phase === "del";
-    document.body.classList.toggle("landing-handoff", on);
-    return () => document.body.classList.remove("landing-handoff");
-  }, [phase]);
-
-  useEffect(() => {
-    let t;
-    if (phase === "type") {
-      if (display.length < FULL.length) {
-        t = setTimeout(() => setDisplay(FULL.slice(0, display.length + 1)), 115);
-      } else if (!dotOn) {
-        t = setTimeout(() => setDotOn(true), 260);        // the full stop lands
-      } else {
-        t = setTimeout(() => { setBlink(0); setPhase("blink"); }, 340);
-      }
-    } else if (phase === "blink") {
-      // Toggle the full stop: off-on three times, ending lit.
-      if (blink < 6) t = setTimeout(() => { setDotOn(d => !d); setBlink(b => b + 1); }, 320);
-      else           t = setTimeout(startRise, 420);
-    } else if (phase === "rise") {
-      t = setTimeout(() => setPhase("del"), 1080);        // transform runs 1s
-    } else if (phase === "del") {
-      if (dotOn)               t = setTimeout(() => setDotOn(false), 200);
-      else if (display.length) t = setTimeout(() => setDisplay(d => d.slice(0, -1)), 65);
-      else                     t = setTimeout(finish, 220);
-    }
-    return () => clearTimeout(t);
-  }, [phase, display, dotOn, blink, startRise, finish]);
-
-  const handoff = phase === "rise" || phase === "del";
-  const cursorOn = phase === "type" || phase === "del";
-
-  return (
-    <div id="landing" className={handoff ? "handoff" : ""} onClick={finish}>
-      <div id="landing-backdrop" className={bgReady && !handoff ? "on" : ""} style={{ backgroundImage: "url(/backdrops/jerome.webp)" }} />
-      <div id="landing-inner">
-        <div
-          id="landing-headline"
-          ref={headRef}
-          style={rise ? { transform: `translateY(${rise.dy}px) scale(${rise.scale})` } : undefined}
-        >
-          {display}
-          <span id="landing-dot" style={{ opacity: dotOn ? 1 : 0 }}>.</span>
-          {cursorOn && <span id="landing-cursor" />}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── HumanSignalModal ─────────────────────────────────────────────────────────
-
-function HumanSignalModal({ onClose }) {
-  return (
-    <div id="auth-overlay" onClick={onClose}>
-      <div id="auth-modal" onClick={e => e.stopPropagation()}>
-        <button id="auth-close" onClick={onClose}>×</button>
-        <div id="hs-modal-title">A small study of writing.</div>
-        <p id="hs-modal-body">
-          When you write in Inkk, your text and the rhythm of your typing (pauses, revisions, bursts) are captured as part of a study into human writing. We use this to study what distinguishes human writing from machine-generated text.
-        </p>
-        <p className="hs-modal-body" style={{ marginTop: "12px" }}>
-          You can opt out, download, or delete your contribution at any time from your Profile.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// ─── Build a score-shape from publication/document record fields ─────────────
-
-function scoreFromRecord(rec) {
-  if (!rec) return null;
-  // Prefer the new schema fields if present.
-  if (rec.human_score != null && rec.score_tier) {
-    return {
-      score: rec.human_score,
-      tier:  rec.score_tier,
-      confidence: 1,
-      contributors: rec.score_features?.contributors || [],
-      paste_ratio: rec.score_features?.paste_ratio || 0,
-    };
-  }
-  // Legacy fallback for older publications (writing_time_seconds + revision_count).
-  const wt = rec.writing_time_seconds || 0;
-  const rv = rec.revision_count || 0;
-  if (!wt && !rv) return null;
-  let tier = "Faint";
-  if (wt >= 480 || rv >= 5)      tier = "Strong";
-  else if (wt >= 90 || rv >= 2)  tier = "Developing";
-  const score = Math.min(100, Math.round((Math.min(wt, 600) / 600) * 60 + Math.min(rv, 10) * 4));
-  return { score, tier, confidence: 0.5, contributors: [], paste_ratio: 0, legacy: true };
-}
-
-// ─── AuthModal ────────────────────────────────────────────────────────────────
-
-const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
-const PW_MIN = 8;
-
-function passwordChecks(pw) {
-  return {
-    length: pw.length >= PW_MIN,
-    letter: /[a-zA-Z]/.test(pw),
-    number: /[0-9]/.test(pw),
-  };
-}
-
-// ─── Google Identity Services (ID-token sign-in) ──────────────────────────────
-// On DESKTOP, when REACT_APP_GOOGLE_CLIENT_ID is set, "continue with Google"
-// uses Google's own button to obtain an ID token in-page, which we hand to
-// supabase.auth.signInWithIdToken. The whole consent flow runs on our own
-// domain (no redirect), so Google's screen shows the Inkk app.
-//
-// On MOBILE that in-page flow is unusable: Google's popup/transform step loses
-// its opener and dead-ends on a blank accounts.google.com/gsi/transform page,
-// so sign-in never returns. Mobile therefore uses the full-page redirect flow
-// (signInWithOAuth). Google's consent screen still shows "inkk" (set via the
-// OAuth consent screen's App name), so branding holds; the only cosmetic cost
-// is a brief <ref>.supabase.co in the address bar mid-redirect. Without the env
-// var, everything falls back to the redirect flow.
-const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "";
-
-let gsiScriptPromise = null;
-function loadGoogleIdentity() {
-  if (gsiScriptPromise) return gsiScriptPromise;
-  gsiScriptPromise = new Promise((resolve, reject) => {
-    if (window.google?.accounts?.id) { resolve(); return; }
-    const s = document.createElement("script");
-    s.src = "https://accounts.google.com/gsi/client";
-    s.async = true; s.defer = true;
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error("Could not load Google sign-in."));
-    document.head.appendChild(s);
-  });
-  return gsiScriptPromise;
-}
-
-// Supabase validates the nonce by SHA-256-hashing the value passed to
-// signInWithIdToken and matching it to the token's nonce claim — so Google gets
-// the hashed nonce and Supabase gets the raw one.
-async function makeGoogleNonce() {
-  const raw = window.crypto?.randomUUID
-    ? window.crypto.randomUUID()
-    : `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
-  const digest = await window.crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
-  const hashed = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
-  return { raw, hashed };
-}
-
-function AuthModal({ onClose, initialMode = "signin" }) {
-  const [mode, setMode]             = useState(initialMode); // signin | signup | reset
-  const [email, setEmail]           = useState("");
-  const [username, setUsername]     = useState("");
-  const [password, setPassword]     = useState("");
-  const [showPw, setShowPw]         = useState(false);
-  const [accepted, setAccepted]     = useState(false);
-  const [showTerms, setShowTerms]   = useState(false);
-  const [showPrivacy, setShowPrivacy] = useState(false);
-  const [error, setError]           = useState("");
-  const [message, setMessage]       = useState("");
-  const [loading, setLoading]       = useState(false);
-  const [unameStatus, setUnameStatus] = useState(""); // "" | checking | available | taken | invalid
-  const [resend, setResend]         = useState("");   // "" | sending | sent
-  const [needsConfirm, setNeedsConfirm] = useState(false); // show "resend confirmation" UI
-  const [gsiReady, setGsiReady]     = useState(false);     // Google Identity script loaded
-  const sentEmailRef                = useRef("");
-  const googleBtnRef                = useRef(null);        // host for Google's rendered button
-  const acceptedRef                 = useRef(false);       // latest Terms state for the GIS callback
-
-  // In-page Google button on desktop only. On mobile it dead-ends on Google's
-  // blank /gsi/transform page, so mobile (and the no-client-id fallback) uses
-  // the redirect flow instead. See the GOOGLE_CLIENT_ID note above.
-  const [useGsi] = useState(() => !!GOOGLE_CLIENT_ID && !isMobile());
-
-  const switchMode = (m) => {
-    setMode(m); setError(""); setMessage(""); setResend(""); setNeedsConfirm(false);
-    if (m === "reset") setPassword("");
-  };
-
-  // Live username availability check (signup only, debounced).
-  useEffect(() => {
-    if (mode !== "signup") return;
-    const u = username.trim();
-    if (!u)                    { setUnameStatus(""); return; }
-    if (!USERNAME_RE.test(u))  { setUnameStatus("invalid"); return; }
-    setUnameStatus("checking");
-    let alive = true;
-    const t = setTimeout(async () => {
-      const existing = await fetchProfileByUsername(u);
-      if (alive) setUnameStatus(existing ? "taken" : "available");
-    }, 400);
-    return () => { alive = false; clearTimeout(t); };
-  }, [username, mode]);
-
-  // Keep the latest Terms state available to the (long-lived) GIS callback.
-  useEffect(() => { acceptedRef.current = accepted; }, [accepted]);
-
-  // Load Google Identity Services once, if we're using the in-page button.
-  useEffect(() => {
-    if (!useGsi) return;
-    let active = true;
-    loadGoogleIdentity().then(() => { if (active) setGsiReady(true); }).catch(() => {});
-    return () => { active = false; };
-  }, [useGsi]);
-
-  // Render Google's button as soon as the script is ready (so it's never a dead
-  // placeholder). Terms are enforced inside the callback, which exchanges the
-  // Google ID token for a Supabase session via signInWithIdToken — no redirect
-  // ever leaves our own domain.
-  useEffect(() => {
-    if (!useGsi || !gsiReady || mode === "reset") return;
-    const el = googleBtnRef.current;
-    const gid = window.google?.accounts?.id;
-    if (!el || !gid) return;
-    let active = true;
-    makeGoogleNonce().then(({ raw, hashed }) => {
-      if (!active) return;
-      gid.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        nonce: hashed,
-        callback: async (resp) => {
-          if (!acceptedRef.current) {
-            setError("Please accept the Terms & Privacy Policy first.");
-            return;
-          }
-          // Record Terms acceptance for the profile auto-provisioner.
-          try { localStorage.setItem("inkk_pending_tos", TOS_VERSION); } catch {}
-          const { error } = await supabase.auth.signInWithIdToken({
-            provider: "google", token: resp.credential, nonce: raw,
-          });
-          if (error) setError(error.message);
-        },
-      });
-      el.innerHTML = "";
-      gid.renderButton(el, {
-        type: "standard", theme: "outline", size: "large",
-        text: "continue_with", shape: "pill", logo_alignment: "center", width: 272,
-      });
-    }).catch(() => {});
-    return () => { active = false; };
-  }, [useGsi, gsiReady, mode]);
-
-  const pw       = passwordChecks(password);
-  const pwOk     = pw.length && pw.letter && pw.number;
-  const unameOk  = USERNAME_RE.test(username.trim()) && unameStatus !== "taken";
-  const signupReady = !!email && unameOk && pwOk && accepted;
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setError(""); setMessage(""); setNeedsConfirm(false);
-
-    if (mode === "signin") {
-      setLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      setLoading(false);
-      if (error) {
-        // Correct password but the address was never confirmed — Supabase returns
-        // a dedicated code/message. Surface it clearly and offer a resend instead
-        // of the generic "invalid credentials".
-        if (error.code === "email_not_confirmed" || /not confirmed/i.test(error.message || "")) {
-          sentEmailRef.current = email;
-          setNeedsConfirm(true);
-          setMessage(`${email} hasn't been confirmed yet. Check your inbox for the confirmation link to finish signing in.`);
-        } else {
-          setError(error.message);
-        }
-      }
-      return;
-    }
-
-    if (mode === "reset") {
-      setLoading(true);
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + "/?recovery=1",
-      });
-      setLoading(false);
-      if (error) setError(error.message);
-      else setMessage("Check your email for a link to reset your password.");
-      return;
-    }
-
-    // signup
-    const u = username.trim();
-    if (!USERNAME_RE.test(u)) { setError("Username must be 3–20 characters."); return; }
-    if (!pwOk)                { setError(`Password needs at least ${PW_MIN} characters, a letter, and a number.`); return; }
-    if (!accepted)            { setError("Please accept the Terms & Privacy Policy to continue."); return; }
-
-    setLoading(true);
-    // Final availability check right before we commit.
-    const existing = await fetchProfileByUsername(u);
-    if (existing) { setUnameStatus("taken"); setError("That username is already taken. Please try another."); setLoading(false); return; }
-
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: window.location.origin,
-        data: { username: u, display_name: u, tos_accepted: true, tos_version: TOS_VERSION },
-      },
-    });
-    setLoading(false);
-    if (error) { setError(error.message); return; }
-    if (data.user?.identities?.length === 0) {
-      setError("An account with this email already exists. Try signing in.");
-      return;
-    }
-    sentEmailRef.current = email;
-    // No session means email confirmation is required; a session means we're in
-    // and onAuthStateChange will create the profile from the metadata above.
-    if (!data.session) {
-      setNeedsConfirm(true);
-      setMessage(`We sent a confirmation link to ${email}. Open it to finish creating your account.`);
-    }
-  };
-
-  const resendConfirmation = async () => {
-    if (!sentEmailRef.current || resend === "sending") return;
-    setResend("sending"); setError("");
-    const { error } = await supabase.auth.resend({
-      type: "signup",
-      email: sentEmailRef.current,
-      options: { emailRedirectTo: window.location.origin },
-    });
-    if (error) { setResend(""); setError(error.message); }
-    else setResend("sent");
-  };
-
-  const googleSignIn = async () => {
-    // Google has no username/Terms step of its own, so the agreement is ticked
-    // in the modal first. The button stays tappable even when it isn't, so the
-    // tap can explain why nothing happens (a disabled button is silent, which
-    // reads as broken — especially on mobile).
-    if (!accepted) {
-      setError("Please accept the Terms & Privacy Policy to continue with Google.");
-      return;
-    }
-    setError("");
-    // Stash the acceptance across the OAuth redirect so the profile provisioned
-    // on return records the Terms acceptance.
-    try { localStorage.setItem("inkk_pending_tos", TOS_VERSION); } catch {}
-    if (window.Capacitor?.isNativePlatform?.()) {
-      // In the app, a plain redirect escapes to Safari and strands the session
-      // there. Run the flow in an in-app browser sheet and come home on the
-      // inkk:// deep link instead.
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo: "inkk://auth-callback", skipBrowserRedirect: true },
-      });
-      if (error) { setError(error.message); return; }
-      try {
-        const { Browser } = await import("@capacitor/browser");
-        await Browser.open({ url: data.url, presentationStyle: "popover" });
-      } catch {
-        window.location.href = data.url;
-      }
-      return;
-    }
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: window.location.origin },
-    });
-    // If the redirect can't be started, surface it instead of failing silently.
-    if (error) setError(error.message);
-  };
-
-  const unameHint = {
-    checking:  { text: "checking…",        cls: "muted" },
-    available: { text: "available",         cls: "ok" },
-    taken:     { text: "already taken",     cls: "bad" },
-    invalid:   { text: "3–20 chars", cls: "muted" },
-  }[unameStatus];
-
-  // The modal only closes via the × button — never on a backdrop click,
-  // text-selection drag, or key press.
-  return (
-    <>
-    <div id="auth-overlay">
-      <div id="auth-modal">
-        <button id="auth-close" onClick={onClose}>×</button>
-        {message ? (
-          <div id="auth-message-wrap">
-            <p id="auth-message">{message}</p>
-            {needsConfirm && sentEmailRef.current && (
-              <div className="auth-resend">
-                {resend === "sent"
-                  ? <span className="auth-resend-done">Sent again. Please check your inbox and spam folder.</span>
-                  : <>Didn't get it? <button type="button" onClick={resendConfirmation} disabled={resend === "sending"}>{resend === "sending" ? "sending…" : "resend confirmation email"}</button></>}
-                <button type="button" className="auth-back" onClick={() => { setMessage(""); setResend(""); }}>← back</button>
-              </div>
-            )}
-          </div>
-        ) : mode === "reset" ? (
-          <>
-            <div id="auth-tabs">
-              <button className="active" style={{ cursor: "default" }}>Reset password</button>
-            </div>
-            <p className="auth-blurb">Enter the email you signed up with and we'll send you a link to set a new password.</p>
-            <form onSubmit={submit}>
-              <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus={!isMobile()} />
-              {error && <p className="auth-error">{error}</p>}
-              <button id="auth-submit" type="submit" disabled={loading}>
-                {loading ? "…" : "Send reset link"}
-              </button>
-            </form>
-            <button className="auth-back" onClick={() => switchMode("signin")}>← back to sign in</button>
-          </>
-        ) : (
-          <>
-            <div id="auth-tabs">
-              <button className={mode === "signin" ? "active" : ""} onClick={() => switchMode("signin")}>Sign in</button>
-              <button className={mode === "signup" ? "active" : ""} onClick={() => switchMode("signup")}>Create account</button>
-            </div>
-            <form onSubmit={submit}>
-              {/* Don't autofocus on mobile: it pops the keyboard the moment the
-                  modal opens, covering the "continue with Google" button. The
-                  keyboard should only appear when a field is actually tapped. */}
-              <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus={!isMobile()} autoComplete="email" />
-
-              {mode === "signup" && (
-                <>
-                  <div className="auth-field">
-                    <input
-                      type="text"
-                      placeholder="Username"
-                      value={username}
-                      onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
-                      maxLength={20}
-                      required
-                      autoComplete="off"
-                      autoCapitalize="off"
-                      spellCheck={false}
-                    />
-                    {unameHint && <span className={`auth-uname-hint ${unameHint.cls}`}>{unameHint.text}</span>}
-                  </div>
-                </>
-              )}
-
-              <div className="auth-field">
-                <input
-                  type={showPw ? "text" : "password"}
-                  placeholder="Password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  required
-                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                />
-                {password && (
-                  <button type="button" className="auth-pw-toggle" onClick={() => setShowPw(v => !v)} aria-label={showPw ? "Hide password" : "Show password"}>
-                    {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
-                  </button>
-                )}
-              </div>
-
-              {mode === "signup" && password && !pwOk && (
-                <ul className="auth-pw-reqs">
-                  <li className={pw.length ? "met" : ""}>{pw.length ? "✓" : "○"} at least {PW_MIN} characters</li>
-                  <li className={pw.letter ? "met" : ""}>{pw.letter ? "✓" : "○"} a letter</li>
-                  <li className={pw.number ? "met" : ""}>{pw.number ? "✓" : "○"} a number</li>
-                </ul>
-              )}
-
-              {mode === "signup" && (
-                <label id="tos-consent" className="auth-tos">
-                  <input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} />
-                  <span id="tos-consent-text">
-                    I agree to the{" "}
-                    <button type="button" className="tos-link" onClick={() => setShowTerms(true)}>Terms</button>
-                    {" "}and{" "}
-                    <button type="button" className="tos-link" onClick={() => setShowPrivacy(true)}>Privacy Policy</button>
-                    , including contributing my anonymised writing-process data to Inkk's research dataset. I can opt out anytime from my Profile.
-                  </span>
-                </label>
-              )}
-
-              {error && <p className="auth-error">{error}</p>}
-              <button id="auth-submit" type="submit" disabled={loading || (mode === "signup" && !signupReady)}>
-                {loading ? "…" : mode === "signin" ? "Sign in" : "Create account"}
-              </button>
-            </form>
-            {mode === "signin" && (
-              <button className="auth-forgot" onClick={() => switchMode("reset")}>
-                Forgot password?
-              </button>
-            )}
-            <div id="auth-divider"><span>or</span></div>
-            {/* Google has no username/Terms step of its own, so the agreement is
-                collected here and carried across the OAuth redirect. In create-
-                account mode the in-form checkbox above already covers it. */}
-            {mode === "signin" && (
-              <label id="tos-consent" className="auth-tos">
-                <input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} />
-                <span id="tos-consent-text">
-                  I agree to the{" "}
-                  <button type="button" className="tos-link" onClick={() => setShowTerms(true)}>Terms</button>
-                  {" "}and{" "}
-                  <button type="button" className="tos-link" onClick={() => setShowPrivacy(true)}>Privacy Policy</button>
-                  , including contributing my anonymised writing-process data to Inkk's research dataset. I can opt out anytime from my Profile.
-                </span>
-              </label>
-            )}
-            {useGsi ? (
-              <div ref={googleBtnRef} style={{ display: "flex", justifyContent: "center" }} />
-            ) : (
-              <button id="google-btn" onClick={googleSignIn}>Continue with Google</button>
-            )}
-          </>
-        )}
-      </div>
-    </div>
-    {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
-    {showTerms   && <TermsModal   onClose={() => setShowTerms(false)} />}
-    </>
-  );
-}
-
-// ─── UpdatePasswordModal ──────────────────────────────────────────────────────
-// Shown after the user clicks a password-recovery link in their email, or
-// from the Profile "Change password" entry. Calls supabase.auth.updateUser.
-
-function UpdatePasswordModal({ onClose, onDone }) {
-  const [password, setPassword]   = useState("");
-  const [confirm, setConfirm]     = useState("");
-  const [error, setError]         = useState("");
-  const [loading, setLoading]     = useState(false);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setError("");
-    if (password.length < 8)        { setError("At least 8 characters."); return; }
-    if (password !== confirm)        { setError("Passwords don't match.");  return; }
-    setLoading(true);
-    const { error } = await supabase.auth.updateUser({ password });
-    setLoading(false);
-    if (error) setError(error.message);
-    else { onDone?.(); onClose?.(); }
-  };
-
-  return (
-    <div id="auth-overlay">
-      <div id="auth-modal" onClick={e => e.stopPropagation()}>
-        {onClose && <button id="auth-close" onClick={onClose}>×</button>}
-        <div id="auth-tabs">
-          <button className="active" style={{ cursor: "default" }}>set new password</button>
-        </div>
-        <form onSubmit={submit}>
-          <input type="password" placeholder="new password (min 8)" value={password} onChange={e => setPassword(e.target.value)} required autoFocus />
-          <input type="password" placeholder="confirm new password" value={confirm} onChange={e => setConfirm(e.target.value)} required />
-          {error && <p className="auth-error">{error}</p>}
-          <button id="auth-submit" type="submit" disabled={loading || !password || !confirm}>
-            {loading ? "saving…" : "Set new password"}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-// ─── PublishModal ─────────────────────────────────────────────────────────────
-
-function PublishModal({ doc, user, profile, onConfirm, onClose, titleCapsOn }) {
-  const author = profile?.username || user.user_metadata?.full_name || user.email.split("@")[0];
-  const [title, setTitle]     = useState(stripHtml(doc.title || ""));
-  const [justify, setJustify] = useState(false);
-  const [indent, setIndent]   = useState(false);
-  const [note, setNote]       = useState(stripHtml(doc.author_note || ""));
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState("");
-
-  const applyCase = useCallback((val) => {
-    if (titleCapsOn && val.trim()) setTitle(titleCase(val));
-  }, [titleCapsOn]);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    const t = (titleCapsOn ? titleCase(title) : title).trim();
-    if (!t) return;
-    setLoading(true); setError("");
-    const errMsg = await onConfirm(t, author, { justify, indent, note: note.trim() });
-    if (errMsg) setError(errMsg);
-    setLoading(false);
-  };
-
-  return (
-    <div id="auth-overlay">
-      <div id="auth-modal">
-        <button id="auth-close" onClick={onClose}>×</button>
-        <div id="auth-tabs">
-          <button className="active" style={{ cursor: "default" }}>publish to feed</button>
-        </div>
-        <form onSubmit={submit}>
-          <input type="text" placeholder="article title" value={title} onChange={e => setTitle(e.target.value)} onBlur={e => applyCase(e.target.value)} required autoFocus />
-          <div className="dl-section-label">Style</div>
-          <label className="dl-check"><input type="checkbox" checked={justify} onChange={e => setJustify(e.target.checked)} /><span>Justify text</span></label>
-          <label className="dl-check"><input type="checkbox" checked={indent}  onChange={e => setIndent(e.target.checked)} /><span>Paragraph indent</span></label>
-          <div className="dl-section-label">Note (optional)</div>
-          <textarea
-            className="publish-note-input"
-            placeholder="write a line of context such as who you are, or what your work is about"
-            value={note}
-            onChange={e => setNote(e.target.value)}
-            maxLength={200}
-            rows={2}
-          />
-          {error && <p className="auth-error">{error}</p>}
-          <button id="auth-submit" type="submit" disabled={loading || !title.trim()}>
-            {loading ? "publishing…" : "publish"}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-// ─── DownloadModal ────────────────────────────────────────────────────────────
-
-function DownloadModal({ onConfirm, onClose }) {
-  const [format,          setFormat]          = useState("pdf");
-  const [justify,         setJustify]         = useState(false);
-  const [paragraphIndent, setParagraphIndent] = useState(false);
-  const [busy,            setBusy]            = useState(false);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setBusy(true);
-    await onConfirm({ format, style: { justify, paragraphIndent } });
-    setBusy(false);
-    onClose();
-  };
-
-  return (
-    <div id="auth-overlay">
-      <div id="auth-modal">
-        <button id="auth-close" onClick={onClose}>×</button>
-        <div id="auth-tabs"><button className="active" style={{ cursor: "default" }}>download</button></div>
-        <form onSubmit={submit}>
-          <div className="dl-section-label">Format</div>
-          <div className="dl-radio-row">
-            {[
-              { v: "pdf",          l: "PDF" },
-              { v: "png-square",   l: "PNG · square" },
-              { v: "png-portrait", l: "PNG · portrait" },
-            ].map(o => (
-              <label key={o.v} className={`dl-radio${format === o.v ? " active" : ""}`}>
-                <input type="radio" name="format" value={o.v} checked={format === o.v} onChange={() => setFormat(o.v)} />
-                <span>{o.l}</span>
-              </label>
-            ))}
-          </div>
-
-          <div className="dl-section-label">Style</div>
-          <label className="dl-check"><input type="checkbox" checked={justify}         onChange={e => setJustify(e.target.checked)} /><span>Justify text</span></label>
-          <label className="dl-check"><input type="checkbox" checked={paragraphIndent} onChange={e => setParagraphIndent(e.target.checked)} /><span>Paragraph indent</span></label>
-
-          <button id="auth-submit" type="submit" disabled={busy}>
-            {busy ? "preparing…" : `Download ${format === "pdf" ? "PDF" : "PNG"}`}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-// ─── Feed ─────────────────────────────────────────────────────────────────────
-
-function isToday(iso) {
-  if (!iso) return false;
-  const d = new Date(iso), n = new Date();
-  return d.getDate() === n.getDate() && d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
-}
-
-// Word-boundary excerpt with an ellipsis when truncated.
-function feedExcerpt(content, limit) {
-  const raw = content ? stripHtml(content).replace(/\s+/g, " ").trim() : "";
-  if (raw.length <= limit) return raw;
-  return raw.slice(0, limit).replace(/\s+\S*$/, "") + "…";
-}
-
-// Shared engagement cluster — quiet diamond signal, likes, comments.
-function FeedActions({ pub, sc, likeCount, commentCount, onRead, onLike }) {
-  return (
-    <div className="feed-entry-actions">
-      {sc && <HumanSignalBadge score={sc} />}
-      <button className="feed-engage" onClick={e => { e.stopPropagation(); onLike(pub); }} aria-label="Like">
-        <PHeart size={15} weight="light" />
-        <span>{likeCount}</span>
-      </button>
-      <button className="feed-engage" onClick={e => { e.stopPropagation(); onRead(pub, { focus: "comments" }); }} aria-label="Comments">
-        <PChat size={15} weight="light" />
-        <span>{commentCount}</span>
-      </button>
-    </div>
-  );
-}
-
-// ─── The living excerpt ───────────────────────────────────────────────────────
-// The feed does not print a finished sentence; it lets the piece write itself,
-// once, at ITS OWN recorded rhythm. Every other platform can only show the
-// result — inkk owns the process, so a card performs the becoming: the real
-// tempo, hesitancy and correction rate of how this specific piece was written,
-// then it settles into stillness.
-//
-// It runs on data already public on the row (text, keystrokes, deletions,
-// writing_time_seconds, score_features) — never another author's raw
-// keystrokes, which stay private. The exact keystroke-for-keystroke replay is
-// the productionisation (a small derived track stored at publish time); this
-// prototype reconstructs the rhythm faithfully from the piece's own numbers.
-
-// deterministic PRNG so a given piece always writes itself the same way — it is
-// authored, not random noise.
-function seededRandom(seed) {
-  let h = 2166136261 >>> 0;
-  for (const c of String(seed)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); }
-  return () => { h += 0x6D2B79F5; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-}
-
-// Turn a piece's aggregate numbers into a per-character playback rhythm.
-function rhythmOf(pub) {
-  const secs   = Math.max(1, pub.writing_time_seconds || pub.total_writing_secs || 0);
-  const keys   = Math.max(1, pub.keystrokes || 0);
-  const dels   = pub.deletions || 0;
-  const feats  = pub.score_features || {};
-  const netCps = keys > 1 ? keys / secs : 3;            // real chars/sec for THIS piece
-  const hesit  = Math.min(1, (feats.thinking_pauses || feats.pause_count_2000 || 0) / 8
-                            + (feats.pause_count_500 || 0) / 40);
-  const delRate = Math.min(0.06, dels / keys);          // real correction propensity
-  return {
-    slow: netCps < 3.2,        // a slow, deliberate writer vs a fast one
-    hesit,                     // 0..1 how much it stops to think
-    delRate,                   // chance per char of a type-then-fix flourish
-  };
-}
-
-function LivingExcerpt({ text, pub, className }) {
-  const [shown, setShown] = useState("");
-  const [done, setDone]   = useState(false);
-  const ref = useRef(null);
-  const startedRef = useRef(false);
-
-  useEffect(() => {
-    if (!text) return;
-    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const seen = sessionStorage.getItem("lf_" + pub.id);   // once per piece per session
-    if (reduce || seen) { setShown(text); setDone(true); return; }
-
-    const el = ref.current;
-    if (!el) return;
-    const rng = seededRandom(pub.id + text.length);
-    const r = rhythmOf(pub);
-    let i = 0, timer = null, cancelled = false;
-
-    // base per-char delay scaled so the whole excerpt performs in a few seconds
-    // regardless of length; the piece's rhythm modulates AROUND this base.
-    // A fixed performance budget keeps it a few seconds whatever the length;
-    // the piece's rhythm is felt as gentle unevenness within that, never as a
-    // pile of dead stops. base is the flat per-char pace; everything jitters
-    // mildly around it, with short punctuation breaths.
-    const budget = Math.min(3200, Math.max(1800, text.length * 12)) * (r.slow ? 1.1 : 1);
-    const base = budget / text.length;
-    const delRate = Math.min(0.03, r.delRate);
-    // corrections and thinking pauses are human TELLS, not a tax: cap the
-    // count so a long excerpt shows a couple, not dozens that pile into a slog.
-    let delLeft = r.delRate > 0.005 ? 2 : (r.delRate > 0 ? 1 : 0);
-    let thinkLeft = 1 + Math.round(r.hesit);
-
-    const step = () => {
-      if (cancelled) return;
-      if (i >= text.length) { setDone(true); sessionStorage.setItem("lf_" + pub.id, "1"); return; }
-      const ch = text[i];
-      // a correction flourish: a wrong letter, a beat, delete, carry on
-      if (delLeft > 0 && ch !== " " && i > 5 && i < text.length - 5 && rng() < delRate) {
-        delLeft--;
-        const wrong = "aeiotrns"[Math.floor(rng() * 8)];
-        setShown(text.slice(0, i) + wrong);
-        timer = setTimeout(() => { if (cancelled) return;
-          setShown(text.slice(0, i));
-          timer = setTimeout(step, 60 + rng() * 70);
-        }, 110 + rng() * 110);
-        return;
-      }
-      i++;
-      setShown(text.slice(0, i));
-      let gap = base * (0.7 + rng() * 0.6);                 // mild jitter around the pace
-      if (/[.!?]/.test(ch)) gap += 140 + rng() * 150;       // a short breath at a full stop
-      else if (/[,;:]/.test(ch)) gap += 55 + rng() * 70;
-      else if (thinkLeft > 0 && rng() < 0.02) { thinkLeft--; gap += (160 + rng() * 300) * (0.4 + r.hesit); }  // a rare think
-      timer = setTimeout(step, gap);
-    };
-
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach(e => {
-        if (e.isIntersecting && !startedRef.current) {
-          startedRef.current = true;
-          timer = setTimeout(step, 220);
-        }
-      });
-    }, { threshold: 0.6 });
-    io.observe(el);
-
-    return () => { cancelled = true; clearTimeout(timer); io.disconnect(); };
-    // key on the STABLE id: the feed hands a fresh pub object whenever like or
-    // comment counts refresh, and depending on it would cancel the timer
-    // mid-write and freeze the animation.
-  }, [text, pub.id]);  // eslint-disable-line react-hooks/exhaustive-deps
-
-  // a click/scroll settle: if the card is opened mid-write, show it whole
-  const settle = () => { if (!done) { setShown(text); setDone(true); sessionStorage.setItem("lf_" + pub.id, "1"); } };
-
-  return (
-    <p ref={ref} className={className + (done ? "" : " is-writing")} onClick={settle}>
-      {shown}{!done && <span className="lf-caret" aria-hidden="true" />}
-    </p>
-  );
-}
-
-function FeedCard({ pub, index, featured, dropCapImages, avatarMap, onRead, onAuthorClick, onLike, noAvatar }) {
-  const authorAvatar = (avatarMap && avatarMap[pub.user_id]) || pub.avatar_data;
-  const excerpt      = feedExcerpt(pub.content, featured ? 300 : 168);
-  const cover        = pieceCover(pub.content);
-  const likeCount    = getRelCount(pub.like_count);
-  const commentCount = getRelCount(pub.comment_count);
-  const sc           = scoreFromRecord(pub);
-  const fresh        = isToday(pub.published_at);
-  const initial      = (pub.author_name || "?")[0];
-
-  const author = pub.author_name && (
-    <button
-      className="feed-entry-author"
-      onClick={e => { e.stopPropagation(); pub.user_id && onAuthorClick(pub.user_id); }}
-    >
-      {pub.author_name}
-    </button>
-  );
-
-  const dateline = (
-    <span className="feed-entry-date">
-      {fresh && <span className="feed-fresh-dot" title="Published today" />}
-      {formatDate(pub.published_at)}
-    </span>
-  );
-
-  if (featured) {
-    return (
-      <article className="feed-lead" style={{ "--card-index": index }} onClick={() => onRead(pub)}>
-        {/* the piece's own art: the author's image if they placed one, else the plate */}
-        <span className={"feed-lead-art" + (cover ? " is-photo" : "")} aria-hidden="true"
-          style={{ backgroundImage: `url(${cover || `/backdrops/${imgForPub(pub.id)}.webp`})` }} />
-        <span className="feed-lead-kicker">{fresh ? "Today's read" : "Latest"}</span>
-        <h2 className="feed-lead-title">{pub.title || "Untitled"}</h2>
-        {excerpt && <LivingExcerpt text={excerpt} pub={pub} className="feed-lead-excerpt" />}
-        <div className="feed-lead-byline">
-          {!noAvatar && (
-            <span className="feed-mark">
-              <DropCapAvatar letter={initial} avatarData={authorAvatar} dropCapImages={dropCapImages} size={44} />
-            </span>
-          )}
-          <div className="feed-lead-byline-text">
-            {author}
-            <span className="feed-lead-sub">
-              {dateline}
-              <span className="feed-dot">·</span>
-              <span>{readingTime(pub.content)}</span>
-            </span>
-          </div>
-          <FeedActions pub={pub} sc={sc} likeCount={likeCount} commentCount={commentCount} onRead={onRead} onLike={onLike} />
-        </div>
-      </article>
-    );
-  }
-
-  return (
-    <article className="feed-entry" style={{ "--card-index": index }} onClick={() => onRead(pub)}>
-      {!noAvatar && (
-        <span className="feed-mark feed-mark-sm">
-          <DropCapAvatar letter={initial} avatarData={authorAvatar} dropCapImages={dropCapImages} size={34} />
-        </span>
-      )}
-      <div className="feed-entry-body">
-        <h2 className="feed-entry-title">{pub.title || "Untitled"}</h2>
-        {excerpt && <LivingExcerpt text={excerpt} pub={pub} className="feed-entry-excerpt" />}
-        <div className="feed-entry-meta">
-          {author}
-          <span className="feed-dot">·</span>
-          {dateline}
-          <FeedActions pub={pub} sc={sc} likeCount={likeCount} commentCount={commentCount} onRead={onRead} onLike={onLike} />
-        </div>
-      </div>
-      <span className={"feed-entry-plate" + (cover ? " is-photo" : "")} aria-hidden="true"
-        style={{ backgroundImage: `url(${cover || `/backdrops/${imgForPub(pub.id)}.webp`})` }} />
-    </article>
-  );
-}
-
-// Renders a feed: the newest piece as the full-width lead sheet, the rest as
-// sheet cards. Containment does the separating — no interleaved devices.
-function FeedList({ pubs, onRead, onAuthorClick, onLike, dropCapImages, avatarMap }) {
-  return (
-    <>
-      {pubs.map((pub, i) => (
-        <FeedCard key={pub.id} pub={pub} index={i} featured={i === 0} dropCapImages={dropCapImages}
-          avatarMap={avatarMap} onRead={onRead} onAuthorClick={onAuthorClick} onLike={onLike} />
-      ))}
-    </>
-  );
-}
-
-// Premium loading state — hairline shimmer rows that echo the entry shape.
-function FeedSkeleton({ count = 4 }) {
-  return (
-    <div className="feed-skeleton" aria-hidden="true">
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="feed-skel-row" style={{ "--card-index": i }}>
-          <div className="feed-skel-mark" />
-          <div className="feed-skel-body">
-            <div className="feed-skel-line feed-skel-title" />
-            <div className="feed-skel-line w-92" />
-            <div className="feed-skel-line w-74" />
-            <div className="feed-skel-line feed-skel-meta w-40" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function FeedEmpty({ title, sub, action, serif }) {
-  return (
-    <div className="feed-empty-state">
-      <span className="feed-empty-mark" aria-hidden="true">◇</span>
-      <p className={`feed-empty-title${serif ? " feed-empty-title-serif" : ""}`}>{title}</p>
-      {sub && <p className="feed-empty-sub">{sub}</p>}
-      {action}
-    </div>
-  );
-}
-
-function Feed({ user, me, onRead, onAuthorClick, dropCapImages, onRequestAuth, onWrite, onOpenProfile }) {
-  const [pubs, setPubs]               = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [feedTab, setFeedTab]         = useState("stories");
-  const [followingPubs, setFollowingPubs]   = useState([]);
-  const [followingLoading, setFollowingLoading] = useState(false);
-  const [followingFetched, setFollowingFetched] = useState(false);
-  const [searchQuery, setSearchQuery]     = useState("");
-  const [searchPeople, setSearchPeople]   = useState([]);
-  const [searchStories, setSearchStories] = useState([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const searchInputRef = useRef(null);
-  const inflightLikes = useRef(new Set());
-
-  useEffect(() => {
-    fetchFeed().then(data => { setPubs(data); setLoading(false); });
-  }, []);
-
-  useEffect(() => {
-    if (feedTab === "following" && user && !followingFetched) {
-      setFollowingLoading(true);
-      fetchFollowingFeed(user.id).then(data => {
-        setFollowingPubs(data);
-        setFollowingLoading(false);
-        setFollowingFetched(true);
-      });
-    }
-  }, [feedTab, user, followingFetched]);
-
-  // Reset following cache when user changes
-  useEffect(() => {
-    setFollowingFetched(false);
-    setFollowingPubs([]);
-  }, [user]);
-
-  useEffect(() => {
-    if (feedTab === "search") searchInputRef.current?.focus();
-  }, [feedTab]);
-
-  useEffect(() => {
-    const t = setTimeout(async () => {
-      if (!searchQuery.trim()) { setSearchPeople([]); setSearchStories([]); return; }
-      setSearchLoading(true);
-      const [people, stories] = await Promise.all([searchProfiles(searchQuery), searchPublications(searchQuery)]);
-      setSearchPeople(people); setSearchStories(stories); setSearchLoading(false);
-    }, 300);
-    return () => clearTimeout(t);
-  }, [searchQuery]);
-
-  const writers = useMemo(() => {
-    const seen = new Set();
-    return pubs.filter(p => {
-      if (!p.user_id || seen.has(p.user_id)) return false;
-      seen.add(p.user_id);
-      return true;
-    });
-  }, [pubs]);
-
-  // Publications don't carry avatar_data, so author pictures were invisible on
-  // every feed surface (cards, rail, writers) — only comment threads, which
-  // join profiles, ever showed them. One lookup hydrates the lot.
-  const [avatarByUser, setAvatarByUser] = useState({});
-  const avatarFetchedRef = useRef(new Set());
-  useEffect(() => {
-    if (!supabase) return;
-    const ids = [...new Set([...pubs, ...followingPubs].map(p => p.user_id).filter(Boolean))]
-      .filter(id => !avatarFetchedRef.current.has(id));
-    if (!ids.length) return;
-    ids.forEach(id => avatarFetchedRef.current.add(id));
-    supabase.from("profiles").select("id, avatar_data").in("id", ids).then(({ data }) => {
-      if (!data) return;
-      setAvatarByUser(prev => {
-        const next = { ...prev };
-        for (const r of data) if (r.avatar_data) next[r.id] = r.avatar_data;
-        return next;
-      });
-    });
-  }, [pubs, followingPubs]);
-
-  // ── the social plumbing: who do I already follow, and real follow buttons ──
-  const [followedIds, setFollowedIds] = useState(() => new Set());
-  useEffect(() => {
-    if (!user || !supabase) { setFollowedIds(new Set()); return; }
-    supabase.from("follows").select("following_id").eq("follower_id", user.id)
-      .then(({ data }) => setFollowedIds(new Set((data || []).map(r => r.following_id))));
-  }, [user]);
-
-  const handleRailFollow = useCallback(async (writerId) => {
-    if (!user) { onRequestAuth?.(); return; }
-    const was = followedIds.has(writerId);
-    setFollowedIds(prev => {
-      const next = new Set(prev);
-      if (was) next.delete(writerId); else next.add(writerId);
-      return next;
-    });
-    const err = await toggleFollow(user.id, writerId, was);
-    if (err) {
-      setFollowedIds(prev => {
-        const next = new Set(prev);
-        if (was) next.add(writerId); else next.delete(writerId);
-        return next;
-      });
-    } else {
-      setFollowingFetched(false);  // the Following tab refetches with the new list
-    }
-  }, [user, followedIds, onRequestAuth]);
-
-  // rail: the writers worth meeting (not yourself), and the most-loved pieces
-  const railWriters = useMemo(
-    () => writers.filter(w => w.user_id !== user?.id).slice(0, 5),
-    [writers, user]);
-  const mostLoved = useMemo(
-    () => [...pubs].filter(p => getRelCount(p.like_count) > 0)
-      .sort((a, b) => getRelCount(b.like_count) - getRelCount(a.like_count))
-      .slice(0, 3),
-    [pubs]);
-
-  const makeLikeHandler = useCallback((pubList, setPubList) => async (pub) => {
-    if (!user) { onRequestAuth?.(); return; }
-    if (inflightLikes.current.has(pub.id)) return;
-    inflightLikes.current.add(pub.id);
-    setPubList(prev => prev.map(p => p.id !== pub.id ? p : {
-      ...p,
-      like_count: [{ count: Math.max(0, getRelCount(p.like_count) + 1) }],
-    }));
-    const err = await togglePubLike(pub.id, user.id, false);
-    inflightLikes.current.delete(pub.id);
-    if (err) {
-      setPubList(prev => prev.map(p => p.id !== pub.id ? p : {
-        ...p,
-        like_count: [{ count: Math.max(0, getRelCount(p.like_count) - 1) }],
-      }));
-    }
-  }, [user, onRequestAuth]);
-
-  const handleLike          = useMemo(() => makeLikeHandler(pubs, setPubs), [makeLikeHandler, pubs]);
-  const handleFollowingLike = useMemo(() => makeLikeHandler(followingPubs, setFollowingPubs), [makeLikeHandler, followingPubs]);
-
-  // Pull-to-refresh (touch only): drag down from the top of the feed and it
-  // refetches. A quiet line of type stands in for a spinner.
-  const [refreshing, setRefreshing] = useState(false);
-  const pullRef = useRef({ y: 0, active: false, fired: false });
-  const containerRef = useRef(null);
-  const onTouchStart = (e) => {
-    const el = containerRef.current;
-    if (!el || el.scrollTop > 2) { pullRef.current.active = false; return; }
-    pullRef.current = { y: e.touches[0].clientY, active: true, fired: false };
-  };
-  const onTouchMove = (e) => {
-    const pr = pullRef.current;
-    if (!pr.active || pr.fired || refreshing) return;
-    if (e.touches[0].clientY - pr.y > 74) {
-      pr.fired = true;
-      setRefreshing(true);
-      Promise.all([fetchFeed(), user ? fetchFollowingFeed(user.id) : Promise.resolve(null)])
-        .then(([data, fdata]) => {
-          if (data) setPubs(data);
-          if (fdata) setFollowingPubs(fdata);
-        })
-        .finally(() => setTimeout(() => setRefreshing(false), 350));
-    }
-  };
-  const onTouchEnd = () => { pullRef.current.active = false; };
-
-  const editionDate = useMemo(() => {
-    const d = new Date();
-    const weekday = d.toLocaleDateString("en-GB", { weekday: "long" });
-    const rest    = d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
-    return `${weekday} · ${rest}`;
-  }, []);
-
-  return (
-    <div id="feed-container" ref={containerRef}
-      onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
-     {refreshing && <div id="feed-refresh">gathering the latest…</div>}
-     <div id="feed-desk">
-      <div id="feed-main">
-      <div id="feed-masthead">
-        {/* a day with new writing is, literally, a red-letter day */}
-        <span className={"feed-dateline" + (pubs.some(p => isToday(p.published_at)) ? " red-letter" : "")}>
-          {editionDate}
-        </span>
-        {user && (
-          <button className="masthead-me" onClick={onOpenProfile} aria-label="Your profile">
-            <DropCapAvatar letter={(me?.username || "i")[0]} avatarData={me?.avatar_data}
-              dropCapImages={dropCapImages} size={30} />
-          </button>
-        )}
-      </div>
-
-      {/* the open invitation: the feed is a place you write, not just read */}
-      <div id="feed-composer-wrap">
-        <button id="feed-composer" onClick={onWrite}>
-          {user && (
-            <DropCapAvatar letter={(me?.username || me?.display_name || "i")[0]}
-              avatarData={me?.avatar_data} dropCapImages={dropCapImages} size={32} />
-          )}
-          <span className="feed-composer-ghost">
-            Write something by hand<span className="lf-caret" aria-hidden="true" />
-          </span>
-        </button>
-      </div>
-
-      <div id="feed-header">
-        <div id="feed-tabs">
-          {user && (
-            <button className={`feed-tab${feedTab === "following" ? " active" : ""}`} onClick={() => setFeedTab("following")}>Following</button>
-          )}
-          <button className={`feed-tab${feedTab === "stories" ? " active" : ""}`} onClick={() => setFeedTab("stories")}>Stories</button>
-          <button className={`feed-tab${feedTab === "writers" ? " active" : ""}`} onClick={() => setFeedTab("writers")}>Writers{writers.length > 0 && <span className="feed-tab-count">{writers.length}</span>}</button>
-          <button className={`feed-tab feed-tab-icon${feedTab === "search" ? " active" : ""}`} onClick={() => setFeedTab("search")} aria-label="Search"><Search size={13} strokeWidth={1.8} /></button>
-        </div>
-      </div>
-
-      {feedTab === "following" && (
-        <div id="feed-list">
-          {followingLoading && <FeedSkeleton />}
-          {!followingLoading && followingFetched && followingPubs.length === 0 && (
-            <FeedEmpty title="Your feed is quiet" sub="Follow writers to see their latest work here." serif />
-          )}
-          {!followingLoading && (
-            <FeedList pubs={followingPubs} dropCapImages={dropCapImages} avatarMap={avatarByUser}
-              onRead={onRead} onAuthorClick={onAuthorClick} onLike={handleFollowingLike} />
-          )}
-        </div>
-      )}
-
-      {feedTab === "writers" && (
-        <div id="feed-list">
-          {loading && <FeedSkeleton count={5} />}
-          {!loading && writers.length === 0 && (
-            <FeedEmpty title="No writers yet" sub="The first published piece will introduce its author here." />
-          )}
-          {!loading && writers.map((w, i) => {
-            const pieceCount = pubs.filter(p => p.user_id === w.user_id).length;
-            return (
-              <div key={w.user_id} className="writer-card" style={{ "--card-index": i }} onClick={() => w.user_id && onAuthorClick(w.user_id)}>
-                <DropCapAvatar letter={w.author_name?.[0] || "?"} avatarData={avatarByUser[w.user_id] || w.avatar_data} dropCapImages={dropCapImages} size={36} />
-                <div className="writer-card-info">
-                  <span className="writer-card-name">{w.author_name}</span>
-                  <span className="writer-card-meta">{pieceCount} {pieceCount === 1 ? "piece" : "pieces"} · {formatDate(w.published_at)}</span>
-                </div>
-                <span className="writer-card-arrow">→</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {feedTab === "stories" && (
-        <div id="feed-list">
-          {loading && <FeedSkeleton />}
-          {!loading && pubs.length === 0 && (
-            <FeedEmpty title="Nothing published yet" sub="Be the first to share something written by hand." />
-          )}
-          {!loading && (
-            <FeedList pubs={pubs} dropCapImages={dropCapImages} avatarMap={avatarByUser}
-              onRead={onRead} onAuthorClick={onAuthorClick} onLike={handleLike} />
-          )}
-        </div>
-      )}
-
-      {feedTab === "search" && (
-        <div id="feed-list">
-          <div className="feed-search-bar">
-            <Search size={13} className="feed-search-icon" />
-            <input
-              ref={searchInputRef}
-              className="feed-search-input"
-              type="text"
-              placeholder="Search writers and stories…"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
-            {searchQuery && <button className="feed-search-clear" onClick={() => setSearchQuery("")}>×</button>}
-          </div>
-          {searchLoading && <p className="feed-empty">searching…</p>}
-          {!searchLoading && !searchQuery.trim() && <p className="feed-empty search-prompt">Search for writers or stories.</p>}
-          {!searchLoading && searchQuery.trim() && searchPeople.length === 0 && searchStories.length === 0 && (
-            <p className="feed-empty">No results.</p>
-          )}
-          {searchPeople.length > 0 && (
-            <>
-              <p className="feed-search-label">Writers</p>
-              {searchPeople.map((p, i) => (
-                <div key={p.id} className="writer-card" style={{ "--card-index": i }} onClick={() => onAuthorClick(p.id)}>
-                  <DropCapAvatar letter={p.username?.[0]} avatarData={p.avatar_data} dropCapImages={dropCapImages} size={36} />
-                  <div className="writer-card-info">
-                    <span className="writer-card-name">{p.display_name || `@${p.username}`}</span>
-                    <span className="writer-card-meta">@{p.username}</span>
-                  </div>
-                  <span className="writer-card-arrow">→</span>
-                </div>
-              ))}
-            </>
-          )}
-          {searchStories.length > 0 && (
-            <>
-              <p className="feed-search-label">Stories</p>
-              {searchStories.map((pub, i) => (
-                <FeedCard key={pub.id} pub={pub} index={i} onRead={onRead} onAuthorClick={onAuthorClick}
-                  onLike={handleLike} dropCapImages={dropCapImages} noAvatar />
-              ))}
-            </>
-          )}
-        </div>
-      )}
-      </div>
-
-      {/* the rail: the people of the place, and what they loved */}
-      <aside id="feed-rail">
-        {railWriters.length > 0 && (
-          <div className="rail-panel">
-            <p className="rail-title">Writers to follow</p>
-            {railWriters.map(w => (
-              <div key={w.user_id} className="rail-writer">
-                <button className="rail-writer-id" onClick={() => onAuthorClick(w.user_id)}>
-                  <DropCapAvatar letter={(w.author_name || "?")[0]} avatarData={avatarByUser[w.user_id] || w.avatar_data}
-                    dropCapImages={dropCapImages} size={30} />
-                  <span className="rail-writer-name">{w.author_name}</span>
-                </button>
-                <button
-                  className={"rail-follow" + (followedIds.has(w.user_id) ? " is-following" : "")}
-                  onClick={() => handleRailFollow(w.user_id)}
-                >
-                  {followedIds.has(w.user_id) ? "Following" : "Follow"}
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        {mostLoved.length > 0 && (
-          <div className="rail-panel">
-            <p className="rail-title">Most loved</p>
-            {mostLoved.map(p => (
-              <button key={p.id} className="rail-piece" onClick={() => onRead(p)}>
-                <span className={"rail-piece-plate" + (pieceCover(p.content) ? " is-photo" : "")} aria-hidden="true"
-                  style={{ backgroundImage: `url(${pieceCover(p.content) || `/backdrops/${imgForPub(p.id)}.webp`})` }} />
-                <span className="rail-piece-info">
-                  <span className="rail-piece-title">{p.title || "Untitled"}</span>
-                  <span className="rail-piece-meta">
-                    {p.author_name} · {getRelCount(p.like_count)} {getRelCount(p.like_count) === 1 ? "like" : "likes"}
-                  </span>
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </aside>
-     </div>
-    </div>
-  );
-}
-
-// ─── Profile ──────────────────────────────────────────────────────────────────
-
-function Profile({ user, profile, localDocs, publishedDocIds, streak, dropCapImages, onRead, onUnpublish, onSignIn, onCreateAccount, onSignOut, onAvatarChange, onEditDoc, onNewDoc, onDeleteDoc, onPublishDoc, researchOptIn, onToggleOptIn, onDownloadData, onDeleteData, onChangePassword, onProfileUpdate, onOpenVerify, onToast }) {
-  const [pubs, setPubs]           = useState([]);
-  const [loading, setLoading]     = useState(!!user);
-  const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
-  const [uploading, setUploading] = useState(false);
-  const [optBusy, setOptBusy]     = useState(false);
-  const [delBusy, setDelBusy]     = useState(false);
-  const [confirmDel, setConfirmDel] = useState(false);
-  const [showPrivacy, setShowPrivacy] = useState(false);
-  const [showTerms,   setShowTerms]   = useState(false);
-  const [confirmDeleteId, setConfirmDeleteId]         = useState(null);
-  const [unpubConfirm, setUnpubConfirm] = useState(null);  // { pub, thenEdit }
-  const [confirmDeletePubId, setConfirmDeletePubId]   = useState(null);
-  const [copiedCode, setCopiedCode]                   = useState(null);
-  const copyCode = (code) => {
-    navigator.clipboard?.writeText(code).then(() => {
-      setCopiedCode(code);
-      setTimeout(() => setCopiedCode(c => (c === code ? null : c)), 1800);
-    });
-  };
-  const [contribution, setContribution] = useState(null);
-  const [pendingLocal, setPendingLocal] = useState(0);
-  const [editingProfile, setEditingProfile]   = useState(false);
-  const [editUsername, setEditUsername]       = useState("");
-  const [editDisplayName, setEditDisplayName] = useState("");
-  const [editBio, setEditBio]                 = useState("");
-  const [profileSaving, setProfileSaving]     = useState(false);
-  const [profileError, setProfileError]       = useState("");
-  const fileInputRef              = useRef(null);
-
-  useEffect(() => {
-    if (!user) { setFollowCounts({ followers: 0, following: 0 }); return; }
-    fetchFollowCounts(user.id).then(setFollowCounts);
-  }, [user]);
-
-  useEffect(() => {
-    if (!user || !researchOptIn) { setContribution(null); setPendingLocal(0); return; }
-    let alive = true;
-    const refresh = async () => {
-      // Nudge the syncer so the server total keeps pace, then read both the
-      // synced (server) count and the not-yet-uploaded (local queue) count.
-      // Showing the local queue makes recording visible immediately and makes a
-      // stalled upload obvious instead of looking like a frozen number.
-      try { syncFlushNow?.(); } catch {}
-      const [contrib, pending] = await Promise.all([
-        fetchMyContribution(user.id),
-        countLocalEvents(user.id),
-      ]);
-      if (!alive) return;
-      if (contrib) setContribution(contrib);
-      setPendingLocal(pending || 0);
-    };
-    refresh();
-    const id = setInterval(refresh, 4000);
-    const onVis = () => { if (!document.hidden) refresh(); };
-    document.addEventListener("visibilitychange", onVis);
-    window.addEventListener("focus", refresh);
-    return () => {
-      alive = false;
-      clearInterval(id);
-      document.removeEventListener("visibilitychange", onVis);
-      window.removeEventListener("focus", refresh);
-    };
-  }, [user, researchOptIn]);
-
-  useEffect(() => {
-    if (!user) { setPubs([]); setLoading(false); return; }
-    fetchMyPublications(user.id).then(data => { setPubs(data); setLoading(false); });
-  }, [user]);
-
-  const handleUnpublish = async (pub, { thenEdit = false } = {}) => {
-    const err = await doUnpublish(pub.doc_id);
-    if (err) { onToast?.("Couldn't unpublish. Try again."); return; }
-    setPubs(prev => prev.filter(p => p.id !== pub.id));
-    if (onUnpublish) onUnpublish(pub.doc_id);
-    if (thenEdit) onEditDoc(pub.doc_id);
-    else onToast?.("Unpublished. The draft stays with you.");
-  };
-
-  const handleDeletePub = async (pub) => {
-    await doUnpublish(pub.doc_id);
-    onDeleteDoc(pub.doc_id);
-    setPubs(prev => prev.filter(p => p.id !== pub.id));
-    if (onUnpublish) onUnpublish(pub.doc_id);
-  };
-
-  const handleFileChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    const data = await compressAvatar(file);
-    await onAvatarChange(data);
-    setUploading(false);
-    e.target.value = "";
-  };
-
-  if (!user) {
-    return (
-      <div id="profile-container">
-        <div id="profile-signin">
-          <div id="profile-signin-mark">Inkk</div>
-          <h2 id="profile-signin-title">Join the conversation</h2>
-          <p id="profile-signin-sub">Write privately, or publish to the feed.</p>
-          <div id="profile-signin-actions">
-            <button className="profile-cta" onClick={onSignIn}>Sign in</button>
-            <button className="profile-cta-ghost" onClick={onCreateAccount || onSignIn}>Create account</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const totalWords = localDocs.reduce((sum, d) => sum + wordCount(d.content), 0);
-  const avatarLetter = profile?.username?.[0] || user.email[0];
-
-  const hasCustomAvatar = !!profile?.avatar_data;
-  const handleRemoveAvatar = async () => {
-    if (!hasCustomAvatar || uploading) return;
-    setUploading(true);
-    await onAvatarChange(null);
-    setUploading(false);
-  };
-
-  const startEditProfile = () => {
-    setEditUsername(profile?.username || "");
-    setEditDisplayName(profile?.display_name || "");
-    setEditBio(profile?.bio || "");
-    setProfileError("");
-    setEditingProfile(true);
-  };
-
-  const saveProfile = async () => {
-    const newUsername = editUsername.trim();
-    const newDisplayName = editDisplayName.trim();
-    const newBio = editBio.trim();
-    if (newUsername.length < 3) { setProfileError("Username must be at least 3 characters."); return; }
-    setProfileSaving(true);
-    setProfileError("");
-    if (newUsername !== profile?.username) {
-      const existing = await fetchProfileByUsername(newUsername);
-      if (existing && existing.id !== user.id) {
-        setProfileError("That username is already taken.");
-        setProfileSaving(false);
-        return;
-      }
-    }
-    const err = await upsertProfile(user.id, newUsername, newDisplayName || null, { bio: newBio });
-    setProfileSaving(false);
-    if (err) {
-      setProfileError(err.includes("unique") || err.includes("duplicate") ? "Username already taken." : err);
-      return;
-    }
-    onProfileUpdate?.({ ...profile, username: newUsername, display_name: newDisplayName || null, bio: newBio || null });
-    setEditingProfile(false);
-  };
-
-  return (
-    <div id="profile-container">
-      <header id="profile-header">
-        <div id="profile-head-row">
-          <div id="profile-avatar-wrap">
-            <DropCapAvatar letter={avatarLetter} avatarData={profile?.avatar_data} dropCapImages={dropCapImages} size={64} />
-            <button id="avatar-upload-btn" onClick={() => fileInputRef.current?.click()} title="Change photo">
-              {uploading ? "…" : "✎"}
-            </button>
-            {hasCustomAvatar && (
-              <button
-                id="avatar-remove-btn"
-                onClick={handleRemoveAvatar}
-                title="Remove photo, revert to default"
-                disabled={uploading}
-              >×</button>
-            )}
-            <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFileChange} />
-          </div>
-
-          <div id="profile-identity">
-            <h1 id="profile-username">{profile?.username ? `@${profile.username}` : user.email}</h1>
-            {profile?.display_name && <div id="profile-displayname">{profile.display_name}</div>}
-            {profile?.bio && <p id="profile-bio">{profile.bio}</p>}
-            {user.created_at && (
-              <div id="profile-joined">Member since {formatJoined(user.created_at)}</div>
-            )}
-          </div>
-
-          <button className="profile-edit-btn" onClick={startEditProfile}>Edit profile</button>
-        </div>
-
-        {/* the numbers live with the person, as the card's own footer */}
-        <div id="profile-stats">
-          {streak > 0 && (
-            <div className="stat-fig">
-              <span className="stat-fig-num">{streak}</span>
-              <span className="stat-fig-label">Day streak</span>
-            </div>
-          )}
-          <div className="stat-fig">
-            <span className="stat-fig-num">{pubs.length}</span>
-            <span className="stat-fig-label">Published</span>
-          </div>
-        <div className="stat-fig">
-          <span className="stat-fig-num">{totalWords.toLocaleString()}</span>
-          <span className="stat-fig-label">Words</span>
-        </div>
-        <div className="stat-fig">
-          <span className="stat-fig-num">{followCounts.followers}</span>
-          <span className="stat-fig-label">{followCounts.followers === 1 ? "Follower" : "Followers"}</span>
-        </div>
-        <div className="stat-fig">
-          <span className="stat-fig-num">{followCounts.following}</span>
-          <span className="stat-fig-label">Following</span>
-        </div>
-        </div>
-      </header>
-
-      {/* ── Edit profile, in its own room ── */}
-      {editingProfile && (
-        <div className="pe-overlay" onClick={() => { if (!profileSaving) { setEditingProfile(false); setProfileError(""); } }}>
-          <div className="pe-modal" onClick={e => e.stopPropagation()}>
-            <h2 className="pe-title">Edit profile</h2>
-            <label className="pe-field">
-              <span className="pe-label">Username</span>
-              <input
-                className="pe-input"
-                type="text"
-                value={editUsername}
-                onChange={e => setEditUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
-                maxLength={20}
-                autoFocus
-              />
-            </label>
-            <label className="pe-field">
-              <span className="pe-label">Display name</span>
-              <input
-                className="pe-input"
-                type="text"
-                value={editDisplayName}
-                onChange={e => setEditDisplayName(e.target.value)}
-                placeholder="Optional"
-                maxLength={50}
-              />
-            </label>
-            <label className="pe-field">
-              <span className="pe-label">Bio</span>
-              <textarea
-                className="pe-input pe-bio"
-                value={editBio}
-                onChange={e => setEditBio(e.target.value)}
-                placeholder="Who you are, what you write about"
-                maxLength={200}
-                rows={3}
-              />
-              <span className="pe-count">{200 - editBio.length} characters left</span>
-            </label>
-            {profileError && <p className="pe-error">{profileError}</p>}
-            <div className="pe-actions">
-              <button className="pe-btn" onClick={() => { setEditingProfile(false); setProfileError(""); }} disabled={profileSaving}>Cancel</button>
-              <button className="pe-btn pe-btn-primary" onClick={saveProfile} disabled={profileSaving || editUsername.length < 3}>{profileSaving ? "Saving…" : "Save"}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Drafts ─────────────────────────────────────────────────────── */}
-      {(() => {
-        const drafts = (localDocs || [])
-          .filter(d => !publishedDocIds?.has(d.id) && stripHtml(d.content).trim().length > 0)
-          .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-        return (
-          <section className="profile-section">
-            <div className="profile-section-head">
-              <h2 className="profile-section-label">Drafts<span className="section-count">{drafts.length}</span></h2>
-              <button className="section-action" onClick={onNewDoc}>New draft</button>
-            </div>
-            <p className="profile-section-sub">Drafts are only visible to you.</p>
-
-            <div className="profile-list">
-              {drafts.length === 0 && (
-                <p className="feed-empty">No drafts yet. <button className="feed-empty-link" onClick={onNewDoc}>Start writing →</button></p>
-              )}
-              {drafts.map((d, idx) => {
-                const title = stripHtml(d.title || "") || docTitle(d.content);
-                const wc = wordCount(d.content);
-                const confirming = confirmDeleteId === d.id;
-                return (
-                  <article key={d.id} className="profile-article-card" style={{ "--card-index": idx }} onClick={() => !confirming && onEditDoc(d.id)}>
-                    <div className="pac-main">
-                      <span className="pac-title">{title || "Untitled"}</span>
-                      <span className="pac-meta">{wc} words · {formatDate(new Date(d.updatedAt).toISOString())}</span>
-                      {d.verifyCode && (
-                        <div className="pac-code" onClick={e => e.stopPropagation()}>
-                          <span className="pac-code-mark" aria-hidden="true">◇</span>
-                          <button className="pac-code-val" title="Copy verification code" onClick={() => copyCode(d.verifyCode)}>
-                            {d.verifyCode}
-                            <span className="pac-code-copied">{copiedCode === d.verifyCode ? "copied" : "copy"}</span>
-                          </button>
-                          <button className="pac-code-link" onClick={() => onOpenVerify?.(d.verifyCode)}>Verify →</button>
-                        </div>
-                      )}
-                    </div>
-                    {!confirming ? (
-                      <div className="pac-actions" onClick={e => e.stopPropagation()}>
-                        <button className="pac-btn" onClick={e => { e.stopPropagation(); onPublishDoc(d); }}>Publish</button>
-                        <button className="pac-btn pac-btn-danger" onClick={e => { e.stopPropagation(); setConfirmDeleteId(d.id); }}>Delete</button>
-                      </div>
-                    ) : (
-                      <div className="pac-confirm" onClick={e => e.stopPropagation()}>
-                        <button className="pac-btn" onClick={() => setConfirmDeleteId(null)}>Cancel</button>
-                        <button className="pac-btn pac-btn-danger" onClick={() => { onDeleteDoc(d.id); setConfirmDeleteId(null); }}>Delete</button>
-                      </div>
-                    )}
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-        );
-      })()}
-
-      {/* ── Published ──────────────────────────────────────────────────── */}
-      <section className="profile-section">
-      <div className="profile-section-head">
-        <h2 className="profile-section-label">Published<span className="section-count">{pubs.length}</span></h2>
-      </div>
-      <p className="profile-section-sub">Visible to anyone on the feed.</p>
-
-      <div className="profile-list">
-        {loading && <p className="feed-empty">loading…</p>}
-        {!loading && pubs.length === 0 && (
-          <p className="feed-empty">Nothing published yet.</p>
-        )}
-        {pubs.map((pub, idx) => {
-          const confirmingDelete = confirmDeletePubId === pub.id;
-          return (
-            <article key={pub.id} className="profile-article-card" style={{ "--card-index": idx }} onClick={() => !confirmingDelete && onRead(pub)}>
-              <div className="pac-main">
-                <span className="pac-title">{pub.title || "Untitled"}</span>
-                <span className="pac-meta">{readingTime(pub.content)} · {formatDate(pub.published_at)}</span>
-                {pub.verify_code && (
-                  <div className="pac-code" onClick={e => e.stopPropagation()}>
-                    <span className="pac-code-mark" aria-hidden="true">◇</span>
-                    <button
-                      className="pac-code-val"
-                      title="Copy verification code"
-                      onClick={() => copyCode(pub.verify_code)}
-                    >
-                      {pub.verify_code}
-                      <span className="pac-code-copied">{copiedCode === pub.verify_code ? "copied" : "copy"}</span>
-                    </button>
-                    <button className="pac-code-link" onClick={() => onOpenVerify?.(pub.verify_code)}>Verify →</button>
-                  </div>
-                )}
-              </div>
-              {!confirmingDelete && (
-                <div className="pac-actions" onClick={e => e.stopPropagation()}>
-                  <button className="pac-btn" onClick={e => { e.stopPropagation(); setUnpubConfirm({ pub, thenEdit: true }); }}>Edit</button>
-                  <button className="pac-btn pac-btn-danger" onClick={e => { e.stopPropagation(); setUnpubConfirm({ pub, thenEdit: false }); }}>Unpublish</button>
-                  <button className="pac-btn pac-btn-danger" onClick={e => { e.stopPropagation(); setConfirmDeletePubId(pub.id); }}>Delete</button>
-                </div>
-              )}
-              {confirmingDelete && (
-                <div className="pac-confirm" onClick={e => e.stopPropagation()}>
-                  <button className="pac-btn" onClick={() => setConfirmDeletePubId(null)}>Cancel</button>
-                  <button className="pac-btn pac-btn-danger" onClick={() => { handleDeletePub(pub); setConfirmDeletePubId(null); }}>Delete</button>
-                </div>
-              )}
-            </article>
-          );
-        })}
-      </div>
-      </section>
-
-      {unpubConfirm && (
-        <div className="pe-overlay" onClick={() => setUnpubConfirm(null)}>
-          <div className="pe-modal" onClick={e => e.stopPropagation()}>
-            <h2 className="pe-title">{unpubConfirm.thenEdit ? "Unpublish to edit?" : "Unpublish this piece?"}</h2>
-            <p className="pe-body">
-              "{unpubConfirm.pub.title || "Untitled"}" comes off the public feed, and its likes and
-              comments are removed for good. Your draft stays{unpubConfirm.thenEdit
-                ? ", and opens in the editor so you can rework and republish it."
-                : ", so you can edit and republish it later."}
-            </p>
-            <div className="pe-actions">
-              <button className="pe-btn" onClick={() => setUnpubConfirm(null)}>Cancel</button>
-              <button className="pe-btn pe-btn-primary" onClick={async () => {
-                const c = unpubConfirm; setUnpubConfirm(null);
-                await handleUnpublish(c.pub, { thenEdit: c.thenEdit });
-              }}>{unpubConfirm.thenEdit ? "Unpublish and edit" : "Unpublish"}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <section id="research-section">
-        <div className="profile-section-head">
-          <h2 className="profile-section-label">Research</h2>
-        </div>
-        <p id="research-blurb">
-          When you write in Inkk, your text and the rhythm of your typing (pauses, revisions, bursts) are captured as part of a study into human writing. We use this to study what distinguishes human writing from machine-generated text. You can turn this off at any time.
-        </p>
-
-        {researchOptIn && ((Number(contribution?.event_count) || 0) + pendingLocal) > 0 && (() => {
-          const synced = Number(contribution?.event_count) || 0;
-          const total = synced + pendingLocal;
-          return (
-            <div id="contribution-card">
-              <div id="contribution-num">{total.toLocaleString()}</div>
-              <div id="contribution-label">events contributed to the inkk writing study</div>
-              <div id="contribution-status" className={pendingLocal > 0 ? "syncing" : "synced"}>
-                {pendingLocal > 0
-                  ? <><span className="research-pulse" aria-hidden="true" />{pendingLocal.toLocaleString()} events studied, uploading…</>
-                  : "all events uploaded"}
-              </div>
-              {contribution?.first_t && (
-                <div id="contribution-since">since {formatDate(new Date(Number(contribution.first_t)).toISOString())}</div>
-              )}
-            </div>
-          );
-        })()}
-
-        <label className="research-toggle">
-          <input
-            type="checkbox"
-            checked={!!researchOptIn}
-            disabled={optBusy}
-            onChange={async (e) => {
-              setOptBusy(true);
-              await onToggleOptIn(e.target.checked);
-              setOptBusy(false);
-            }}
-          />
-          <span className="research-toggle-track" aria-hidden="true"><span className="research-toggle-thumb" /></span>
-          <span className="research-toggle-label">{researchOptIn ? "Sharing on" : "Sharing off"}</span>
-        </label>
-
-        {researchOptIn && (
-          <div id="research-controls">
-            <button className="text-btn" onClick={onDownloadData}>Download my data</button>
-            {!confirmDel ? (
-              <button className="text-btn text-btn-danger" onClick={() => setConfirmDel(true)}>Delete my data</button>
-            ) : (
-              <div className="research-confirm">
-                <span>Delete all your captured writing-process data?</span>
-                <button className="text-btn" onClick={() => setConfirmDel(false)}>Cancel</button>
-                <button
-                  className="text-btn text-btn-danger"
-                  disabled={delBusy}
-                  onClick={async () => { setDelBusy(true); await onDeleteData(); setDelBusy(false); setConfirmDel(false); }}
-                >{delBusy ? "Deleting…" : "Yes, delete"}</button>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div id="research-legal-links">
-          <button type="button" className="tos-link" onClick={() => setShowPrivacy(true)}>Privacy Policy</button>
-          <span className="research-legal-dot">·</span>
-          <button type="button" className="tos-link" onClick={() => setShowTerms(true)}>Terms</button>
-        </div>
-      </section>
-
-      <div id="account-footer">
-        <button className="account-link" onClick={onChangePassword}>Change password</button>
-        <span className="account-dot">·</span>
-        <a className="account-link" href="mailto:hello@inkk.site?subject=Hello%20Inkk">Contact</a>
-        <span className="account-dot">·</span>
-        <button className="account-link account-signout" onClick={onSignOut}>Sign out</button>
-      </div>
-
-      {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
-      {showTerms   && <TermsModal   onClose={() => setShowTerms(false)} />}
-    </div>
-  );
-}
-
-// ─── SearchView ───────────────────────────────────────────────────────────────
-
-function SearchView({ onViewUser, dropCapImages }) {
-  const [query, setQuery]       = useState("");
-  const [results, setResults]   = useState([]);
-  const [loading, setLoading]   = useState(false);
-  const [searched, setSearched] = useState(false);
-  const inputRef = useRef(null);
-
-  useEffect(() => {
-    const t = setTimeout(async () => {
-      if (!query.trim()) { setResults([]); setSearched(false); return; }
-      setLoading(true);
-      const data = await searchProfiles(query);
-      setResults(data); setSearched(true); setLoading(false);
-    }, 300);
-    return () => clearTimeout(t);
-  }, [query]);
-
-  useEffect(() => { inputRef.current?.focus(); }, []);
-
-  return (
-    <div id="search-container">
-      <div id="search-bar">
-        <Search size={14} id="search-icon" />
-        <input
-          ref={inputRef}
-          id="search-input"
-          type="text"
-          placeholder="Find writers by username…"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-        />
-        {query && <button id="search-clear" onClick={() => setQuery("")}>×</button>}
-      </div>
-      <div id="search-results">
-        {loading && <p className="feed-empty">searching…</p>}
-        {!loading && searched && results.length === 0 && <p className="feed-empty">no writers found.</p>}
-        {!loading && !searched && <p className="feed-empty search-prompt">Search for a writer by username.</p>}
-        {results.map((p, i) => (
-          <div key={p.id} className="writer-card" style={{ "--card-index": i }} onClick={() => onViewUser(p)}>
-            <DropCapAvatar letter={p.username?.[0]} avatarData={p.avatar_data} dropCapImages={dropCapImages} size={36} />
-            <div className="writer-card-info">
-              <span className="writer-card-name">{p.display_name || `@${p.username}`}</span>
-              <span className="writer-card-meta">@{p.username}</span>
-            </div>
-            <span className="writer-card-arrow">→</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── UserProfileView ──────────────────────────────────────────────────────────
-
-function UserProfileView({ profile, onRead, dropCapImages, user, onRequestAuth }) {
-  const [pubs, setPubs]                 = useState([]);
-  const [loading, setLoading]           = useState(true);
-  const [following, setFollowing]       = useState(false);
-  const [followerCount, setFollowerCount] = useState(0);
-  const [followBusy, setFollowBusy]     = useState(false);
-  const inflightLikes                   = useRef(new Set());
-
-  const isOwnProfile = user?.id === profile.id;
-
-  useEffect(() => {
-    fetchUserPublications(profile.id).then(data => { setPubs(data); setLoading(false); });
-    fetchFollowCounts(profile.id).then(({ followers }) => setFollowerCount(followers));
-  }, [profile.id]);
-
-  useEffect(() => {
-    if (user && !isOwnProfile) fetchIsFollowing(user.id, profile.id).then(setFollowing);
-    else setFollowing(false);
-  }, [user, profile.id, isOwnProfile]);
-
-  const handleFollow = async () => {
-    if (!user) { onRequestAuth?.(); return; }
-    setFollowBusy(true);
-    const wasFollowing = following;
-    setFollowing(!wasFollowing);
-    setFollowerCount(c => Math.max(0, c + (wasFollowing ? -1 : 1)));
-    await toggleFollow(user.id, profile.id, wasFollowing);
-    setFollowBusy(false);
-  };
-
-  const handleLike = useCallback(async (pub) => {
-    if (!user) { onRequestAuth?.(); return; }
-    if (inflightLikes.current.has(pub.id)) return;
-    inflightLikes.current.add(pub.id);
-    setPubs(prev => prev.map(p => p.id !== pub.id ? p : {
-      ...p,
-      like_count: [{ count: Math.max(0, getRelCount(p.like_count) + 1) }],
-    }));
-    const err = await togglePubLike(pub.id, user.id, false);
-    inflightLikes.current.delete(pub.id);
-    if (err) {
-      setPubs(prev => prev.map(p => p.id !== pub.id ? p : {
-        ...p,
-        like_count: [{ count: Math.max(0, getRelCount(p.like_count) - 1) }],
-      }));
-    }
-  }, [user, onRequestAuth]);
-
-  return (
-    <div id="user-profile-container">
-      <div id="user-profile-header">
-        <DropCapAvatar letter={profile.username?.[0]} avatarData={profile.avatar_data} dropCapImages={dropCapImages} size={52} />
-        <div id="user-profile-info">
-          <div id="user-profile-username">@{profile.username}</div>
-          {profile.display_name && <div id="user-profile-name">{profile.display_name}</div>}
-          {profile.bio && <p id="user-profile-bio">{profile.bio}</p>}
-          <div id="user-profile-stats">
-            <span className="user-profile-stat">{pubs.length} {pubs.length === 1 ? "piece" : "pieces"}</span>
-            <span className="user-profile-stat-sep">·</span>
-            <span className="user-profile-stat">{followerCount} {followerCount === 1 ? "follower" : "followers"}</span>
-          </div>
-        </div>
-        {!isOwnProfile && (
-          <button
-            className={`follow-btn${following ? " following" : ""}`}
-            onClick={handleFollow}
-            disabled={followBusy}
-          >
-            {following ? "Following" : "Follow"}
-          </button>
-        )}
-      </div>
-      <div id="user-profile-list">
-        {loading && <p className="feed-empty">loading…</p>}
-        {!loading && pubs.length === 0 && <p className="feed-empty">nothing published yet.</p>}
-        {pubs.map((pub, i) => (
-          <FeedCard key={pub.id} pub={pub} index={i} onRead={onRead} onAuthorClick={() => {}} onLike={handleLike} noAvatar />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── ReadingView ──────────────────────────────────────────────────────────────
-
-function ReadingView({ pub, user, isAdmin, dropCapImages, focus, onRequestAuth, onAuthorClick, onVerify }) {
-  const containerRef = useRef(null);
-  const commentsRef  = useRef(null);
-  const [progress, setProgress] = useState(0);
-  const [copied, setCopied]     = useState(false);
-  const [codeCopied, setCodeCopied] = useState(false);
-  const [likeCount, setLikeCount]       = useState(getRelCount(pub.like_count));
-  const [liked, setLiked]               = useState(false);
-  const [likeBusy, setLikeBusy]         = useState(false);
-  const [comments, setComments]         = useState([]);
-  const [commentsLoading, setCommentsLoading] = useState(true);
-  const [body, setBody]                 = useState("");
-  const [posting, setPosting]           = useState(false);
-  const [confirmDelId, setConfirmDelId] = useState(null);
-  const [pages, setPages]               = useState([]);
-  const [pagesLoading, setPagesLoading] = useState(true);
-  const [zoom, setZoom]                 = useState(1.0);
-  const [phone] = useState(isPhone);
-  const imgs = pieceImages(pub.content);
-  const cover = imgs[0] || null;
-  const gallery = imgs.slice(1);
-  // An illuminated initial opens the piece, as it would open a manuscript.
-  const initialSrc = phone ? dropCapSrc(openingLetter(pub.content), dropCapImages) : null;
-
-  useEffect(() => {
-    if (isPhone()) { setPagesLoading(false); return; }   // phones reflow instead
-    setPages([]);
-    setPagesLoading(true);
-    renderBookPdfPages({
-      title: pub.title || "",
-      byline: pub.author_name || "",
-      html: stripImgs(pub.content || ""),
-      options: { justify: !!pub.render_justify, paragraphIndent: !!pub.render_indent, paperTexture: true },
-      async onPage(canvas) {
-        const url = canvas.toDataURL("image/jpeg", 0.95);
-        setPages(prev => [...prev, url]);
-      },
-    }).then(() => setPagesLoading(false))
-      .catch(() => setPagesLoading(false));
-  }, [pub.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    setLikeCount(getRelCount(pub.like_count));
-    setCommentsLoading(true);
-    fetchComments(pub.id).then(rows => { setComments(rows); setCommentsLoading(false); });
-    if (user) {
-      supabase
-        .from("likes")
-        .select("publication_id", { count: "exact", head: true })
-        .eq("user_id", user.id).eq("publication_id", pub.id)
-        .then(({ count }) => setLiked((count || 0) > 0));
-    } else {
-      setLiked(false);
-    }
-    supabase
-      .from("likes")
-      .select("publication_id", { count: "exact", head: true })
-      .eq("publication_id", pub.id)
-      .then(({ count }) => { if (count != null) setLikeCount(count); });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pub.id, user]);
-
-  // Optional scroll-to-comments when arriving via the comment-count button.
-  useEffect(() => {
-    if (focus === "comments" && commentsRef.current) {
-      const t = setTimeout(() => commentsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 250);
-      return () => clearTimeout(t);
-    }
-  }, [focus, commentsLoading]);
-
-  const handleScroll = useCallback(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const max = el.scrollHeight - el.clientHeight;
-    setProgress(max > 0 ? el.scrollTop / max : 0);
-  }, []);
-
-  const copyText = useCallback(() => {
-    navigator.clipboard.writeText(pub.title + "\n\n" + stripHtml(pub.content)).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }, [pub]);
-
-  const copyCode = useCallback(() => {
-    if (!pub.verify_code) return;
-    navigator.clipboard.writeText(pub.verify_code).then(() => {
-      setCodeCopied(true);
-      setTimeout(() => setCodeCopied(false), 2000);
-    });
-  }, [pub.verify_code]);
-
-  const toggleLike = useCallback(async () => {
-    if (!user) { onRequestAuth?.(); return; }
-    if (likeBusy) return;
-    setLikeBusy(true);
-    const wasLiked = liked;
-    setLiked(!wasLiked);
-    setLikeCount(c => Math.max(0, c + (wasLiked ? -1 : 1)));
-    const err = await togglePubLike(pub.id, user.id, wasLiked);
-    if (err) {
-      setLiked(wasLiked);
-      setLikeCount(c => Math.max(0, c + (wasLiked ? 1 : -1)));
-    }
-    setLikeBusy(false);
-  }, [user, liked, likeBusy, pub.id, onRequestAuth]);
-
-  const submitComment = useCallback(async (e) => {
-    e.preventDefault();
-    if (!user) { onRequestAuth?.(); return; }
-    if (!body.trim() || posting) return;
-    setPosting(true);
-    const err = await addComment(pub.id, user.id, body);
-    if (!err) {
-      setBody("");
-      const rows = await fetchComments(pub.id);
-      setComments(rows);
-    }
-    setPosting(false);
-  }, [user, body, posting, pub.id, onRequestAuth]);
-
-  const removeComment = useCallback(async (commentId) => {
-    const err = await deleteCommentRow(commentId);
-    if (!err) setComments(prev => prev.filter(c => c.id !== commentId));
-    setConfirmDelId(null);
-  }, []);
-
-  // Held (auto-flagged, awaiting review) and removed pieces stay hidden even via
-  // a direct link or a pasted inkk code. Exceptions: the author — who is never
-  // told their piece is held — and admins, who open it to review from the queue.
-  const isHidden  = pub.moderation_status === "flagged" || pub.moderation_status === "removed";
-  const canBypass = user && (pub.user_id === user.id || isAdmin);
-  if (isHidden && !canBypass) {
-    return (
-      <div id="reading-container">
-        <div id="reading-meta" style={{ textAlign: "center", paddingTop: "20vh" }}>
-          <p className="feed-empty">This piece isn’t available.</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <div id="reading-progress" style={{ width: `${progress * 100}%` }} />
-      <div id="reading-container" ref={containerRef} onScroll={handleScroll}>
-        <div id="reading-meta">
-          <button
-            className="reading-author-btn"
-            onClick={() => pub.user_id && onAuthorClick?.(pub.user_id)}
-            disabled={!pub.user_id}
-          >
-            {pub.author_name}
-          </button>
-          <span className="reading-dot">·</span>
-          <span>{formatDate(pub.published_at)}</span>
-          <span className="reading-dot">·</span>
-          <span>{readingTime(pub.content)}</span>
-          <button id="reading-copy" onClick={copyText} title="Copy text">
-            {copied ? <CheckCheck size={14} /> : <Copy size={14} />}
-          </button>
-          <div className="reading-zoom" data-desktop-only="">
-            <button className="zoom-btn" onClick={() => setZoom(z => Math.max(0.6, +(z - 0.2).toFixed(1)))} title="Zoom out">−</button>
-            <button className="zoom-btn" onClick={() => setZoom(z => Math.min(2.4, +(z + 0.2).toFixed(1)))} title="Zoom in">+</button>
-          </div>
-        </div>
-        <div id="reading-inner" style={{ maxWidth: `${700 * zoom}px` }}>
-          {pub.author_note && (
-            <p className="reading-author-note">{pub.author_note}</p>
-          )}
-          {phone ? (
-            <article id="reading-reflow">
-              {/* frontispiece: the author's cover if they placed one, else the plate */}
-              <div className={"reading-plate" + (cover ? " is-photo" : "")}
-                   style={{ backgroundImage: `url(${cover || `/backdrops/${imgForPub(pub.id)}.webp`})` }} />
-              {gallery.length > 0 && (
-                <div className="reading-gallery">
-                  {gallery.map((u, i) => <img key={i} src={u} alt="" loading="lazy" />)}
-                </div>
-              )}
-              <h1 className="reading-reflow-title">{pub.title}</h1>
-              {initialSrc && <img className="reading-initial" src={initialSrc} alt="" aria-hidden="true" />}
-              <div className={"reading-reflow-body" + (initialSrc ? " has-initial" : "")}
-                   dangerouslySetInnerHTML={{ __html: (() => {
-                     const src = stripImgs(pub.content);
-                     return initialSrc
-                       ? sanitizeForReading(stripOpeningLetter(src))
-                       : sanitizeForReading(src);
-                   })() }} />
-            </article>
-          ) : (
-          <div id="reading-pages">
-            {cover && <img className="reading-cover" src={cover} alt="" />}
-            {gallery.length > 0 && (
-              <div className="reading-gallery">
-                {gallery.map((u, i) => <img key={i} src={u} alt="" loading="lazy" />)}
-              </div>
-            )}
-            {pagesLoading && pages.length === 0 && (
-              <p className="reading-pages-loading">rendering…</p>
-            )}
-            {pages.map((url, i) => (
-              <img key={i} className="reading-page-img" src={url} alt="" />
-            ))}
-          </div>
-          )}
-
-          {/* ── Verification colophon ──────────────────────────────────────── */}
-          {pub.verify_code && (
-            <div className={`reading-verify${isVerifiedTier(pub.score_tier) ? " is-verified" : ""}`}>
-              <div className="rv-body">
-                <span className="rv-status">
-                  {isVerifiedTier(pub.score_tier) ? "Human-verified" : "Written in inkk"}
-                </span>
-                <button className="rv-code" onClick={copyCode} title="Copy code">
-                  {pub.verify_code}
-                  <span className="rv-copy">{codeCopied ? "copied" : "copy"}</span>
-                </button>
-              </div>
-              <button className="rv-verify-link" onClick={() => onVerify?.(pub.verify_code)}>
-                Verify →
-              </button>
-            </div>
-          )}
-
-          {/* ── Like + Comments ──────────────────────────────────────────── */}
-          <div id="reading-footer">
-            <div className="reading-actions">
-              <button
-                className={`reading-like${liked ? " liked" : ""}`}
-                onClick={toggleLike}
-                disabled={likeBusy}
-              >
-                <Heart size={18} strokeWidth={1.6} fill={liked ? "currentColor" : "none"} />
-                <span>{likeCount} {likeCount === 1 ? "like" : "likes"}</span>
-              </button>
-            </div>
-
-            <div className="reading-report-row">
-              <ReportControl
-                targetType="publication"
-                targetId={pub.id}
-                targetUserId={pub.user_id}
-                user={user}
-                onRequestAuth={onRequestAuth}
-              />
-            </div>
-
-            <div className="reading-comments" ref={commentsRef}>
-              <h3 className="reading-comments-title">{comments.length} {comments.length === 1 ? "comment" : "comments"}</h3>
-
-              {user ? (
-                <form className="comment-form" onSubmit={submitComment}>
-                  <textarea
-                    className="comment-input"
-                    placeholder="Leave a comment…"
-                    value={body}
-                    onChange={e => setBody(e.target.value)}
-                    maxLength={2000}
-                    rows={3}
-                  />
-                  <div className="comment-form-row">
-                    <span className="comment-counter">{body.length}/2000</span>
-                    <button type="submit" className="comment-post" disabled={!body.trim() || posting}>
-                      {posting ? "posting…" : "Post"}
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <p className="comment-signin">
-                  <button className="tos-link" onClick={() => onRequestAuth?.()}>Sign in</button> to like and comment.
-                </p>
-              )}
-
-              {commentsLoading && <p className="feed-empty">loading…</p>}
-              {!commentsLoading && comments.length === 0 && (
-                <p className="feed-empty">No comments yet.</p>
-              )}
-
-              <div className="comment-list">
-                {comments.map(c => {
-                  const username = c.profiles?.username || "anonymous";
-                  const isMine   = user && c.user_id === user.id;
-                  const isConfirming = confirmDelId === c.id;
-                  return (
-                    <div key={c.id} className="comment">
-                      <DropCapAvatar
-                        letter={username[0]}
-                        avatarData={c.profiles?.avatar_data}
-                        dropCapImages={dropCapImages}
-                        size={28}
-                      />
-                      <div className="comment-body-wrap">
-                        <div className="comment-header">
-                          <span className="comment-author">@{username}</span>
-                          <span className="comment-time">{formatDate(c.created_at)}</span>
-                          {isMine && !isConfirming && (
-                            <button className="comment-delete" onClick={() => setConfirmDelId(c.id)}>delete</button>
-                          )}
-                          {isMine && isConfirming && (
-                            <span className="comment-confirm">
-                              <button className="comment-delete" onClick={() => setConfirmDelId(null)}>cancel</button>
-                              <button className="comment-delete comment-delete-yes" onClick={() => removeComment(c.id)}>yes, delete</button>
-                            </span>
-                          )}
-                          {!isMine && (
-                            <ReportControl
-                              targetType="comment"
-                              targetId={c.id}
-                              targetUserId={c.user_id}
-                              user={user}
-                              onRequestAuth={onRequestAuth}
-                              className="comment-report"
-                            />
-                          )}
-                        </div>
-                        <p className="comment-body">{c.body}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
-// ─── App ──────────────────────────────────────────────────────────────────────
-
-// ─── Report control ──────────────────────────────────────────────────────────
-// Quiet "report" affordance reused on publications and comments. Opens a small
-// reason picker and files (or updates) one report per user per target.
-function ReportControl({ targetType, targetId, targetUserId, user, onRequestAuth, className = "" }) {
-  const [open, setOpen]     = useState(false);
-  const [reason, setReason] = useState("");
-  const [note, setNote]     = useState("");
-  const [busy, setBusy]     = useState(false);
-  const [done, setDone]     = useState(false);
-  const [err, setErr]       = useState("");
-
-  // You can't report your own content.
-  if (user && targetUserId && user.id === targetUserId) return null;
-
-  if (done) return <span className={`report-done ${className}`}>Reported. Thank you.</span>;
-
-  if (!open) {
-    return (
-      <button
-        className={`report-btn ${className}`}
-        onClick={() => { if (!user) { onRequestAuth?.(); return; } setOpen(true); }}
-      >
-        Report
-      </button>
-    );
-  }
-
-  const submit = async () => {
-    if (!reason || busy) return;
-    setBusy(true); setErr("");
-    const e = await reportContent({ targetType, targetId, targetUserId, reason, note, userId: user.id });
-    setBusy(false);
-    if (e) { setErr(e); return; }
-    setOpen(false); setDone(true);
-  };
-
-  return (
-    <div className="report-panel" onClick={e => e.stopPropagation()}>
-      <div className="report-panel-head">
-        <span className="report-panel-title">Report this {targetType === "comment" ? "comment" : "piece"}</span>
-        <button className="report-cancel" onClick={() => { setOpen(false); setErr(""); }}>cancel</button>
-      </div>
-      <div className="report-reasons">
-        {REPORT_REASONS.map(([val, label]) => (
-          <label key={val} className="report-reason">
-            <input
-              type="radio" name={`reason-${targetType}-${targetId}`} value={val}
-              checked={reason === val} onChange={() => setReason(val)}
-            />
-            <span>{label}</span>
-          </label>
-        ))}
-      </div>
-      <textarea
-        className="report-note"
-        placeholder="Add a note (optional)"
-        value={note} onChange={e => setNote(e.target.value)}
-        maxLength={1000} rows={2}
-      />
-      {err && <p className="report-err">{err}</p>}
-      <div className="report-actions">
-        <button className="report-submit" onClick={submit} disabled={!reason || busy}>
-          {busy ? "sending…" : "Submit report"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Admin moderation queue ───────────────────────────────────────────────────
-// Open reports + auto-flagged content, with remove / dismiss / keep. Gated on
-// profile.is_admin (RLS enforces it server-side too).
-function AdminView({ profile, onOpenPiece }) {
-  const [reports, setReports] = useState([]);
-  const [flagged, setFlagged] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [busyId, setBusyId]   = useState(null);
-
-  const load = useCallback(async () => {
-    if (!supabase) return;
-    setLoading(true);
-    const [reps, fpubs, fcoms] = await Promise.all([
-      supabase.from("reports").select("*").eq("status", "open").order("created_at", { ascending: false }),
-      supabase.from("publications").select("id, title, content, user_id, moderation_scores")
-        .eq("moderation_status", "flagged").order("published_at", { ascending: false }).limit(50),
-      supabase.from("comments").select("id, body, user_id, moderation_scores")
-        .eq("moderation_status", "flagged").order("created_at", { ascending: false }).limit(50),
-    ]);
-    setReports(reps.data || []);
-    setFlagged([
-      ...(fpubs.data || []).map(p => ({ ...p, _kind: "publication" })),
-      ...(fcoms.data || []).map(c => ({ ...c, _kind: "comment" })),
-    ]);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const tableFor = (kind) => (kind === "comment" ? "comments" : "publications");
-  const setStatus = async (kind, id, status) => {
-    setBusyId(id);
-    await supabase.from(tableFor(kind)).update({ moderation_status: status }).eq("id", id);
-    setBusyId(null); load();
-  };
-  const resolveReport = async (rep, action) => {
-    setBusyId(rep.id);
-    if (action === "remove" && rep.target_id) {
-      await supabase.from(tableFor(rep.target_type)).update({ moderation_status: "removed" }).eq("id", rep.target_id);
-    }
-    await supabase.from("reports").update({
-      status: action === "remove" ? "actioned" : "dismissed",
-      reviewed_at: new Date().toISOString(),
-      reviewed_by: profile?.id || null,
-    }).eq("id", rep.id);
-    setBusyId(null); load();
-  };
-
-  if (!profile?.is_admin) {
-    return (
-      <div className="admin-view">
-        <p className="feed-empty">Moderation is restricted to administrators.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="admin-view">
-      <header className="admin-masthead"><span className="admin-dateline">Moderation</span></header>
-
-      <section className="admin-section">
-        <h2 className="admin-section-title">Reports: {reports.length} open</h2>
-        {loading && <p className="feed-empty">loading…</p>}
-        {!loading && reports.length === 0 && <p className="feed-empty">No open reports.</p>}
-        {reports.map(r => (
-          <div key={r.id} className="admin-row">
-            <div className="admin-row-body">
-              <span className="admin-tag">{r.target_type}</span>
-              <span className="admin-reason">{(REPORT_REASONS.find(x => x[0] === r.reason) || [])[1] || r.reason}</span>
-              {r.note && <p className="admin-note">“{r.note}”</p>}
-            </div>
-            <div className="admin-row-actions">
-              {r.target_type === "publication" && (
-                <button className="text-btn" onClick={() => onOpenPiece?.(r.target_id)}>View</button>
-              )}
-              <button className="text-btn text-btn-danger" disabled={busyId === r.id} onClick={() => resolveReport(r, "remove")}>Remove</button>
-              <button className="text-btn" disabled={busyId === r.id} onClick={() => resolveReport(r, "dismiss")}>Dismiss</button>
-            </div>
-          </div>
-        ))}
-      </section>
-
-      <section className="admin-section">
-        <h2 className="admin-section-title">Auto-flagged: {flagged.length}</h2>
-        {!loading && flagged.length === 0 && <p className="feed-empty">Nothing auto-flagged.</p>}
-        {flagged.map(item => {
-          const text = item._kind === "comment" ? item.body : (item.title || "Untitled");
-          const top  = topCategory(item.moderation_scores);
-          return (
-            <div key={item._kind + item.id} className="admin-row">
-              <div className="admin-row-body">
-                <span className="admin-tag">{item._kind}</span>
-                {top && <span className="admin-reason">{top}</span>}
-                <p className="admin-snippet">{stripHtml(text).slice(0, 160)}</p>
-              </div>
-              <div className="admin-row-actions">
-                {item._kind === "publication" && (
-                  <button className="text-btn" onClick={() => onOpenPiece?.(item.id)}>View</button>
-                )}
-                <button className="text-btn text-btn-danger" disabled={busyId === item.id} onClick={() => setStatus(item._kind, item.id, "removed")}>Remove</button>
-                <button className="text-btn" disabled={busyId === item.id} onClick={() => setStatus(item._kind, item.id, "ok")}>Keep</button>
-              </div>
-            </div>
-          );
-        })}
-      </section>
-    </div>
-  );
-}
-
-// ─── Image toolbar ───────────────────────────────────────────────────────────
-// Floating controls shown when an embedded image is selected in the editor:
-// width presets, alignment, and remove. Edits are written as inline width % +
-// data-align on the <img>, which the book renderer reads when publishing.
-function ImageToolbar({ rect, width, align, onWidth, onAlign, onRemove, panelRef }) {
-  const top  = Math.max(8, rect.top - 46);
-  const left = rect.left + rect.width / 2;
-  const Btn = ({ active, children, ...p }) => (
-    <button className={`img-tb-btn${active ? " active" : ""}`} onMouseDown={e => e.preventDefault()} {...p}>{children}</button>
-  );
-  return (
-    <div ref={panelRef} className="img-toolbar" style={{ top, left }} onMouseDown={e => e.preventDefault()}>
-      <div className="img-tb-group">
-        <Btn active={width <= 45}            onClick={() => onWidth(40)}>S</Btn>
-        <Btn active={width > 45 && width < 100} onClick={() => onWidth(70)}>M</Btn>
-        <Btn active={width >= 100}           onClick={() => onWidth(100)}>Full</Btn>
-      </div>
-      <span className="img-tb-sep" />
-      <div className="img-tb-group">
-        <Btn active={align === "left"}   onClick={() => onAlign("left")}   aria-label="Align left"><AlignLeft size={14} strokeWidth={1.75} /></Btn>
-        <Btn active={align === "center"} onClick={() => onAlign("center")} aria-label="Align center"><AlignCenter size={14} strokeWidth={1.75} /></Btn>
-        <Btn active={align === "right"}  onClick={() => onAlign("right")}  aria-label="Align right"><AlignRight size={14} strokeWidth={1.75} /></Btn>
-      </div>
-      <span className="img-tb-sep" />
-      <Btn onClick={onRemove} aria-label="Remove image"><Trash2 size={14} strokeWidth={1.75} /></Btn>
-    </div>
-  );
-}
+import { startSync, stopSync, setResearchOptIn as remoteSetResearchOptIn, deleteMyEvents, dumpMyEvents, flushNow as syncFlushNow } from "./telemetry/sync";
+import { claimAnonymous as claimAnonymousEvents, clearForUser as clearLocalForUser, dumpForUser as dumpLocalForUser } from "./telemetry/store";
+import { HumanSignalPanel } from "./components/HumanSignal";
+import { TOS_VERSION, PrivacyModal, TermsModal } from "./components/Legal";
+import { hashContent, isVerifiedTier } from "./verify/code";
+import { NotesView } from "./views/Notes";
+import { CertifyView } from "./views/Certify";
+import { createDoc, normaliseDoc, saveState, loadOwner, saveOwner, initState, stripHtml, setEditorHtml, setTitleHtml, docTitle, wordCount, loadStreak, touchStreak } from "./lib/docs";
+import { applySmartTypography, caretRangeAt, compressImage, titleCase, liveTitleCase, titleCaretOffset, setTitleCaret, isMobile } from "./lib/text";
+import { formatWritingTime } from "./lib/format";
+import { fetchCloudDocs, fetchCloudDoc, pushDocToCloud, deleteDocFromCloud, mergeDocs } from "./lib/cloud";
+import { ensureCertificate } from "./lib/certify";
+import { fetchProfile, upsertProfile, generateUniqueUsername } from "./lib/profile";
+import { viewToPath, pathToView, pathToLegal } from "./lib/routes";
+import { enterBrowserFullscreen, exitBrowserFullscreen } from "./lib/fullscreen";
+import { Toasts } from "./components/Toasts";
+import { imgForPub, Backdrop } from "./components/Backdrop";
+import { LandingScreen } from "./components/Landing";
+import { HumanSignalModal } from "./components/HumanSignalModal";
+import { AuthModal, UpdatePasswordModal } from "./components/AuthModal";
+import { DownloadModal } from "./components/DownloadModal";
+import { ImageToolbar } from "./components/ImageToolbar";
 
 export default function App() {
   const { docs: initDocs, activeId: initActiveId } = initState();
@@ -3909,17 +55,16 @@ export default function App() {
   const [authOpen, setAuthOpen]       = useState(false);
   const [authMode, setAuthMode]       = useState("signin"); // which tab the modal opens on
   const [view, setView]               = useState(() => pathToView(window.location.pathname));
-  const [readingPub, setReadingPub]   = useState(null);
-  const [readingFocus, setReadingFocus] = useState(null);
-  const [publishedDocIds, setPublishedDocIds] = useState(new Set());
+  const [legalPage, setLegalPage]     = useState(() => pathToLegal(window.location.pathname));
+  const viewRef = useRef(pathToView(window.location.pathname));
+  useEffect(() => { viewRef.current = view; }, [view]);
+  const explicitSignOutRef = useRef(false);   // only a deliberate Sign out wipes local notes
   const [certMenuOpen, setCertMenuOpen] = useState(false);
   const [certStale, setCertStale]       = useState(false);
   const [certConfirmOpen, setCertConfirmOpen] = useState(false); // mobile: explain Certify before acting
-  const [publishConfirmOpen, setPublishConfirmOpen] = useState(false); // mobile: explain Publish before acting
   const [certifying, setCertifying]   = useState(false);
   const [verifyCode, setVerifyCode]   = useState(() =>
     window.location.pathname.startsWith("/v/") ? window.location.pathname.slice(3) : "");
-  const [publishModalDoc, setPublishModalDoc] = useState(null);
   const [font, setFont]               = useState(() => localStorage.getItem("inkk_font") || "garamond");
   const [titleCapsOn, setTitleCapsOn] = useState(() => localStorage.getItem("inkk_title_caps") !== "0");
   const [showLanding, setShowLanding] = useState(() =>
@@ -3930,15 +75,12 @@ export default function App() {
   const [streak, setStreak]           = useState(() => loadStreak().count);
   const [toasts, setToasts]           = useState([]);
   const [focusMode, setFocusMode]     = useState(false);
-  const [publishMenuOpen, setPublishMenuOpen] = useState(false);
   const [profile, setProfile]         = useState(null);
   const [dropCapImages, setDropCapImages] = useState({});
   const [updatePasswordOpen, setUpdatePasswordOpen] = useState(false);
-  const [viewingUser, setViewingUser] = useState(null);
   const [researchOptIn, setResearchOptIn] = useState(false);
   const [liveStats, setLiveStats] = useState({ events: 0, sessionStartedAt: null });
   const [panelConfirmDeleteId, setPanelConfirmDeleteId] = useState(null);
-  const [confirmUnpublishOpen, setConfirmUnpublishOpen] = useState(false);
   const [formatActive, setFormatActive] = useState({ bold: false, italic: false });
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
   const [previewMode, setPreviewMode]     = useState(false);
@@ -4015,14 +157,19 @@ export default function App() {
   // the web this import resolves to a no-op implementation.
   useEffect(() => {
     let cancelled = false;
-    import("@capacitor-community/safe-area")
-      .then(({ SafeArea }) => { if (!cancelled) SafeArea?.enable?.({ config: {} }); })
-      .catch(() => { /* web build, or plugin unavailable */ });
-    // iOS puts a prev/next/Done bar above the keyboard. On a page that is just
-    // paper and a sentence it is the only piece of furniture left, so remove it.
-    import("@capacitor/keyboard")
-      .then(({ Keyboard }) => { if (!cancelled) Keyboard?.setAccessoryBarVisible?.({ isVisible: false }); })
-      .catch(() => {});
+    // Both plugins reject with "not implemented on web" outside the native
+    // shell, so only ask for them there (and swallow their own rejections).
+    const native = !!window.Capacitor?.isNativePlatform?.();
+    if (native) {
+      import("@capacitor-community/safe-area")
+        .then(({ SafeArea }) => { if (!cancelled) return SafeArea?.enable?.({ config: {} }); })
+        .catch(() => { /* plugin unavailable */ });
+      // iOS puts a prev/next/Done bar above the keyboard. On a page that is just
+      // paper and a sentence it is the only piece of furniture left, so remove it.
+      import("@capacitor/keyboard")
+        .then(({ Keyboard }) => { if (!cancelled) return Keyboard?.setAccessoryBarVisible?.({ isVisible: false }); })
+        .catch(() => {});
+    }
     // OAuth comes home via inkk://auth-callback?code=…: exchange the code for a
     // session inside THIS webview (the PKCE verifier lives in its storage), and
     // close the in-app browser sheet the flow ran in.
@@ -4385,35 +532,13 @@ export default function App() {
     };
   }, []);
 
-  const handleAvatarChange = useCallback(async (avatarData) => {
-    if (!userRef.current) return;
-    // Moderate uploaded avatars (skip when clearing). Reject on a flag;
-    // fail-open if the check itself is unavailable.
-    if (avatarData) {
-      const mod = await moderateText("", [avatarData]);
-      if (mod?.status === "flagged") {
-        addToast("That image can’t be used as a profile picture.");
-        return;
-      }
-    }
-    const err = await updateAvatar(userRef.current.id, avatarData);
-    if (!err) {
-      setProfile(prev => prev ? { ...prev, avatar_data: avatarData } : prev);
-      addToast(avatarData ? "Profile picture updated." : "Profile picture removed.");
-    } else {
-      addToast("Could not save picture.");
-    }
-  }, [addToast]);
-
   const navigate = useCallback((newView, opts = {}) => {
-    const { pub, userProfile, code } = opts;
-    const url = viewToPath(newView, pub, userProfile, code);
+    const { code } = opts;
+    const url = viewToPath(newView, code);
     if (window.location.pathname !== url)
-      window.history.pushState({ view: newView, pubId: pub?.id, username: userProfile?.username, code }, "", url);
+      window.history.pushState({ view: newView, code }, "", url);
     setView(newView);
-    if (pub       !== undefined) setReadingPub(pub);
-    if (userProfile !== undefined) setViewingUser(userProfile);
-    if (newView === "verify") setVerifyCode(code || "");
+    if (newView === "certify") setVerifyCode(code || "");
   }, []);
 
   // Nav-tab taps go straight from touchend to navigate. WKWebView's
@@ -4438,21 +563,14 @@ export default function App() {
   }), []);
 
   useEffect(() => {
-    const handler = async (e) => {
-      const s = e.state || {};
-      const newView = s.view || "editor";
+    const handler = () => {
+      // The URL is the truth: history entries written by the old app (or with
+      // no state at all) still resolve to the right view.
+      const p = window.location.pathname;
+      const newView = pathToView(p);
       setView(newView);
-      if (newView !== "reading")     setReadingPub(null);
-      if (newView !== "userProfile") setViewingUser(null);
-      if (newView === "verify")      setVerifyCode(s.code || "");
-      if (newView === "reading" && s.pubId) {
-        const pub = await fetchPublicationById(s.pubId);
-        if (pub) setReadingPub(pub);
-      }
-      if (newView === "userProfile" && s.username) {
-        const prof = await fetchProfileByUsername(s.username);
-        if (prof) setViewingUser(prof);
-      }
+      setLegalPage(pathToLegal(p));
+      if (newView === "certify") setVerifyCode(p.startsWith("/v/") ? p.slice(3) : "");
     };
     window.addEventListener("popstate", handler);
     return () => window.removeEventListener("popstate", handler);
@@ -4556,13 +674,10 @@ export default function App() {
       docsRef.current = merged; activeIdRef.current = newActiveId;
       const docToLoad = merged.find(d => d.id === newActiveId);
       if (docToLoad) loadDocIntoEditor(docToLoad, { preserveLocalTitle: true });
-      const myPubs = await fetchMyPublications(signedInUser.id);
-      setPublishedDocIds(new Set(myPubs.map(p => p.doc_id).filter(Boolean)));
-      // Backfill verify codes from publications onto any doc that doesn't carry
-      // one yet (published on another device, or before doc-level certs).
+      // Backfill verify codes from the cloud copy onto any local doc that
+      // doesn't carry one yet (certified on another device).
       const codeByDoc = new Map(
-        myPubs.filter(p => p.doc_id && p.verify_code)
-          .map(p => [p.doc_id, { code: p.verify_code, hash: p.content_hash || null }])
+        cloudDocs.filter(d => d.verifyCode).map(d => [d.id, { code: d.verifyCode, hash: d.contentHash || null }])
       );
       if (codeByDoc.size) {
         setDocs(prev => prev.map(d => {
@@ -4577,7 +692,7 @@ export default function App() {
       // other provider) has no username, so we derive a unique handle from the
       // Google name / email and record the Terms acceptance ticked in the auth
       // modal, which we stashed across the OAuth redirect. Username + display
-      // name stay editable anytime from the Profile tab.
+      // name stay editable anytime from the Notes tab.
       if (!prof) {
         const meta = signedInUser.user_metadata || {};
         const metaUsername = (meta.username || "").trim();
@@ -4610,7 +725,7 @@ export default function App() {
       } else {
         // Provisioning failed (offline / transient DB error) — never trap the
         // user behind a modal. They keep writing; the profile is created on the
-        // next sign-in, or when they set a username from the Profile tab.
+        // next sign-in, or when they set a username from the Notes tab.
         optInRef.current = false;
         setResearchOptIn(false);
       }
@@ -4631,10 +746,13 @@ export default function App() {
       if (event === "SIGNED_OUT") {
         syncedUserRef.current = null;
         setUser(null); userRef.current = null;
-        setPublishedDocIds(new Set()); setProfile(null);
+        setProfile(null);
         setResearchOptIn(false); optInRef.current = false;
         recorderRef.current?.recordUserChange(null);
-        resetLocalWorkspace(); // clear A's drafts/streak so B doesn't inherit them
+        // A deliberate Sign out clears this device so the next person doesn't
+        // inherit the notes. An implicit one (an expired or revoked token)
+        // must not: the writer is still here and their notes are still theirs.
+        if (explicitSignOutRef.current) { explicitSignOutRef.current = false; resetLocalWorkspace(); }
       }
     });
 
@@ -4734,43 +852,9 @@ export default function App() {
     });
   }, [activeId]);
 
-  // ─ publish ──────────────────────────────────────────────────────────────────
+  // ─ certify ──────────────────────────────────────────────────────────────────
 
-  const openPublishModal = useCallback(async (doc, e) => {
-    if (e) e.stopPropagation();
-    if (!userRef.current) { setAuthMode("signin"); setAuthOpen(true); return; }
-    const content = doc.id === activeId ? contentRef.current : doc.content;
-    if (!stripHtml(content || "").trim()) return;
-    // Pre-fill the existing note when re-publishing, so it persists.
-    const author_note = publishedDocIds.has(doc.id) ? await fetchPublicationNote(doc.id) : "";
-    setPublishModalDoc({ ...doc, content, author_note });
-  }, [activeId, publishedDocIds]);
-
-  const confirmPublish = useCallback(async (title, authorName, renderOpts) => {
-    if (!publishModalDoc) return "No document selected.";
-    const wasAlreadyPublished = publishedDocIds.has(publishModalDoc.id);
-    const events = await gatherDocEvents(publishModalDoc.id);
-    const { error, code, verified, contentHash } = await doPublish(publishModalDoc, userRef.current, title, authorName, profile?.username, renderOpts, events);
-    if (!error) {
-      const docId = publishModalDoc.id;
-      setPublishedDocIds(prev => new Set([...prev, docId]));
-      // Persist the code onto the document so the editor shows it and it survives reload.
-      if (code) {
-        setDocs(prev => {
-          const next = prev.map(d => d.id === docId ? { ...d, verifyCode: code, contentHash: contentHash ?? d.contentHash } : d);
-          const updated = next.find(d => d.id === docId);
-          if (updated) pushDocToCloud(updated, userRef.current.id);
-          return next;
-        });
-      }
-      setPublishModalDoc(null);
-      addToast(verified ? "Published · human-verified." : (wasAlreadyPublished ? "Updated." : "Published to feed."));
-    }
-    return error;
-  }, [publishModalDoc, publishedDocIds, profile, addToast, gatherDocEvents]);
-
-  // Certify the active document — mint/show a verification code WITHOUT
-  // publishing it to the feed.
+  // Certify the active document — mint (or refresh) its verification code.
   const certifyActiveDoc = useCallback(async () => {
     if (!userRef.current) { setAuthMode("signin"); setAuthOpen(true); return; }
     const docId = activeIdRef.current;
@@ -4795,17 +879,9 @@ export default function App() {
       saveState(next, docId);
       return next;
     });
-    setCertMenuOpen(true);
+    if (viewRef.current === "editor") setCertMenuOpen(true);   // the popover belongs to the editor's top bar
     if (cert.isNew) addToast(cert.verified ? "Certified · human-verified." : "Certified.");
   }, [profile, addToast, gatherDocEvents]);
-
-  const openUserProfile = useCallback(async (userIdOrProfile) => {
-    const prof = typeof userIdOrProfile === "string"
-      ? await fetchProfile(userIdOrProfile)
-      : userIdOrProfile;
-    if (!prof) { addToast("This writer hasn't set up their profile."); return; }
-    navigate("userProfile", { userProfile: prof });
-  }, [navigate, addToast]);
 
   // Open the auth modal on a specific tab. Mode is set before the modal mounts,
   // so each open lands on the requested tab (signin by default).
@@ -4818,6 +894,7 @@ export default function App() {
 
   const signOut = useCallback(async () => {
     if (!supabase) return;
+    explicitSignOutRef.current = true;
     await supabase.auth.signOut();
     addToast("Signed out.");
   }, [addToast]);
@@ -4938,8 +1015,12 @@ export default function App() {
         const newStreak = touchStreak();
         setStreak(newStreak);
       }
-      if (userRef.current)
-        pushDocToCloud({ id: capturedId, content: capturedContent, updatedAt: capturedUpdatedAt }, userRef.current.id);
+      if (userRef.current) {
+        // Push the whole note (metrics, certificate, title) — the cloud upsert
+        // writes every column, so a partial would wipe what it didn't carry.
+        const full = docsRef.current.find(d => d.id === capturedId);
+        if (full) pushDocToCloud({ ...full, title: capturedTitle, content: capturedContent, updatedAt: capturedUpdatedAt, writingTimeSecs: capturedTime }, userRef.current.id);
+      }
       setSaveStatus("saved");
     }, 500);
   }, [activeId, scheduleMenuReturn, scrollToCursor, addToast]);
@@ -5041,11 +1122,15 @@ export default function App() {
       const capturedUpdatedAt = Date.now();
       setDocs(prev => {
         const next = prev.map(d =>
-          d.id === capturedId ? { ...d, title: capturedTitle, updatedAt: capturedUpdatedAt } : d
+          d.id === capturedId ? { ...d, title: capturedTitle, content: contentRef.current || d.content, updatedAt: capturedUpdatedAt } : d
         );
         saveState(next, capturedId);
         return next;
       });
+      if (userRef.current) {
+        const full = docsRef.current.find(d => d.id === capturedId);
+        if (full) pushDocToCloud({ ...full, title: capturedTitle, content: contentRef.current || full.content, updatedAt: capturedUpdatedAt }, userRef.current.id);
+      }
       setSaveStatus("saved");
     }, 500);
   }, [activeId, titleCapsOn]);
@@ -5141,7 +1226,7 @@ export default function App() {
     const paperTexture = (format === "pdf");
     // Verification certificate for this piece, if it's certified. Written into
     // the PDF's (invisible) document metadata only — the code is surfaced in
-    // the app (Profile, reading view, Verify tab), not stamped on the page.
+    // the app (Notes, Certify tab), not stamped on the page.
     const activeDoc = docsRef.current.find(d => d.id === activeIdRef.current);
     let certCode = activeDoc?.verifyCode || null;
     let certTier = activeDoc?.scoreTier || null;
@@ -5255,16 +1340,19 @@ export default function App() {
         if (authOpen) return;       // auth modal closes only via its × button
         if (focusMode) { exitFocusMode(); return; }
         if (certMenuOpen) { setCertMenuOpen(false); return; }
-        if (publishMenuOpen) { setPublishMenuOpen(false); setConfirmUnpublishOpen(false); return; }
-        if (publishModalDoc) { setPublishModalDoc(null); return; }
         if (downloadModalOpen) { setDownloadModalOpen(false); return; }
         setPanelOpen(false); setHsModalOpen(false); setHsScoreOpen(false);
-        if (view !== "editor") { window.history.back(); return; }
+        if (view !== "editor") {
+          if (document.querySelector(".pe-overlay, .legal-overlay")) return;   // a dialog owns Escape
+          if (window.history.state?.view && window.history.length > 1) window.history.back();
+          else navigate("editor");
+          return;
+        }
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [openDownloadModal, view, focusMode, certMenuOpen, toggleFocusMode, exitFocusMode, publishMenuOpen, publishModalDoc, downloadModalOpen, authOpen, onInput, onTitleInput]);
+  }, [openDownloadModal, view, focusMode, certMenuOpen, toggleFocusMode, exitFocusMode, downloadModalOpen, authOpen, onInput, onTitleInput, navigate]);
 
   // ─ mount ────────────────────────────────────────────────────────────────────
 
@@ -5293,16 +1381,12 @@ export default function App() {
     const initView = pathToView(initPath);
     // Preserve hash — Supabase reads #access_token from it during OAuth callback
     const initUrl = initPath + window.location.search + window.location.hash;
-    window.history.replaceState({ view: initView, pubId: initPath.startsWith("/read/") ? initPath.slice(6) : undefined, username: initPath.startsWith("/u/") ? initPath.slice(3) : undefined, code: initPath.startsWith("/v/") ? initPath.slice(3) : undefined }, "", initUrl);
-    // If landing directly on a reading or user-profile URL, load the data
-    if (initView === "reading") {
-      const pubId = initPath.slice(6);
-      fetchPublicationById(pubId).then(pub => { if (pub) setReadingPub(pub); });
-    }
-    if (initView === "userProfile") {
-      const username = initPath.slice(3);
-      fetchProfileByUsername(username).then(prof => { if (prof) setViewingUser(prof); });
-    }
+    const initCode = initPath.startsWith("/v/") ? initPath.slice(3) : undefined;
+    // Old addresses (/profile, /verify, retired social routes) resolve to a view
+    // above; give the address bar the current spelling of that view.
+    const canonical = pathToLegal(initPath) ? initPath : viewToPath(initView, initCode);
+    window.history.replaceState({ view: initView, code: initCode }, "", canonical + window.location.search + window.location.hash);
+    void initUrl;
 
     mountedRef.current = true;
     return () => {
@@ -5396,8 +1480,8 @@ export default function App() {
   const menuClass = menuVisible ? "menu-visible" : "menu-hidden";
 
   const sortedDocs   = [...docs].sort((a, b) => b.updatedAt - a.updatedAt);
+  const noteCount    = docs.filter(d => stripHtml(d.content).trim() || stripHtml(d.title || "").trim()).length;
   const hasContent   = words > 0;
-  const isPublished  = publishedDocIds.has(activeId);
   const activeDoc      = docs.find(d => d.id === activeId);
   const activeCert     = activeDoc?.verifyCode || null;
   const activeCertOk   = isVerifiedTier(activeDoc?.scoreTier);
@@ -5417,26 +1501,26 @@ export default function App() {
     return () => { live = false; clearTimeout(t); };
   }, [words, activeId, docs]);
 
-  const openReading = useCallback((pub, opts = {}) => {
-    setReadingFocus(opts.focus || null);
-    navigate("reading", { pub });
-  }, [navigate]);
-
   const openVerify = useCallback((code) => {
-    navigate("verify", { code: code || "" });
+    navigate("certify", { code: code || "" });
   }, [navigate]);
 
-  // From the verify view: resolve a certificate's publication and open it.
-  const openPieceById = useCallback(async (pubId) => {
-    if (!pubId) return;
-    const pub = await fetchPublicationById(pubId);
-    if (pub) openReading(pub);
-    else addToast("That piece is no longer available.");
-  }, [openReading, addToast]);
-
-  const goBack = useCallback(() => {
-    window.history.back();
-  }, []);
+  // Open a note from the Notes page: pull it from the cloud if this device
+  // doesn't hold it yet, make it the active document, then go to the editor
+  // (or straight to certify).
+  const openDocFromNotes = useCallback(async (id, { view: target = "editor" } = {}) => {
+    if (!docsRef.current.some(d => d.id === id)) {
+      const cloud = await fetchCloudDoc(id);
+      if (!cloud) { addToast("Couldn't find that note on this device or in your account."); return; }
+      setDocs(prev => {
+        const next = [cloud, ...prev.filter(d => d.id !== cloud.id)];
+        saveState(next, id);
+        return next;
+      });
+    }
+    switchDoc(id);
+    navigate(target);
+  }, [switchDoc, navigate, addToast]);
 
   return (
     <>
@@ -5444,18 +1528,13 @@ export default function App() {
           In the editor the plate belongs to the blank page: it fades while the
           title is being typed and leaves for good once the piece has words —
           except in preview, where the draft's own plate returns to frame the
-          rendered pages (as reading frames a published piece) and fades away
-          when the preview closes. A fresh blank document brings a fresh
-          plate. When reading, the frame is always the piece's own plate. */}
+          rendered pages and fades away when the preview closes. A fresh blank
+          document brings a fresh plate. */}
       <Backdrop
         view={view}
         hidden={showLanding || (isEditor && !previewMode && (hasContent || !menuVisible))}
-        override={
-          view === "reading" && readingPub ? { img: imgForPub(readingPub.id), pos: "center 30%" }
-          : isEditor && previewMode        ? { img: imgForPub(activeId), pos: "center 30%" }
-          : null
-        }
-        ringed={view === "verify" && verifyStatus !== "found"}
+        override={isEditor && previewMode ? { img: imgForPub(activeId), pos: "center 30%" } : null}
+        ringed={view === "certify" && verifyStatus !== "found"}
       />
 
       {/* ── landing overlay ── */}
@@ -5480,17 +1559,12 @@ export default function App() {
             <button
               className="icon-btn icon-btn-labelled"
               onClick={() => setPanelOpen(v => !v)}
-              title="Open documents"
-              aria-label="Open documents"
+              title="Open notes"
+              aria-label="Open notes"
             >
               <Menu size={18} />
-              <span className="icon-btn-label">Drafts</span>
+              <span className="icon-btn-label">Notes</span>
               {docs.length > 1 && <span className="icon-btn-count">{docs.length}</span>}
-            </button>
-          )}
-          {(view === "reading" || view === "userProfile") && (
-            <button className="icon-btn" onClick={goBack} title="Back">
-              <ArrowLeft size={18} />
             </button>
           )}
         </div>
@@ -5505,7 +1579,7 @@ export default function App() {
                 className={`${menuClass}${activeCert && !certStale ? " is-certified" : ""}`}
                 title={activeCert
                   ? (certStale ? "The text has changed since certification. Click to recertify." : "Verification code")
-                  : "Get a human verification code. You do not need to publish to use this feature."}
+                  : "Get a human verification code for this note."}
                 disabled={certifying}
                 onClick={() => {
                   if (activeCert && certStale) certifyActiveDoc();
@@ -5521,7 +1595,7 @@ export default function App() {
                   <span className="cert-menu-label">Certify</span>
                   <p className="cert-menu-note">
                     Mint a verification code that proves this piece was written by hand.
-                    It stays private to you until you publish.
+                    It stays private to you until you share it.
                   </p>
                   <button
                     className="cert-menu-link"
@@ -5538,8 +1612,8 @@ export default function App() {
                     onClick={() => navigator.clipboard?.writeText(activeCert).then(() => addToast("Code copied."))}
                   >{activeCert}</button>
                   <p className="cert-menu-note">
-                    Proof this piece displays human signal. Share the code and the recipient can check this.
-                    {!isPublished && " It stays private to you until you publish."}
+                    Proof this piece displays human signal. Share the code and the recipient can check it.
+                    It stays private to you until you share it.
                   </p>
                   <button
                     className="cert-menu-link"
@@ -5549,69 +1623,6 @@ export default function App() {
                     className="cert-menu-link cert-menu-recertify"
                     onClick={() => { setCertMenuOpen(false); certifyActiveDoc(); }}
                   >Re-certify current text</button>
-                </div>
-              )}
-            </div>
-          )}
-          {isEditor && supabase && hasContent && (
-            <div id="publish-menu-wrap">
-              <button
-                id="publish-btn"
-                className={menuClass}
-                onClick={() => {
-                  const doc = docs.find(d => d.id === activeId);
-                  if (!doc) return;
-                  if (isPublished) { setConfirmUnpublishOpen(false); setPublishMenuOpen(v => !v); }
-                  else if (isMobileRef.current) setPublishConfirmOpen(v => !v);
-                  else openPublishModal(doc);
-                }}
-              >
-                {isPublished
-                  ? <><Check size={13} /><span className="btn-label">Published</span></>
-                  : <><PShare size={15} weight="light" /><span className="btn-label">Publish</span></>
-                }
-              </button>
-              {!isPublished && publishConfirmOpen && (
-                <div id="publish-menu">
-                  <div className="publish-menu-prompt">Share this piece to the public feed?</div>
-                  <button className="publish-menu-item" onClick={() => {
-                    setPublishConfirmOpen(false);
-                    const doc = docs.find(d => d.id === activeId);
-                    if (doc) openPublishModal(doc);
-                  }}>Publish →</button>
-                </div>
-              )}
-              {isPublished && publishMenuOpen && (
-                <div id="publish-menu">
-                  {!confirmUnpublishOpen ? (
-                    <>
-                      <button className="publish-menu-item" onClick={() => {
-                        setPublishMenuOpen(false);
-                        const doc = docs.find(d => d.id === activeId);
-                        if (doc) openPublishModal(doc);
-                      }}>Update</button>
-                      <button
-                        className="publish-menu-item publish-menu-danger"
-                        onClick={() => setConfirmUnpublishOpen(true)}
-                      >Remove from feed</button>
-                    </>
-                  ) : (
-                    <>
-                      <div className="publish-menu-prompt">Remove this piece from the public feed?</div>
-                      <button className="publish-menu-item" onClick={() => { setConfirmUnpublishOpen(false); setPublishMenuOpen(false); }}>Cancel</button>
-                      <button
-                        className="publish-menu-item publish-menu-danger"
-                        onClick={() => {
-                          setConfirmUnpublishOpen(false);
-                          setPublishMenuOpen(false);
-                          doUnpublish(activeId).then(() => {
-                            setPublishedDocIds(prev => { const s = new Set(prev); s.delete(activeId); return s; });
-                            addToast("Removed from feed.");
-                          });
-                        }}
-                      >Yes, remove</button>
-                    </>
-                  )}
                 </div>
               )}
             </div>
@@ -5631,7 +1642,7 @@ export default function App() {
             <button
               className={`icon-btn icon-btn-preview${previewMode ? " active" : ""}`}
               onClick={() => setPreviewMode(v => !v)}
-              title={previewMode ? "Back to editing" : "Preview as published"}
+              title={previewMode ? "Back to editing" : "Preview the rendered pages"}
             >
               {previewMode ? <EyeOff size={14} /> : <Eye size={14} />}
               <span className="btn-label">{previewMode ? "Edit" : "Preview"}</span>
@@ -5660,7 +1671,7 @@ export default function App() {
       {isEditor && (
         <div id="doc-panel" className={panelOpen ? "open" : ""}>
           <button className="new-doc-btn" onClick={newDoc}>
-            <Plus size={13} /> New document
+            <Plus size={13} /> New note
           </button>
           <div id="doc-list">
             {sortedDocs.map(d => (
@@ -5673,15 +1684,6 @@ export default function App() {
                   </span>
                 </div>
                 <div className="doc-item-actions">
-                  {user && (
-                    <button
-                      className={`doc-publish${publishedDocIds.has(d.id) ? " published" : ""}`}
-                      title={publishedDocIds.has(d.id) ? "Remove from feed" : "Publish to feed"}
-                      onClick={e => openPublishModal(d, e)}
-                    >
-                      {publishedDocIds.has(d.id) ? <Check size={11} /> : <Share2 size={11} />}
-                    </button>
-                  )}
                   <button className="doc-pdf" onClick={openDownloadModal} title="Download  ⌘S">
                     <Download size={11} />
                   </button>
@@ -5743,10 +1745,6 @@ export default function App() {
                 {liveStats.events > 0 && researchOptIn && user && (<>
                   <span className="ws-sep">·</span>
                   <span className="ws-stat">{liveStats.events.toLocaleString()} events</span>
-                </>)}
-                {isPublished && (<>
-                  <span className="ws-sep">·</span>
-                  <span className="ws-stat ws-published">published</span>
                 </>)}
                 {(() => {
                   const sf = doc?.scoreFeatures;
@@ -5913,94 +1911,52 @@ export default function App() {
       )}
 
       {/* ── views ── */}
-      {view === "feed" && (
-        <Feed
-          user={user}
-          me={profile}
-          onRead={openReading}
-          onAuthorClick={openUserProfile}
-          dropCapImages={dropCapImages}
-          onRequestAuth={() => openAuth()}
-          onWrite={() => navigate("editor")}
-          onOpenProfile={() => navigate("profile")}
-        />
-      )}
-      {view === "profile" && (
-        <Profile
+      {view === "notes" && (
+        <NotesView
           user={user}
           profile={profile}
-          localDocs={docs}
-          publishedDocIds={publishedDocIds}
+          docs={docs}
+          activeId={activeId}
           streak={streak}
           dropCapImages={dropCapImages}
-          onRead={openReading}
-          onUnpublish={docId => setPublishedDocIds(prev => { const s = new Set(prev); s.delete(docId); return s; })}
           onSignIn={() => openAuth("signin")}
           onCreateAccount={() => openAuth("signup")}
           onSignOut={signOut}
-          onAvatarChange={handleAvatarChange}
-          onEditDoc={async (id) => {
-            if (!docsRef.current.some(d => d.id === id)) {
-              const cloud = await fetchCloudDoc(id);
-              if (cloud) {
-                setDocs(prev => {
-                  const next = [cloud, ...prev.filter(d => d.id !== cloud.id)];
-                  saveState(next, id);
-                  return next;
-                });
-              } else {
-                addToast("Couldn't find that draft on this device or in your account.");
-                return;
-              }
-            }
-            switchDoc(id);
-            navigate("editor");
-          }}
-          onToast={addToast}
+          onOpenDoc={openDocFromNotes}
           onNewDoc={() => { newDoc(); navigate("editor"); }}
           onDeleteDoc={(id) => deleteDoc(id, { stopPropagation: () => {} })}
-          onPublishDoc={(d) => openPublishModal(d)}
+          onDownloadDoc={async (id) => { await openDocFromNotes(id); setDownloadModalOpen(true); }}
+          onCertifyDoc={async (id) => { await openDocFromNotes(id, { view: "certify" }); }}
+          onOpenVerify={(code) => openVerify(code)}
           researchOptIn={researchOptIn}
           onToggleOptIn={toggleResearchOptIn}
           onDownloadData={downloadResearchData}
           onDeleteData={deleteResearchData}
           onChangePassword={() => setUpdatePasswordOpen(true)}
           onProfileUpdate={(updatedProfile) => setProfile(updatedProfile)}
-          onOpenVerify={() => openVerify()}
+          onToast={addToast}
         />
       )}
-      {view === "search" && (
-        <SearchView onViewUser={openUserProfile} dropCapImages={dropCapImages} />
-      )}
-      {view === "userProfile" && viewingUser && (
-        <UserProfileView
-          profile={viewingUser}
-          onRead={openReading}
-          dropCapImages={dropCapImages}
-          user={user}
-          onRequestAuth={() => openAuth()}
-        />
-      )}
-      {view === "reading" && readingPub && (
-        <ReadingView
-          pub={readingPub}
-          user={user}
-          isAdmin={!!profile?.is_admin}
-          dropCapImages={dropCapImages}
-          focus={readingFocus}
-          onRequestAuth={() => openAuth()}
-          onAuthorClick={openUserProfile}
-          onVerify={openVerify}
-        />
-      )}
-      {view === "admin" && (
-        <AdminView profile={profile} onOpenPiece={openPieceById} />
-      )}
-      {view === "verify" && (
-        <VerifyView
+      {view === "certify" && (
+        <CertifyView
           initialCode={verifyCode}
-          onOpenPiece={openPieceById}
           onStatus={setVerifyStatus}
+          user={user}
+          note={activeDoc && hasContent ? {
+            id: activeDoc.id,
+            title: stripHtml(activeDoc.title || "") || docTitle(activeDoc.content),
+            words: wordCount(activeDoc.content),
+            verifyCode: activeCert,
+            verifiedTier: activeCertOk,
+            scoreTier: activeDoc.scoreTier,
+            humanScore: activeDoc.humanScore,
+            stale: certStale,
+          } : null}
+          certifying={certifying}
+          onCertify={certifyActiveDoc}
+          onSignIn={() => openAuth("signin")}
+          onWrite={() => navigate("editor")}
+          onToast={addToast}
         />
       )}
 
@@ -6009,55 +1965,30 @@ export default function App() {
           not inherit menu-hidden (pointer-events:none), which made a tap on a
           tab do nothing for ~1.2s after typing. keyboard-open still hides it
           while the writer is actually composing. */}
-      {view !== "reading" && view !== "userProfile" && (
-        <nav id="bottom-nav">
-          <button className={`nav-tab ${isEditor ? "active" : ""}`} {...tabTouch(() => navigate("editor"))}>
-            <PPen size={19} weight="light" />
-            <span className="nav-label">Write</span>
-          </button>
-          <button className={`nav-tab ${view === "feed" ? "active" : ""}`} {...tabTouch(() => navigate("feed"))}>
-            <PGlobe size={19} weight="light" />
-            <span className="nav-label">Feed</span>
-          </button>
-          <button className={`nav-tab ${view === "verify" ? "active" : ""}`} {...tabTouch(() => navigate("verify"))}>
-            <span className="nav-diamond" aria-hidden="true">◇</span>
-            <span className="nav-label">Verify</span>
-          </button>
-          {profile?.is_admin && (
-            <button className={`nav-tab ${view === "admin" ? "active" : ""}`} {...tabTouch(() => navigate("admin"))}>
-              <Eye size={18} strokeWidth={1.75} />
-              <span className="nav-label">Mod</span>
-            </button>
-          )}
-          <button
-            className={`nav-tab ${view === "profile" ? "active" : ""}`}
-            {...tabTouch(() => navigate("profile"))}
-          >
-            {user ? (
-              <DropCapAvatar
-                letter={profile?.username?.[0] || user.email[0]}
-                avatarData={profile?.avatar_data}
-                dropCapImages={dropCapImages}
-                size={22}
-              />
-            ) : (
-              <PUser size={19} weight="light" />
-            )}
-            <span className="nav-label">{user ? "Profile" : "Sign in"}</span>
-            {streak > 1 && <span className="nav-streak">{streak}</span>}
-          </button>
-        </nav>
-      )}
+      <nav id="bottom-nav">
+        <button className={`nav-tab ${isEditor ? "active" : ""}`} {...tabTouch(() => navigate("editor"))}>
+          <PPen size={19} weight="light" />
+          <span className="nav-label">Write</span>
+        </button>
+        <button className={`nav-tab ${view === "notes" ? "active" : ""}`} {...tabTouch(() => navigate("notes"))}>
+          <PNotes size={19} weight="light" />
+          <span className="nav-label">Notes</span>
+          {noteCount > 1 && <span className="nav-count">{noteCount}</span>}
+        </button>
+        <button className={`nav-tab ${view === "certify" ? "active" : ""}${activeCert && !certStale ? " has-cert" : ""}`} {...tabTouch(() => navigate("certify"))}>
+          <PSeal size={19} weight="light" />
+          <span className="nav-label">Certify</span>
+        </button>
+      </nav>
 
       {/* ── modals ── */}
-      {publishModalDoc && user && (
-        <PublishModal doc={publishModalDoc} user={user} profile={profile} onConfirm={confirmPublish} onClose={() => setPublishModalDoc(null)} titleCapsOn={titleCapsOn} />
-      )}
       {downloadModalOpen && (
         <DownloadModal onConfirm={downloadDoc} onClose={() => setDownloadModalOpen(false)} />
       )}
       {authOpen && supabase && <AuthModal onClose={() => setAuthOpen(false)} initialMode={authMode} />}
       {hsModalOpen && <HumanSignalModal onClose={() => setHsModalOpen(false)} />}
+      {legalPage === "privacy" && <PrivacyModal onClose={() => { setLegalPage(null); navigate("notes"); }} />}
+      {legalPage === "terms"   && <TermsModal   onClose={() => { setLegalPage(null); navigate("notes"); }} />}
       {hsScoreOpen && (() => {
         const doc = docs.find(d => d.id === activeId);
         if (!doc?.scoreFeatures) return null;
@@ -6078,11 +2009,9 @@ export default function App() {
         </button>
       )}
 
-      {/* ── publish menu backdrop ── */}
-      {publishMenuOpen && <div id="publish-menu-backdrop" onClick={() => { setPublishMenuOpen(false); setConfirmUnpublishOpen(false); }} />}
-      {certMenuOpen && <div id="publish-menu-backdrop" onClick={() => setCertMenuOpen(false)} />}
-      {certConfirmOpen && <div id="publish-menu-backdrop" onClick={() => setCertConfirmOpen(false)} />}
-      {publishConfirmOpen && <div id="publish-menu-backdrop" onClick={() => setPublishConfirmOpen(false)} />}
+      {/* ── popover backdrop ── */}
+      {isEditor && certMenuOpen && <div id="publish-menu-backdrop" onClick={() => setCertMenuOpen(false)} />}
+      {isEditor && certConfirmOpen && <div id="publish-menu-backdrop" onClick={() => setCertConfirmOpen(false)} />}
 
       {/* ── toasts ── */}
       <Toasts toasts={toasts} />

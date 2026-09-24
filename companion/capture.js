@@ -63,11 +63,13 @@ function createCapture({ userId, docId, sessionId, genId, now, hrnow }) {
   const down = new Map();        // key_class → [names] pressed, for keyup pairing
   const events = [];
 
+  // `partial.at` = { t, pt } captured when the key was pressed, so main-thread
+  // work between the key and this call never shifts the timing data.
   function push(partial) {
     events.push({
-      t: now(),
+      t: partial.at?.t ?? now(),
       id: genId(),
-      pt: hrnow(),
+      pt: partial.at?.pt ?? hrnow(),
       seq: seq++,
       kind: partial.kind,
       doc_id: docId,
@@ -93,40 +95,46 @@ function createCapture({ userId, docId, sessionId, genId, now, hrnow }) {
   // A command chord (⌘/Ctrl/Alt held) is an action, not typed text, so it emits
   // the physical keydown/keyup (dwell still counts) but no input/delete. ⌘V is
   // surfaced separately by the caller via paste().
-  function keydown(name, mods) {
+  function keydown(name, mods, at) {
     const [kc, ch] = classifyKey(name);
     down.set(kc, (down.get(kc) || []).concat(name));
-    push({ kind: "keydown", key_class: kc, key_char: ch, payload: mods ? { mods } : null });
+    push({ kind: "keydown", key_class: kc, key_char: ch, payload: mods ? { mods } : null, at });
 
-    const chord = !!mods && /[MCA]/.test(mods);   // Shift alone is normal typing
+    // ⌘/Ctrl chords are actions. Option (and Shift) is how writers type — em
+    // dashes, accents, @ and brackets on many layouts — so it still counts.
+    const chord = !!mods && /[MC]/.test(mods);
     if (chord) return;
 
     if (PRINTABLE.has(kc) || name === "Enter") {
       caret += 1;
-      push({ kind: "input", len_delta: 1, caret_pos: caret, key_char: ch, input_type: "insertText" });
+      push({ kind: "input", len_delta: 1, caret_pos: caret, key_char: ch, input_type: "insertText", at });
     } else if (name === "Backspace" || name === "Delete") {
       caret = Math.max(0, caret - 1);
-      push({ kind: "delete", len_delta: -1, caret_pos: caret, input_type: "deleteContentBackward" });
+      push({ kind: "delete", len_delta: -1, caret_pos: caret, input_type: "deleteContentBackward", at });
     } else if (kc === "nav") {
       if (name === "ArrowLeft") caret = Math.max(0, caret - 1);
       else if (name === "ArrowRight") caret += 1;
-      push({ kind: "caret", caret_pos: caret, selection_len: 0 });
+      push({ kind: "caret", caret_pos: caret, selection_len: 0, at });
     }
   }
 
-  function keyup(name) {
+  function keyup(name, at) {
     const [kc, ch] = classifyKey(name);
     const q = down.get(kc);
     if (q && q.length) q.shift();
-    push({ kind: "keyup", key_class: kc, key_char: ch });
+    push({ kind: "keyup", key_class: kc, key_char: ch, at });
   }
 
   // A clipboard paste (⌘V). `len` = characters pasted (read from the clipboard
   // in the main process; the text itself never enters an event).
-  function paste(len) {
+  // Outside the browser the pasted length is unknown (reading the pasteboard
+  // from a background app would show a macOS privacy alert on every ⌘V), so
+  // the event records THAT a paste happened; how much text arrived by paste
+  // is inferred at certify time from the finished text (see api/certify).
+  function paste(len, at) {
     const n = Math.max(0, len | 0);
     caret += n;
-    push({ kind: "paste", len_delta: n, caret_pos: caret, input_type: "insertFromPaste", payload: n ? { paste_len: n } : null });
+    push({ kind: "paste", len_delta: n, caret_pos: caret, input_type: "insertFromPaste", payload: n ? { paste_len: n } : null, at });
   }
 
   function stop() {
@@ -141,4 +149,4 @@ function createCapture({ userId, docId, sessionId, genId, now, hrnow }) {
   };
 }
 
-module.exports = { createCapture, classifyKey, SCHEMA_VERSION, CAPTURE_KEY_CHAR };
+module.exports = { createCapture, classifyKey, PRINTABLE, SCHEMA_VERSION, CAPTURE_KEY_CHAR };

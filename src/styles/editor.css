@@ -1,0 +1,156 @@
+/* ─── Editor ──────────────────────────────────────────────────────────────── */
+#text-container {
+  position: fixed;
+  top: var(--top-bar);
+  bottom: calc(var(--bottom-nav) + 60px);
+  left: 0;
+  right: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-top: 22vh;
+  padding-bottom: 28vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: padding-top 0.55s cubic-bezier(0.32, 0.72, 0, 1);
+  -webkit-mask-image: linear-gradient(to bottom, black 0px, black calc(100% - 36px), transparent 100%);
+  mask-image: linear-gradient(to bottom, black 0px, black calc(100% - 36px), transparent 100%);
+}
+/* Once writing has begun in the body, glide the page up so the empty top
+   space collapses and there is room to write downward. */
+#text-container.writing-started { padding-top: 9vh; }
+
+#title-input {
+  width: 40vw;
+  max-width: 440px;
+  min-width: 180px;
+  background: none;
+  border: none;
+  outline: none;
+  font-family: var(--font-serif);
+  /* Cormorant title shown as typed (natural case) at tight spacing. The measure
+     is narrower than the body so a long title wraps to a second line sooner and
+     never runs wider than the prose below it. */
+  font-weight: 600;
+  font-style: normal;
+  font-size: clamp(1.02rem, 1.6vw, 1.2rem);
+  color: var(--text);
+  padding: 0 8px;
+  margin-bottom: 22px;
+  line-height: 1.32;
+  letter-spacing: -0.02em;
+  text-align: center;
+  text-wrap: balance;
+  display: block;
+  flex-shrink: 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  cursor: text;
+  caret-color: #999;
+  min-height: 1.1em;
+}
+#title-input:focus { caret-color: #777; }
+#title-input:empty::before {
+  content: attr(data-placeholder);
+  color: #d8d5d0;
+  font-weight: 400;
+  font-style: normal;
+  pointer-events: none;
+}
+#title-input.font-sans { font-family: "Switzer", -apple-system, sans-serif; font-weight: 600; letter-spacing: -0.02em; }
+
+#format-toolbar {
+  position: fixed;
+  z-index: 900;
+  background: #fff;
+  border: 1px solid #e8e6e2;
+  border-radius: 999px;
+  padding: 4px 6px;
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  transition: opacity 0.12s ease;
+}
+.format-bar-hidden  { opacity: 0; pointer-events: none; }
+.format-bar-visible { opacity: 1; pointer-events: auto; }
+.format-btn {
+  background: none;
+  border: none;
+  font-size: var(--t-xs);
+  color: var(--subtle);
+  cursor: pointer;
+  padding: 3px 9px;
+  border-radius: 999px;
+  min-width: 22px;
+  text-align: center;
+  transition: color 0.15s, background 0.15s;
+}
+.format-btn b { font-weight: 600; font-style: normal; }
+.format-btn:hover  { color: var(--text); }
+.format-btn.active { color: var(--text); background: rgba(0, 0, 0, 0.05); }
+
+#writing-area {
+  width: 44vw;
+  max-width: 560px;
+  min-width: 200px;
+  flex-shrink: 0;
+}
+
+#text {
+  width: 100%;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  font-family: var(--font-serif);
+  font-size: var(--t-lg);
+  line-height: 1.55;
+  color: var(--text);
+  padding: 0 8px 8px;
+  outline: none;
+  cursor: text;
+  caret-color: #999;
+  -webkit-user-select: text;
+  user-select: text;
+  min-height: 2em;
+}
+
+#text.font-sans, #text.font-sans * { font-family: "Switzer", -apple-system, sans-serif; }
+
+/* List items: indent the whole line including bullet/number */
+#text > div[data-list], #text > p[data-list] {
+  padding-left: 1.8em;
+}
+
+#text img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 14px auto;
+  cursor: pointer;
+}
+#text img.img-selected {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+
+#text:empty::after {
+  content: "";
+  display: inline-block;
+  width: 0; height: 0.82em;
+  border-left: 1.5px solid #9a9590;
+  vertical-align: -0.08em;
+  animation: blink 1s steps(2, start) infinite;
+}
+#text:focus { caret-color: #555; }
+
+@keyframes blink {
+  0%, 100% { border-color: transparent; }
+  50%       { border-color: #9a9590; }
+}
+
+/* ─── Rendered-page preview ───────────────────────────────────────────────
+   The editor's preview overlay stacks the rendered book pages; these rules
+   used to live with the reading view and are the only part of it that stays. */
+#reading-pages { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.reading-pages-loading { color: var(--ink-4); font-size: var(--t-sm); padding: 40px 0; text-align: center; }

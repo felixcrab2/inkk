@@ -1,0 +1,31 @@
+/* ─── Reset ───────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+/* Form controls don't inherit font-family by default — without this, every
+   <button>/<input>/<select>/<textarea> (nav tabs, Drafts, Preview, Download,
+   New document, etc.) renders in the browser's system font and ignores
+   --font-ui. This makes the whole interface follow the UI font. */
+button, input, optgroup, select, textarea { font-family: inherit; }
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* The page colour lives on <html> so the engraving backdrop (z-index: -1)
+   can sit between it and the app's content. body must stay transparent. */
+html { background: var(--bg); }
+
+body {
+  background: transparent;
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+}
+
+/* ─── Shared visibility ───────────────────────────────────────────────────── */
+.menu-visible { opacity: 1; pointer-events: auto; transition: opacity 0.5s ease; }
+.menu-hidden  { opacity: 0; pointer-events: none; transition: opacity 0.5s ease; }

@@ -110,7 +110,13 @@ function buildVelocitySeries(inputEvents, statsFunc) {
   return { series, avg_wpm, peak_wpm, velocity_cv: st.cv };
 }
 
-export function extractFeatures(events, { words = 0 } = {}) {
+// `chars` (optional) is the length of the finished, normalised text. Text that
+// was not typed and not accounted for by recorded pastes must have arrived some
+// other way (a paste whose length the recorder couldn't see, dictation), so the
+// excess is counted as pasted. The web recorder measures pastes directly; the
+// desktop companion cannot read the pasteboard, so this is what keeps the paste
+// penalty honest for it.
+export function extractFeatures(events, { words = 0, chars = null } = {}) {
   const out = {
     event_count: events.length,
     words,
@@ -279,6 +285,12 @@ export function extractFeatures(events, { words = 0 } = {}) {
   out.active_ratio = out.total_time_ms > 0 ? out.active_time_ms / out.total_time_ms : 0;
 
   // ── Ratios ────────────────────────────────────────────────────────────────
+  if (Number.isFinite(chars) && chars > 0) {
+    const accounted = Math.max(0, out.typed_chars - out.deleted_chars) + out.pasted_chars;
+    const unexplained = chars - accounted;
+    // Word-boundary spaces and auto-typography add a little; only a clear excess counts.
+    if (unexplained > Math.max(40, chars * 0.05)) { out.pasted_chars += unexplained; out.inferred_paste_chars = unexplained; }
+  }
   const grossIn = out.typed_chars + out.pasted_chars;
   out.paste_ratio    = grossIn > 0 ? out.pasted_chars / grossIn : 0;
   out.deletion_ratio = out.typed_chars > 0 ? out.deleted_chars / out.typed_chars : 0;

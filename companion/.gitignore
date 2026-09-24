@@ -2,6 +2,9 @@ node_modules/
 dist/
 renderer/bundle.js
 renderer/bundle.js.map
+lib/scoring.cjs
+lib/config.cjs
 .env
 .env.local
 .env.signing
+.smoke.js

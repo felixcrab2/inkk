@@ -1,0 +1,312 @@
+/* ─── Human Signal — dots, badge, line, panel ────────────────────────────── */
+.hs-dots { display: inline-flex; gap: 3px; align-items: center; }
+.hs-dot  { width: 5px; height: 5px; border-radius: 50%; background: rgba(62, 50, 36, 0.16); }
+.hs-dot.on { background: var(--text); }
+
+.hs-status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #cccccc;
+  display: inline-block;
+}
+.hs-status-dot.ok      { background: #5a8a55; }
+.hs-status-dot.saving  { background: #8a7a55; animation: hs-pulse 1.2s ease-in-out infinite; }
+.hs-status-dot.off     { background: #c48a3a; }
+@keyframes hs-pulse {
+  0%, 100% { opacity: 0.4; } 50% { opacity: 1; }
+}
+
+/* ─── Human Signal panel modal ──────────────────────────────────────────────── */
+.hs-panel-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(26, 22, 19, 0.35);
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+  z-index: 1500;
+  display: flex; align-items: center; justify-content: center;
+  animation: hsFadeIn 0.18s ease;
+  padding: 20px;
+}
+@keyframes hsFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.hs-panel-modal {
+  position: relative;
+  width: min(520px, 100%);
+  max-height: min(86vh, 680px);
+  display: flex; flex-direction: column;
+  background: var(--card);
+  border: none;
+  border-radius: 18px;
+  box-shadow: 0 24px 70px rgba(45, 36, 24, 0.28);
+  overflow: hidden;
+  animation: hsPanelIn 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes hsPanelIn {
+  from { transform: scale(0.96) translateY(8px); opacity: 0; }
+  to   { transform: scale(1)    translateY(0);   opacity: 1; }
+}
+
+.hs-panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 20px 4px;
+  border-bottom: none;
+  flex-shrink: 0;
+}
+.hs-panel-title {
+  font-size: var(--t-sm); letter-spacing: 0; color: var(--text);
+  text-transform: none;
+  font-weight: 600;
+}
+.hs-panel-close {
+  background: rgba(62, 50, 36, 0.06); border: none; color: var(--muted);
+  width: 26px; height: 26px; border-radius: 50%;
+  font-size: var(--t-md); line-height: 1; padding: 0; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.hs-panel-close:hover { color: var(--text); background: rgba(62, 50, 36, 0.1); }
+
+.hs-panel-hero {
+  display: flex; align-items: baseline; gap: 20px;
+  padding: 18px 20px 14px;
+  flex-shrink: 0;
+}
+.hs-panel-score-block {
+  display: flex; align-items: baseline; gap: 3px;
+}
+.hs-panel-score-num {
+  font-family: var(--font-ui);
+  font-size: 3rem; font-weight: 700; line-height: 1;
+  color: var(--text); letter-spacing: -0.02em;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.hs-panel-score-denom {
+  font-size: var(--t-md); color: var(--muted);
+}
+.hs-panel-tier-block {
+  display: flex; flex-direction: column; gap: 4px;
+}
+.hs-panel-tier-label {
+  font-size: var(--t-lg); font-weight: 500; color: var(--text); letter-spacing: -0.01em;
+}
+
+.hs-dots-sm .hs-dot { width: 5px; height: 5px; }
+.hs-dots-lg .hs-dot { width: 7px; height: 7px; }
+
+.hs-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: none;
+  padding: 8px 16px;
+  flex-shrink: 0;
+}
+.hs-tab {
+  background: none; border: none;
+  font-size: var(--t-xs); font-weight: 600; color: var(--muted);
+  padding: 7px 13px;
+  border-radius: 999px;
+  cursor: pointer;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  transition: color 0.15s, background 0.15s;
+}
+.hs-tab:hover { color: var(--text); }
+.hs-tab.active { color: var(--text); background: rgba(62, 50, 36, 0.07); }
+
+.hs-tab-body {
+  overflow-y: auto; padding: 16px 20px 22px;
+  flex: 1;
+}
+
+.hs-panel-blurb {
+  font-size: var(--t-xs); color: var(--muted);
+  line-height: 1.55; margin: 0 0 14px;
+}
+.hs-panel-empty {
+  font-size: var(--t-xs); color: var(--muted);
+}
+.hs-panel-warn {
+  font-size: var(--t-xs); color: #8a6a3a;
+  margin-top: 12px; line-height: 1.5;
+}
+
+.hs-contrib-row {
+  display: grid;
+  grid-template-columns: 1fr 80px 28px;
+  align-items: center; gap: 10px;
+  margin-bottom: 10px;
+}
+.hs-contrib-label-block {
+  display: flex; flex-direction: column; gap: 1px;
+}
+.hs-contrib-label {
+  font-size: var(--t-xs); color: var(--text);
+}
+.hs-contrib-desc {
+  font-size: var(--t-xs); color: var(--muted);
+}
+.hs-contrib-bar-wrap {
+  height: 4px; background: rgba(62, 50, 36, 0.09); border-radius: 99px; overflow: hidden;
+}
+.hs-contrib-bar-fill {
+  height: 100%; background: var(--text); border-radius: 99px;
+  transition: width 0.3s ease;
+}
+.hs-contrib-val {
+  text-align: right;
+  font-size: var(--t-xs); color: var(--muted);
+}
+
+.hs-chart-svg {
+  display: block; width: 100%; height: auto;
+  margin-bottom: 16px;
+}
+.hs-chart-label {
+  font-size: 7px; fill: var(--subtle);
+  font-family: var(--font-ui);
+}
+.hs-chart-empty {
+  font-size: var(--t-xs); color: var(--muted);
+  margin: 20px 0;
+}
+
+.hs-stat-row {
+  display: flex; gap: 10px; flex-wrap: wrap;
+}
+.hs-stat-row > .hs-stat-chip { flex: 1; }
+.hs-stat-row-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.hs-stat-chip {
+  background: rgba(62, 50, 36, 0.045);
+  border: none;
+  border-radius: 12px;
+  padding: 12px 14px;
+  min-width: 80px;
+}
+.hs-stat-val {
+  font-family: var(--font-ui);
+  font-size: var(--t-xl); font-weight: 700; color: var(--text);
+  line-height: 1.05; letter-spacing: -0.01em;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.hs-stat-label {
+  font-size: var(--t-xs); color: var(--muted);
+  text-transform: none; letter-spacing: 0.05em;
+  margin-top: 4px;
+}
+.hs-stat-sub {
+  font-size: var(--t-xs); color: var(--subtle);
+  margin-top: 1px;
+}
+
+/* ─── Radar fingerprint ──────────────────────────────────────────────────── */
+.hs-radar-svg {
+  display: block; width: 100%; max-width: 300px; height: auto;
+  margin: 4px auto 20px;
+}
+.hs-radar-label {
+  font-size: 8px; fill: var(--subtle);
+  font-family: var(--font-ui);
+  letter-spacing: 0.05em; text-transform: none;
+}
+
+/* ─── Section labels inside tabs ─────────────────────────────────────────── */
+.hs-section-label {
+  font-size: var(--t-xs); font-weight: 600;
+  text-transform: none; letter-spacing: 0.01em;
+  color: var(--subtle);
+  margin: 18px 0 11px;
+}
+.hs-tab-body > div > .hs-section-label:first-child,
+.hs-tab-signal .hs-section-label:first-of-type { margin-top: 4px; }
+
+/* ─── Pause distribution ─────────────────────────────────────────────────── */
+.hs-pause-list { display: flex; flex-direction: column; gap: 10px; }
+.hs-pause-row {
+  display: grid;
+  grid-template-columns: 1fr 110px 26px;
+  align-items: center; gap: 12px;
+}
+.hs-pause-label-block { display: flex; flex-direction: column; gap: 1px; }
+.hs-pause-label { font-size: var(--t-xs); color: var(--text); }
+.hs-pause-sub { font-size: var(--t-xs); color: var(--muted); }
+.hs-pause-bar-wrap {
+  height: 4px; background: #eaeaea; border-radius: 99px; overflow: hidden;
+}
+.hs-pause-bar-fill {
+  height: 100%; background: #2a2a2a; border-radius: 99px;
+  transition: width 0.3s ease;
+}
+.hs-pause-val {
+  text-align: right;
+  font-family: var(--font-serif);
+  font-size: var(--t-md); color: var(--text);
+}
+
+/* ─── Composition (provenance) ───────────────────────────────────────────── */
+.hs-comp-bar {
+  display: flex; height: 8px; border-radius: 99px; overflow: hidden;
+  background: #eaeaea; margin-bottom: 9px;
+}
+.hs-comp-seg { height: 100%; }
+.hs-comp-seg.typed  { background: #2a2a2a; }
+.hs-comp-seg.pasted { background: var(--gold); }
+.hs-comp-legend {
+  display: flex; gap: 16px;
+  font-size: var(--t-xs); color: var(--muted);
+}
+.hs-comp-key { display: inline-flex; align-items: center; gap: 5px; }
+.hs-comp-dot { width: 7px; height: 7px; border-radius: 2px; display: inline-block; }
+.hs-comp-dot.typed  { background: #2a2a2a; }
+.hs-comp-dot.pasted { background: var(--gold); }
+.hs-comp-churn {
+  font-size: var(--t-xs); color: var(--subtle);
+  line-height: 1.5; margin-top: 9px;
+}
+
+/* ─── Method tab ─────────────────────────────────────────────────────────── */
+.hs-method-lead {
+  font-size: var(--t-sm); color: var(--text);
+  line-height: 1.6; margin: 0 0 18px;
+}
+.hs-method-list {
+  display: flex; flex-direction: column; gap: 14px;
+  margin-bottom: 20px;
+}
+.hs-method-item {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(62, 50, 36, 0.035);
+}
+.hs-method-name {
+  font-size: var(--t-xs); font-weight: 500; color: var(--text);
+  letter-spacing: 0;
+}
+.hs-method-body {
+  font-size: var(--t-xs); color: var(--muted);
+  line-height: 1.6;
+}
+.hs-method-footer {
+  font-size: var(--t-xs); color: var(--subtle);
+  line-height: 1.55;
+  border-top: none;
+  padding-top: 10px; margin: 0;
+}
+
+.ws-process-btn {
+  background: none; border: none; padding: 2px 5px;
+  font: inherit; color: var(--muted); cursor: pointer;
+  display: inline-flex; align-items: center; gap: 2px;
+  font-size: var(--t-xs);
+  border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+.ws-process-btn:hover { color: var(--text); background: rgba(0,0,0,0.05); }
+.ws-process-expand { font-size: var(--t-xs); opacity: 0.45; margin-left: 2px; }
+.ws-process-btn:hover .ws-process-expand { opacity: 1; }
+.hs-dot-xs { width: 4px; height: 4px; border-radius: 50%; background: #dcdcdc; display: inline-block; }
+.hs-dot-xs.on { background: #2a2a2a; }

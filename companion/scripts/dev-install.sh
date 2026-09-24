@@ -17,8 +17,12 @@ IDENTITY=$(security find-identity -v -p codesigning | grep "Apple Development" |
 [ -n "$IDENTITY" ] || { echo "✗ no Apple Development identity in the keychain"; exit 1; }
 echo "→ signing as: $IDENTITY"
 
-npm run build:renderer
-CSC_IDENTITY_AUTODISCOVERY=false npx electron-builder --dir --mac >/dev/null
+npm run build
+mkdir -p dist
+# electron-builder is chatty (one line per signed file); keep its output in a
+# log so a failure is diagnosable instead of silently stopping the script.
+CSC_IDENTITY_AUTODISCOVERY=false npx electron-builder --dir --mac > dist/electron-builder.log 2>&1 \
+  || { echo "✗ electron-builder failed — see dist/electron-builder.log"; tail -20 dist/electron-builder.log; exit 1; }
 
 APP="dist/mac-arm64/inkk.app"
 codesign --force --deep --sign "$IDENTITY" \

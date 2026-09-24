@@ -1,0 +1,115 @@
+/* ─── Engraving backdrop ──────────────────────────────────────────────────────
+   Faded public-domain plates (Dürer, Flammarion, Merian…) ghosted into the
+   paper. The files are alpha-keyed at export: the scan's paper is fully
+   transparent and only the ink lines carry alpha, so the page never picks up
+   a grey veil — opacity here scales the lines alone.
+   Sits at z-index -1: above the <html> page colour, below all content.
+   In the editor it fades with the chrome while typing (same idle rhythm). */
+#backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: cover;
+  /* slight zoom so plate edges / paper margins never reach the viewport */
+  transform: scale(1.1);
+  /* The plate lives on the flanks, everywhere: fully cleared behind the
+     central content column (every view's column fits within 780px — feed
+     600, reading pages 700, editor 560, profiles/verify narrower), ramping
+     to full strength by ±700px. The centre of every page stays clean
+     paper; only the perimeter carries the artwork. */
+  -webkit-mask-image: linear-gradient(to right,
+      #000 calc(50% - 700px), transparent calc(50% - 390px),
+      transparent calc(50% + 390px), #000 calc(50% + 700px));
+  mask-image: linear-gradient(to right,
+      #000 calc(50% - 700px), transparent calc(50% - 390px),
+      transparent calc(50% + 390px), #000 calc(50% + 700px));
+  opacity: 0;
+  transition: opacity 1.8s ease;
+}
+#backdrop.bd-on { opacity: var(--backdrop-alpha, 0.16); }
+/* Quick exhale while a view change swaps the plate (fade-in stays slow).
+   Duration must match BACKDROP_VEIL_MS in App.js. */
+#backdrop.bd-veil { transition-duration: 0.7s; }
+
+/* Verify, before a certificate is shown: the intro box only occupies the top
+   of the screen, so instead of the vertical band the plate circles the box —
+   clear inside an ellipse around the masthead + form, fading in on all sides
+   (including below). Once a certificate expands the page, the class drops
+   and the standard band returns. */
+#backdrop.bd-ring {
+  -webkit-mask-image: radial-gradient(ellipse 620px 480px at 50% 300px,
+      transparent 52%, #000 88%);
+  mask-image: radial-gradient(ellipse 620px 480px at 50% 300px,
+      transparent 52%, #000 88%);
+}
+
+/* ─── Landing ─────────────────────────────────────────────────────────────── */
+#landing {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  transition: opacity 0.6s ease, background-color 0.9s ease;
+}
+#landing.fading { opacity: 0; pointer-events: none; }
+/* Handoff: the overlay clears so the editor appears around the headline as
+   it glides up onto the title line. */
+#landing.handoff { background-color: transparent; }
+
+/* The landing gets its own copy of the backdrop (the overlay is opaque),
+   a touch stronger than the in-app one so the first impression registers.
+   The plate is Dürer's St Jerome writing at his desk; the position centres
+   the desk scene behind the headline. */
+#landing-backdrop {
+  position: absolute;
+  inset: 0;
+  /* background-image set inline in LandingScreen (CRA css-loader would try
+     to bundle a url() pointing at public/) */
+  background-position: center 42%;
+  background-size: cover;
+  background-repeat: no-repeat;
+  transform: scale(1.1);
+  /* held clear until the plate has decoded (.on from LandingScreen) */
+  opacity: 0;
+  transition: opacity 1.8s ease;
+  pointer-events: none;
+}
+#landing-backdrop.on { opacity: 0.12; }
+
+#landing-inner {
+  position: relative;
+  max-width: 360px;
+  padding: 0 36px;
+  text-align: center;
+}
+
+#landing-headline {
+  font-family: var(--font-serif);
+  font-size: var(--t-3xl);
+  color: var(--text);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  /* the glide up onto the title line (transform set inline once measured) */
+  transition: transform 1s cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: transform;
+}
+
+/* While the headline occupies the title line, the real title's placeholder
+   underneath stays out of sight; it returns when the overlay unmounts. */
+body.landing-handoff #title-input:empty::before { color: transparent; }
+
+#landing-cursor {
+  display: inline-block;
+  width: 0;
+  height: 1.1em;
+  border-left: 1.5px solid #666;
+  vertical-align: -0.12em;
+  margin-left: 2px;
+  animation: blink 1s steps(2, start) infinite;
+}

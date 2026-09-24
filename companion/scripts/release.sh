@@ -12,11 +12,11 @@ set -a; . ./.env.signing; set +a
 security find-identity -v -p codesigning | grep -q "Developer ID Application" \
   || { echo "✗ no Developer ID Application identity — run ./scripts/install-cert.sh first"; exit 1; }
 
-echo "→ bundling renderer"
-npm run build:renderer
+echo "→ building (config, scoring bundle, renderer bundle)"
+npm run build
 
 echo "→ building, signing and notarizing (notarization takes a few minutes)"
-npx electron-builder --mac dmg
+npx electron-builder --mac dmg -c.mac.notarize=true
 
 echo ""
 echo "=== done ==="

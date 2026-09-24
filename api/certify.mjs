@@ -1,13 +1,13 @@
 // Server-side certificate issuance (Vercel serverless function).
 //
-// THE TRUST ANCHOR. The browser must never be the authority on a piece's human-
-// signal score: the verifications/publications RLS policies only check row
-// ownership, so a signed-in user could otherwise POST { human_score: 100,
-// verified: true } straight to the table and mint a fake certificate without
-// writing a word (no need to read score.js or forge any telemetry). So the score
-// is computed HERE, on the server, and written with the service-role key. Section
-// 13 of schema.sql locks those columns so this route is the only thing that can
-// set them.
+// THE TRUST ANCHOR. The client must never be the authority on a piece's human-
+// signal score: the verifications RLS policy only checks row ownership, so a
+// signed-in user could otherwise POST { human_score: 100, verified: true }
+// straight to the table and mint a fake certificate without writing a word (no
+// need to read score.js or forge any telemetry). So the score is computed HERE,
+// on the server, and written with the service-role key. Section 9 of
+// schema.sql locks those columns so this route is the only thing that can set
+// them.
 //
 // The number is recomputed with the SAME pure functions the editor uses
 // (src/telemetry/features.js + score.js — imported, never duplicated), so a
@@ -16,10 +16,16 @@
 // its IndexedDB queue, which is the complete trace for someone who never syncs —
 // unioned by event id with (b) the user's synced cloud batches.
 //
+// Two callers send the same body: the web editor's Certify tab and the desktop
+// companion. The companion signs in anonymously before calling, so `uid` may be
+// an anonymous Supabase user and authorName / authorUsername are often null —
+// both are optional. The ledger row is all that is written; the submitted
+// events are used for scoring and are not stored by this route.
+//
 // Needs SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (server-only env; never shipped
-// to the browser). If they're missing the route fails soft (ok:false) and the
-// client falls back to its previous write, so a misconfig can never block
-// publishing.
+// to the browser). If they're missing the route fails soft (ok:false) so a
+// misconfig never blocks the writer — they keep their draft, they just don't
+// get a verified code.
 
 import { createClient } from "@supabase/supabase-js";
 import { extractFeatures } from "../src/telemetry/features.js";
@@ -36,8 +42,8 @@ function serviceClient() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-// Confirm the caller is a signed-in inkk user from their access token. Returns
-// the user id, or null to reject.
+// Confirm the caller is a signed-in inkk user (email, Google or anonymous) from
+// their access token. Returns the user id, or null to reject.
 async function verifyUser(req) {
   const url = process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
   const anon = process.env.SUPABASE_ANON_KEY || process.env.REACT_APP_SUPABASE_ANON_KEY;
@@ -92,12 +98,17 @@ export default async function handler(req, res) {
 
   const contentHash = typeof body.contentHash === "string" ? body.contentHash : null;
   const wordCount = Number.isFinite(body.wordCount) ? body.wordCount : 0;
+  // Length of the finished text: lets the scorer count text that was never
+  // typed as pasted (the companion cannot measure pastes directly).
+  const charCount = Number.isFinite(body.charCount) && body.charCount > 0 ? body.charCount : null;
   const title = typeof body.title === "string" ? body.title : null;
+  // Optional: the companion sends null for both (an anonymous user has no name).
   const authorName = typeof body.authorName === "string" ? body.authorName : null;
   const authorUsername = typeof body.authorUsername === "string" ? body.authorUsername : null;
   const clientEvents = Array.isArray(body.events) ? body.events.slice(0, MAX_CLIENT_EVENTS) : [];
 
-  // The caller must own the document they're certifying.
+  // The caller must own the document they're certifying. A missing documents
+  // row passes: the companion certifies sessions that only exist on the Mac.
   try {
     const { data: docRow, error: docErr } = await svc
       .from("documents").select("user_id").eq("id", docId).maybeSingle();
@@ -109,15 +120,18 @@ export default async function handler(req, res) {
 
   // A code already in the ledger keeps its original verdict (the ledger is an
   // immutable, append-only record). Otherwise recompute from the reassembled trace.
-  let humanScore = null, scoreTier = null, verified = false;
+  let humanScore = null, scoreTier = null, verified = false, storedHash = null;
   try {
     const { data: existing } = await svc
-      .from("verifications").select("human_score, score_tier, verified").eq("code", code).maybeSingle();
+      .from("verifications").select("human_score, score_tier, verified, user_id, content_hash").eq("code", code).maybeSingle();
 
     if (existing) {
+      // A code is its owner's: anyone else asking about it gets nothing back.
+      if (existing.user_id && existing.user_id !== uid) { res.status(403).json({ ok: false, error: "Not your certificate" }); return; }
       humanScore = existing.human_score;
       scoreTier  = existing.score_tier;
       verified   = !!existing.verified;
+      storedHash = existing.content_hash || null;
     } else {
       const byId = new Map();
       for (const e of clientEvents) if (e && e.id) byId.set(e.id, e);
@@ -126,12 +140,12 @@ export default async function handler(req, res) {
         .filter(e => e.doc_id === docId)
         .sort((a, b) => (Number(a.t) || 0) - (Number(b.t) || 0));
 
-      const score = computeScore(extractFeatures(events, { words: wordCount }));
+      const score = computeScore(extractFeatures(events, { words: wordCount, chars: charCount }));
       humanScore = score.score;
       scoreTier  = score.tier;
       verified   = VERIFIED_TIERS.has(score.tier);
 
-      // ignoreDuplicates → idempotent if two publishes race the same new code.
+      // ignoreDuplicates → idempotent if two certifications race the same new code.
       await svc.from("verifications").upsert({
         code, doc_id: docId, user_id: uid,
         title, author_name: authorName, author_username: authorUsername,
@@ -143,13 +157,5 @@ export default async function handler(req, res) {
     res.status(200).json({ ok: false, error: "Scoring failed" }); return;
   }
 
-  // Stamp the live publication (if this doc is on the feed) with the authoritative
-  // score. No-op row count when the piece isn't published.
-  try {
-    await svc.from("publications")
-      .update({ human_score: humanScore, score_tier: scoreTier })
-      .eq("doc_id", docId).eq("user_id", uid);
-  } catch { /* non-fatal: the ledger row is the source of truth */ }
-
-  res.status(200).json({ ok: true, code, verified, tier: scoreTier, score: humanScore, contentHash });
+  res.status(200).json({ ok: true, code, verified, tier: scoreTier, score: humanScore, contentHash: storedHash || contentHash });
 }

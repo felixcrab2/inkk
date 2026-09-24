@@ -1,3 +1,5 @@
+> **Status (September 2026):** mobile is no longer an active focus. The Capacitor shell and the `@media (max-width: 600px)` styles are kept building but get no new work; this document is retained as a record of what was done.
+
 # inkk on iPhone
 
 The plan is a Capacitor shell around the existing React app, so the editor, the

@@ -5,21 +5,22 @@
   "description": "inkk desktop companion \u2014 records writing rhythm system-wide and issues a verification code.",
   "main": "main.js",
   "scripts": {
-    "build:renderer": "node build-renderer.js",
-    "start": "npm run build:renderer && electron .",
-    "dev": "npm run build:renderer && electron . --inspect",
-    "test": "node --test capture.test.js",
-    "dist": "npm run build:renderer && electron-builder --mac dmg",
+    "build": "node build.js",
+    "start": "npm run build && electron .",
+    "dev": "npm run build && electron . --inspect",
+    "test": "node --test capture.test.js lib/sessions.test.js",
+    "dist": "npm run build && electron-builder --mac dmg",
     "release": "./scripts/release.sh",
     "install-cert": "./scripts/install-cert.sh"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
+    "node-mac-permissions": "^2.5.0",
     "uiohook-napi": "^1.5.4"
   },
   "devDependencies": {
-    "electron": "^31.7.7",
-    "electron-builder": "^24.13.3",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
     "esbuild": "^0.23.0"
   },
   "build": {
@@ -27,28 +28,36 @@
     "productName": "inkk",
     "files": [
       "main.js",
-      "capture.js",
       "preload.js",
+      "capture.js",
+      "lib/**/*.js",
+      "lib/*.cjs",
+      "!lib/*.test.js",
       "renderer/index.html",
       "renderer/styles.css",
       "renderer/bundle.js",
-      "assets/iconTemplate.png",
-      "assets/iconTemplate@2x.png"
+      "renderer/mock.js",
+      "renderer/fonts/**",
+      "assets/**"
+    ],
+    "asarUnpack": [
+      "node_modules/uiohook-napi/**",
+      "node_modules/node-mac-permissions/**"
     ],
     "mac": {
       "category": "public.app-category.productivity",
       "target": [
         "dmg"
       ],
+      "icon": "assets/icon.icns",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "extendInfo": {
-        "LSUIElement": true,
-        "NSAppleEventsUsageDescription": "inkk checks which app is in front so it can show where you're writing."
+        "LSUIElement": true
       },
-      "notarize": true
+      "notarize": false
     },
     "dmg": {
       "title": "inkk"

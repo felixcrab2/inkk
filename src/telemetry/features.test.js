@@ -158,3 +158,23 @@ describe("extractFeatures", () => {
     expect(f.velocity_series.length).toBeLessThanOrEqual(24);
   });
 });
+
+test("text that was never typed counts as pasted when the finished length is known", () => {
+  // 30 typed characters, no recorded paste, but the finished piece is 600 chars.
+  const events = [];
+  let t = 1000;
+  for (let i = 0; i < 30; i++) {
+    t += 120;
+    events.push({ id: `k${i}`, t, pt: t, kind: "keydown", key_class: "letter" });
+    events.push({ id: `i${i}`, t: t + 1, pt: t + 1, kind: "input", len_delta: 1, caret_pos: i + 1 });
+    events.push({ id: `u${i}`, t: t + 60, pt: t + 60, kind: "keyup", key_class: "letter" });
+  }
+  const plain = extractFeatures(events, { words: 100 });
+  expect(plain.paste_ratio).toBe(0);
+  const known = extractFeatures(events, { words: 100, chars: 600 });
+  expect(known.inferred_paste_chars).toBe(570);
+  expect(known.paste_ratio).toBeGreaterThan(0.9);
+  // a small excess (spaces, smart typography) is not a paste
+  const close = extractFeatures(events, { words: 6, chars: 34 });
+  expect(close.paste_ratio).toBe(0);
+});
