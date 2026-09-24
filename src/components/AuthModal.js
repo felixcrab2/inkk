@@ -133,7 +133,7 @@ export function AuthModal({ onClose, initialMode = "signin" }) {
         nonce: hashed,
         callback: async (resp) => {
           if (!acceptedRef.current) {
-            setError("Agree to the Terms and Privacy Policy first.");
+            setError("Please accept the Terms & Privacy Policy first.");
             return;
           }
           // Record Terms acceptance for the profile auto-provisioner.
@@ -194,14 +194,14 @@ export function AuthModal({ onClose, initialMode = "signin" }) {
 
     // signup
     const u = username.trim();
-    if (!USERNAME_RE.test(u)) { setError("Usernames are 3 to 20 characters."); return; }
+    if (!USERNAME_RE.test(u)) { setError("Username must be 3–20 characters."); return; }
     if (!pwOk)                { setError(`Password needs at least ${PW_MIN} characters, a letter, and a number.`); return; }
-    if (!accepted)            { setError("Agree to the Terms and Privacy Policy first."); return; }
+    if (!accepted)            { setError("Please accept the Terms & Privacy Policy to continue."); return; }
 
     setLoading(true);
     // Final availability check right before we commit.
     const existing = await fetchProfileByUsername(u);
-    if (existing) { setUnameStatus("taken"); setError("That username is taken."); setLoading(false); return; }
+    if (existing) { setUnameStatus("taken"); setError("That username is already taken. Please try another."); setLoading(false); return; }
 
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -244,7 +244,7 @@ export function AuthModal({ onClose, initialMode = "signin" }) {
     // tap can explain why nothing happens (a disabled button is silent, which
     // reads as broken — especially on mobile).
     if (!accepted) {
-      setError("Agree to the Terms and Privacy Policy first.");
+      setError("Please accept the Terms & Privacy Policy to continue with Google.");
       return;
     }
     setError("");
@@ -277,10 +277,10 @@ export function AuthModal({ onClose, initialMode = "signin" }) {
   };
 
   const unameHint = {
-    checking:  { text: "Checking",        cls: "muted" },
-    available: { text: "Available",         cls: "ok" },
-    taken:     { text: "Taken",     cls: "bad" },
-    invalid:   { text: "3 to 20 characters", cls: "muted" },
+    checking:  { text: "checking…",        cls: "muted" },
+    available: { text: "available",         cls: "ok" },
+    taken:     { text: "already taken",     cls: "bad" },
+    invalid:   { text: "3–20 chars", cls: "muted" },
   }[unameStatus];
 
   // The modal only closes via the × button — never on a backdrop click,
@@ -296,9 +296,9 @@ export function AuthModal({ onClose, initialMode = "signin" }) {
             {needsConfirm && sentEmailRef.current && (
               <div className="auth-resend">
                 {resend === "sent"
-                  ? <span className="auth-resend-done">Sent again. Check your inbox and spam folder.</span>
-                  : <>Didn't get it? <button type="button" onClick={resendConfirmation} disabled={resend === "sending"}>{resend === "sending" ? "Sending" : "Send it again"}</button></>}
-                <button type="button" className="auth-back" onClick={() => { setMessage(""); setResend(""); }}>Back</button>
+                  ? <span className="auth-resend-done">Sent again. Please check your inbox and spam folder.</span>
+                  : <>Didn't get it? <button type="button" onClick={resendConfirmation} disabled={resend === "sending"}>{resend === "sending" ? "sending…" : "resend confirmation email"}</button></>}
+                <button type="button" className="auth-back" onClick={() => { setMessage(""); setResend(""); }}>← back</button>
               </div>
             )}
           </div>
@@ -312,10 +312,10 @@ export function AuthModal({ onClose, initialMode = "signin" }) {
               <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus={!isMobile()} />
               {error && <p className="auth-error">{error}</p>}
               <button id="auth-submit" type="submit" disabled={loading}>
-                {loading ? "Sending" : "Send reset link"}
+                {loading ? "…" : "Send reset link"}
               </button>
             </form>
-            <button className="auth-back" onClick={() => switchMode("signin")}>Back to sign in</button>
+            <button className="auth-back" onClick={() => switchMode("signin")}>← back to sign in</button>
           </>
         ) : (
           <>
@@ -366,9 +366,9 @@ export function AuthModal({ onClose, initialMode = "signin" }) {
 
               {mode === "signup" && password && !pwOk && (
                 <ul className="auth-pw-reqs">
-                  <li className={pw.length ? "met" : ""}>At least {PW_MIN} characters</li>
-                  <li className={pw.letter ? "met" : ""}>A letter</li>
-                  <li className={pw.number ? "met" : ""}>A number</li>
+                  <li className={pw.length ? "met" : ""}>{pw.length ? "✓" : "○"} at least {PW_MIN} characters</li>
+                  <li className={pw.letter ? "met" : ""}>{pw.letter ? "✓" : "○"} a letter</li>
+                  <li className={pw.number ? "met" : ""}>{pw.number ? "✓" : "○"} a number</li>
                 </ul>
               )}
 
@@ -380,14 +380,14 @@ export function AuthModal({ onClose, initialMode = "signin" }) {
                     <button type="button" className="tos-link" onClick={() => setShowTerms(true)}>Terms</button>
                     {" "}and{" "}
                     <button type="button" className="tos-link" onClick={() => setShowPrivacy(true)}>Privacy Policy</button>
-                    , and to sharing my anonymised writing rhythm with inkk's study. I can stop from Notes at any time.
+                    , including contributing my anonymised writing-process data to Inkk's research dataset. I can opt out anytime from Notes.
                   </span>
                 </label>
               )}
 
               {error && <p className="auth-error">{error}</p>}
               <button id="auth-submit" type="submit" disabled={loading || (mode === "signup" && !signupReady)}>
-                {loading ? (mode === "signin" ? "Signing in" : "Creating account") : mode === "signin" ? "Sign in" : "Create account"}
+                {loading ? "…" : mode === "signin" ? "Sign in" : "Create account"}
               </button>
             </form>
             {mode === "signin" && (
@@ -407,7 +407,7 @@ export function AuthModal({ onClose, initialMode = "signin" }) {
                   <button type="button" className="tos-link" onClick={() => setShowTerms(true)}>Terms</button>
                   {" "}and{" "}
                   <button type="button" className="tos-link" onClick={() => setShowPrivacy(true)}>Privacy Policy</button>
-                  , and to sharing my anonymised writing rhythm with inkk's study. I can stop from Notes at any time.
+                  , including contributing my anonymised writing-process data to Inkk's research dataset. I can opt out anytime from Notes.
                 </span>
               </label>
             )}
@@ -453,14 +453,14 @@ export function UpdatePasswordModal({ onClose, onDone }) {
       <div id="auth-modal" onClick={e => e.stopPropagation()}>
         {onClose && <button id="auth-close" onClick={onClose}>×</button>}
         <div id="auth-tabs">
-          <button className="active" style={{ cursor: "default" }}>Set a new password</button>
+          <button className="active" style={{ cursor: "default" }}>set new password</button>
         </div>
         <form onSubmit={submit}>
-          <input type="password" placeholder="New password" value={password} onChange={e => setPassword(e.target.value)} required autoFocus />
-          <input type="password" placeholder="New password again" value={confirm} onChange={e => setConfirm(e.target.value)} required />
+          <input type="password" placeholder="new password (min 8)" value={password} onChange={e => setPassword(e.target.value)} required autoFocus />
+          <input type="password" placeholder="confirm new password" value={confirm} onChange={e => setConfirm(e.target.value)} required />
           {error && <p className="auth-error">{error}</p>}
           <button id="auth-submit" type="submit" disabled={loading || !password || !confirm}>
-            {loading ? "Saving" : "Set new password"}
+            {loading ? "saving…" : "Set new password"}
           </button>
         </form>
       </div>

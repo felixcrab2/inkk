@@ -8,7 +8,7 @@ export const TOS_VERSION = "2026-09-25";
 export const PRIVACY_POLICY = `Inkk Privacy Policy
 Effective 25 September 2026
 
-Inkk is a writing tool in two parts: an editor at inkk.site and a desktop companion for macOS. Both pay attention to how you write, the rhythm of your typing, so that a piece can carry a code showing it was written by a person. This page explains, in plain English, who is responsible for your data, what each part collects, why, the legal basis we rely on, and what control you have.
+Inkk is a writing tool in two parts: an editor at inkk.site and a desktop companion for macOS. Both pay attention to how you write — the rhythm of your typing — so that a piece can carry a code showing it was written by a person. This page explains, in plain English, who is responsible for your data, what each part collects, why, the legal basis we rely on, and what control you have.
 
 WHO IS RESPONSIBLE FOR YOUR DATA (DATA CONTROLLER)
 
@@ -17,20 +17,20 @@ Inkk is operated by Felix Crabtree, the data controller for the personal data de
 WHAT THE WEB EDITOR COLLECTS
 
 When you write in the editor at inkk.site, we record metadata about the writing process:
-• The keys you press, including letters, digits and punctuation, and the precise timing of each key down and key up, pause and deletion
+• The keys you press — including letters, digits and punctuation — and the precise timing of each key down and key up, pause and deletion
 • Insertions, deletions and pastes, with how many characters each one added or removed (for a paste, the length of the pasted text)
 • Caret movement and selection events
 • Word counts and revision counts, and the Human Signal score computed from all of the above
-• Basic device and environment context once per writing session, whether the device has a touch screen, operating-system platform, browser language, time zone, and the size of your browser window. This lets researchers account for differences between devices and is not used to identify you.
+• Basic device and environment context once per writing session — whether the device has a touch screen, operating-system platform, browser language, time zone, and the size of your browser window. This lets researchers account for differences between devices and is not used to identify you.
 
-Because the keystroke stream itself is recorded, text you type and later delete can in principle be reconstructed from it, not only the text you ultimately keep. Please do not type anything into the editor that you would not want recorded as part of the writing-process data, such as passwords, payment details, or sensitive personal information (for example about your health, religion, or political views). We do not seek this information and do not use the keystroke data to identify you.
+Because the keystroke stream itself is recorded, text you type and later delete can in principle be reconstructed from it, not only the text you ultimately keep. Please do not type anything into the editor that you would not want recorded as part of the writing-process data — such as passwords, payment details, or sensitive personal information (for example about your health, religion, or political views). We do not seek this information and do not use the keystroke data to identify you.
 
-Your notes are stored in your browser. If you are signed in, they are also saved to our database so they follow you between devices: the text, its title, and the process metrics above. Downloads (PDF, Word and image) are made in your browser and upload nothing. If you are signed in, downloading certifies the note as it is (or reuses its code if the words haven't changed) and writes the code into the file's metadata, so whoever receives the file can check it.
+Your notes are stored in your browser. If you are signed in, they are also saved to our database so they follow you between devices: the text, its title, and the process metrics above. Downloads (PDF, Word and PNG) are made in your browser and upload nothing. If you are signed in, downloading certifies the note as it is (or reuses its code if the words haven't changed) and writes the code into the file's metadata, so whoever receives the file can check it.
 
 WHAT THE DESKTOP COMPANION COLLECTS
 
 The companion is a menu-bar app that runs in the background on your Mac and records the rhythm of your typing in whatever app you are writing in. It is built so that it cannot see what you write:
-• It records the timing of each key down and key up, and only the broad class of key, letter, digit, punctuation, space, edit, navigation or modifier. Which letter was pressed is never recorded (that field is always empty).
+• It records the timing of each key down and key up, and only the broad class of key — letter, digit, punctuation, space, edit, navigation or modifier. Which letter was pressed is never recorded (that field is always empty).
 • When you paste, it records only that a paste happened. It never reads the clipboard. How much of a finished piece arrived by pasting is worked out at certify time by comparing the length of the finished text with what was typed.
 • When you certify a session, it reads the text of the document in front through macOS Accessibility, once, on your Mac, to compute the fingerprint. The text is discarded immediately; it is never stored and never sent. If the app will not share its text, the certificate is bound to the writing session instead and says so.
 • While you read, it looks at the window in front for an inkk code, on your Mac: in its text, its link addresses, its image descriptions and the metadata of the document it has open. When it finds one it looks the code up and compares the certificate's sentence fingerprints with the text in front, on your Mac, to tell you whether the text matches. Only the code is sent; the text is not kept. You can turn this off in Settings.
@@ -43,7 +43,7 @@ The companion is a menu-bar app that runs in the background on your Mac and reco
 
 Everything the companion records stays on your Mac, in its own folder in your Application Support directory, until you choose to certify a session. When you certify, the rhythm events of that one session are sent to our server to compute the score, together with the text's word count and character count, its fingerprints (a SHA-256 hash of the whole text and a short hash of each sentence), the name and bundle identifier of the app the session was typed in, and your operating system. The text itself is hashed on your Mac and is never sent. The server uses the rhythm events to compute the score and does not keep them.
 
-If you certify from the companion without an account, Inkk creates an anonymous account for you, a random identifier with no email address, so that the certificate has an owner in the ledger. That account stays tied to the companion on that Mac: certificates it issued cannot later be moved onto an email account. If you want them removed, write to hello@inkk.site with the codes.
+If you certify from the companion without an account, Inkk creates an anonymous account for you — a random identifier with no email address — so that the certificate has an owner in the ledger. That account stays tied to the companion on that Mac: certificates it issued cannot later be moved onto an email account. If you want them removed, write to hello@inkk.site with the codes.
 
 THE RESEARCH STUDY
 
@@ -66,7 +66,7 @@ For accounts we hold your email address, a hashed password (handled by our authe
 WHY WE COLLECT IT, AND OUR LEGAL BASIS
 
 We rely on the following legal bases under the UK GDPR and the EU GDPR:
-• Running the service for you, creating your account, syncing your notes, issuing and verifying certificates, and showing your Human Signal score, is processing necessary to perform our contract with you (Article 6(1)(b)).
+• Running the service for you — creating your account, syncing your notes, issuing and verifying certificates, and showing your Human Signal score — is processing necessary to perform our contract with you (Article 6(1)(b)).
 • Collecting and analysing writing-process metadata for research is carried out in our legitimate interests in studying human writing and developing AI-detection methods (Article 6(1)(f)), subject to the research safeguards in Article 89: you are identified only by an internal pseudonymous ID, and research outputs are anonymised. You have the right to object to this processing at any time by opting out under Notes. We have weighed this processing against your interests and consider it proportionate, given the safeguards and the easy opt-out.
 
 HOW WE USE IT
@@ -79,7 +79,7 @@ We do not sell your data. We do not use it for advertising. We share data with t
 
 WHERE YOUR DATA IS PROCESSED (INTERNATIONAL TRANSFERS)
 
-Supabase and Vercel may process your data on servers outside the United Kingdom and the European Economic Area, including in the United States. Where data is transferred outside the UK/EEA, we rely on appropriate safeguards, such as the European Commission's Standard Contractual Clauses and the UK International Data Transfer Addendum, applied through our providers' data-processing terms, to protect it.
+Supabase and Vercel may process your data on servers outside the United Kingdom and the European Economic Area, including in the United States. Where data is transferred outside the UK/EEA, we rely on appropriate safeguards — such as the European Commission's Standard Contractual Clauses and the UK International Data Transfer Addendum, applied through our providers' data-processing terms — to protect it.
 
 STORAGE ON YOUR DEVICE
 
@@ -90,8 +90,8 @@ YOUR RIGHTS
 Under the UK GDPR and the EU GDPR you have the following rights over your personal data. To exercise any of them, use the tools under Notes where available, or contact us at hello@inkk.site. We aim to respond within one month.
 
 • Access: see what we hold about you. You can download all your captured process data as JSON at any time from Notes.
-• Portability: receive your process data in a machine-readable format, the same JSON export.
-• Erasure: use "Delete my data" under Notes to permanently delete your captured process data. To delete your account entirely, including your notes, your certificates and the anonymous account the companion may have created, email hello@inkk.site from the address on the account and we will do it.
+• Portability: receive your process data in a machine-readable format — the same JSON export.
+• Erasure: use "Delete my data" under Notes to permanently delete your captured process data. To delete your account entirely — including your notes, your certificates and the anonymous account the companion may have created — email hello@inkk.site from the address on the account and we will do it.
 • Object / opt out: turn off research sharing at any time under Notes. After opt-out, no new data is uploaded to our servers.
 • Rectification: ask us to correct inaccurate account information.
 • Restriction: ask us to limit how we use your data while a question or objection is resolved.
@@ -115,7 +115,7 @@ hello@inkk.site
 `;
 
 export const TERMS_OF_SERVICE = `Inkk Terms of Service
-Effective 24 September 2026
+Effective 25 September 2026
 
 By creating an Inkk account, certifying a piece, or using the editor or the desktop companion, you agree to these terms.
 
@@ -132,7 +132,7 @@ You own the writing you create with Inkk. We store your notes only so that the e
 A certificate records that the keystroke rhythm behind a piece of text looked like a person typing, at the time it was certified, according to our scoring. It is evidence of process, not proof of authorship, originality or quality, and it says nothing about what the text means. We do not adjudicate disputes about who wrote what, and a certificate must not be presented as if it did. Codes are permanent: a certificate cannot be edited once issued, and certifying an edited version issues a new code. Do not misrepresent what a code shows, and do not present a code for text other than the text it was issued for.
 
 5. ACCEPTABLE USE
-You agree not to use Inkk for anything unlawful, and not to abuse the service. In particular, do not fabricate or replay keystroke data, attempt to reverse-engineer or game the Human Signal score, use automated tools against the ledger, the editor or the certification endpoint, or try to enumerate or scrape other people's certificates or data. Do not run the companion on a Mac where it would record another person's typing without their knowledge and consent.
+You agree not to use Inkk for anything unlawful, and not to abuse the service — in particular, not to fabricate or replay keystroke data, not to attempt to reverse-engineer or game the Human Signal score, not to use automated tools against the ledger, the editor or the certification endpoint, and not to try to enumerate or scrape other people's certificates or data. Do not run the companion on a Mac where it would record another person's typing without their knowledge and consent.
 
 6. THE DESKTOP COMPANION
 The companion needs the macOS Accessibility and Input Monitoring permissions to work, and records the rhythm of typing in every app except those you ignore, until you pause or quit it. You are responsible for deciding whether to install it and for what it is allowed to see on your Mac. It never records which letters you type; the Privacy Policy explains exactly what it does record.

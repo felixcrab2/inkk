@@ -1,0 +1,129 @@
+/* ─── Notes ───────────────────────────────────────────────────────────────
+   An index, not a dashboard. Two faces only: the writing serif for titles and
+   the heading, the UI sans for everything else. No cards, no counters, no
+   borders; hierarchy comes from size, tone and space. */
+
+#profile-container.nt { padding: 0 24px 60px; }
+.nt-inner { max-width: 620px; margin: 0 auto; padding-top: clamp(40px, 9vh, 96px); }
+
+/* ── heading ── */
+.nt-head { margin-bottom: 40px; }
+.nt-headline { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; }
+.nt-title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: var(--t-2xl);
+  line-height: 1;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+.nt-new {
+  background: none; border: none; padding: 6px 0;
+  font-family: var(--font-ui); font-size: var(--t-sm); font-weight: 500;
+  color: var(--ink-3); cursor: pointer;
+  transition: color 0.15s ease;
+}
+.nt-new:hover { color: var(--ink); }
+.nt-who {
+  display: inline-flex; align-items: center; gap: 10px;
+  margin-top: 18px; padding: 0;
+  background: none; border: none; cursor: pointer;
+  font-family: var(--font-ui); font-size: var(--t-sm); color: var(--ink-2);
+}
+.nt-who:hover .nt-who-name { color: var(--ink); }
+.nt-who-name { transition: color 0.15s ease; }
+
+/* ── the list ── */
+.nt-list { list-style: none; margin: 0; padding: 0; }
+.nt-row {
+  position: relative;
+  display: flex; align-items: baseline; justify-content: space-between; gap: 20px;
+  margin: 0 -14px;
+  padding: 14px 14px;
+  border-radius: 12px;
+  transition: background 0.15s ease;
+}
+.nt-row:hover, .nt-row:focus-within { background: rgba(62, 50, 36, 0.045); }
+.nt-open {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 0; background: none; border: none; text-align: left; cursor: pointer;
+}
+.nt-row-title {
+  font-family: var(--font-serif);
+  font-size: var(--t-lg);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nt-row.is-open .nt-row-title::before {
+  content: ""; display: inline-block; width: 5px; height: 5px; margin: 0 9px 3px 0;
+  border-radius: 50%; background: var(--ink-4); vertical-align: middle;
+}
+.nt-row-meta { font-family: var(--font-ui); font-size: var(--t-xs); color: var(--ink-3); }
+.nt-certified { color: var(--rubric); }
+
+/* Actions arrive on hover or keyboard focus, in the same quiet voice. */
+.nt-row-actions {
+  flex: 0 0 auto;
+  display: inline-flex; align-items: baseline; gap: 14px;
+  opacity: 0; transition: opacity 0.15s ease;
+}
+.nt-row:hover .nt-row-actions, .nt-row:focus-within .nt-row-actions, .nt-row-actions.is-confirm { opacity: 1; }
+.nt-act {
+  background: none; border: none; padding: 0;
+  font-family: var(--font-ui); font-size: var(--t-xs); font-weight: 500;
+  color: var(--ink-3); cursor: pointer; transition: color 0.15s ease;
+}
+.nt-act:hover { color: var(--ink); }
+.nt-act.is-danger:hover { color: var(--rubric); }
+.nt-confirm-q { font-family: var(--font-ui); font-size: var(--t-xs); color: var(--ink-2); }
+
+.nt-empty { margin: 0; font-family: var(--font-ui); font-size: var(--t-sm); color: var(--ink-3); }
+
+/* ── footer ── */
+.nt-foot { margin-top: 64px; display: flex; flex-direction: column; gap: 14px; }
+.nt-foot-line {
+  margin: 0;
+  font-family: var(--font-ui); font-size: var(--t-xs); line-height: 1.6;
+  color: var(--ink-3);
+}
+.nt-link {
+  background: none; border: none; padding: 0;
+  font: inherit; color: var(--ink-2); cursor: pointer; text-decoration: none;
+  transition: color 0.15s ease;
+}
+.nt-link:hover { color: var(--ink); }
+.nt-link.is-danger:hover { color: var(--rubric); }
+.nt-link:disabled { color: var(--ink-4); cursor: default; }
+.nt-legal { color: var(--ink-4); }
+.nt-legal .nt-link { color: var(--ink-4); }
+.nt-legal .nt-link:hover { color: var(--ink-2); }
+
+.nt-research { display: flex; flex-direction: column; gap: 8px; }
+.nt-switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; }
+.nt-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.nt-switch-track {
+  position: relative; width: 30px; height: 16px; border-radius: 999px;
+  background: rgba(62, 50, 36, 0.16); transition: background 0.2s ease; flex: 0 0 auto;
+}
+.nt-switch-thumb {
+  position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--paper); transition: transform 0.2s ease;
+}
+.nt-switch input:checked + .nt-switch-track { background: var(--ink); }
+.nt-switch input:checked + .nt-switch-track .nt-switch-thumb { transform: translateX(14px); }
+.nt-switch input:focus-visible + .nt-switch-track { outline: 2px solid rgba(158, 59, 40, 0.35); outline-offset: 2px; }
+.nt-switch-label { font-family: var(--font-ui); font-size: var(--t-xs); color: var(--ink-3); }
+
+@media (hover: none) {
+  .nt-row-actions { opacity: 1; }
+}
+@media (max-width: 600px) {
+  #profile-container.nt { padding: 0 20px 40px; }
+  .nt-inner { padding-top: 32px; }
+  .nt-row { flex-direction: column; align-items: flex-start; gap: 8px; margin: 0 -10px; padding: 12px 10px; }
+  .nt-row-title { white-space: normal; }
+}

@@ -1,18 +1,10 @@
 import { useState } from "react";
 
-const FORMATS = [
-  { v: "pdf",          l: "PDF" },
-  { v: "docx",         l: "Word" },
-  { v: "png-portrait", l: "Image" },
-  { v: "png-square",   l: "Square image" },
-];
-
-export function DownloadModal({ onConfirm, onClose, certifies }) {
-  const [format, setFormat]                   = useState("pdf");
-  const [justify, setJustify]                 = useState(false);
+export function DownloadModal({ onConfirm, onClose }) {
+  const [format,          setFormat]          = useState("pdf");
+  const [justify,         setJustify]         = useState(false);
   const [paragraphIndent, setParagraphIndent] = useState(false);
-  const [busy, setBusy]                       = useState(false);
-  const paged = format !== "docx";
+  const [busy,            setBusy]            = useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -23,29 +15,37 @@ export function DownloadModal({ onConfirm, onClose, certifies }) {
   };
 
   return (
-    <div className="modal-overlay" onClick={() => { if (!busy) onClose(); }}>
-      <form className="modal" onClick={e => e.stopPropagation()} onSubmit={submit}>
-        <div className="modal-head">
-          <h2>Download</h2>
-          <button type="button" className="modal-close" onClick={onClose} aria-label="Close">×</button>
-        </div>
-        <div className="seg" role="radiogroup" aria-label="Format">
-          {FORMATS.map(o => (
-            <button key={o.v} type="button" role="radio" aria-checked={format === o.v} className={format === o.v ? "is-on" : ""} onClick={() => setFormat(o.v)}>{o.l}</button>
-          ))}
-        </div>
-        {paged && (
-          <div className="checks">
-            <label className="check"><input type="checkbox" checked={justify} onChange={e => setJustify(e.target.checked)} /><span>Justify</span></label>
-            <label className="check"><input type="checkbox" checked={paragraphIndent} onChange={e => setParagraphIndent(e.target.checked)} /><span>Indent paragraphs</span></label>
+    <div id="auth-overlay">
+      <div id="auth-modal">
+        <button id="auth-close" onClick={onClose}>×</button>
+        <div id="auth-tabs"><button className="active" style={{ cursor: "default" }}>download</button></div>
+        <form onSubmit={submit}>
+          <div className="dl-section-label">Format</div>
+          <div className="dl-radio-row">
+            {[
+              { v: "pdf",          l: "PDF" },
+              { v: "docx",         l: "Word" },
+              { v: "png-square",   l: "PNG · square" },
+              { v: "png-portrait", l: "PNG · portrait" },
+            ].map(o => (
+              <label key={o.v} className={`dl-radio${format === o.v ? " active" : ""}`}>
+                <input type="radio" name="format" value={o.v} checked={format === o.v} onChange={() => setFormat(o.v)} />
+                <span>{o.l}</span>
+              </label>
+            ))}
           </div>
-        )}
-        <p className="modal-note">{certifies ? "The certificate code goes into the file." : "Sign in to put a certificate code in the file."}</p>
-        <div className="modal-actions">
-          <button type="button" className="btn" onClick={onClose} disabled={busy}>Cancel</button>
-          <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? "Preparing" : "Download"}</button>
-        </div>
-      </form>
+
+          {format !== "docx" && (<>
+            <div className="dl-section-label">Style</div>
+            <label className="dl-check"><input type="checkbox" checked={justify}         onChange={e => setJustify(e.target.checked)} /><span>Justify text</span></label>
+            <label className="dl-check"><input type="checkbox" checked={paragraphIndent} onChange={e => setParagraphIndent(e.target.checked)} /><span>Paragraph indent</span></label>
+          </>)}
+
+          <button id="auth-submit" type="submit" disabled={busy}>
+            {busy ? "preparing…" : `Download ${format === "pdf" ? "PDF" : format === "docx" ? "Word" : "PNG"}`}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

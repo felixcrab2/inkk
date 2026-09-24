@@ -1,220 +1,314 @@
 // Certify — the right-hand tab.
 //
-// Two halves. The top is the note you are writing: its code, its signal, and
-// whether its words are still the ones certified. The bottom is for readers:
-// a code, or a document dropped on the page, is looked up in the ledger and
-// the text is checked against the certificate, sentence by sentence, in this
-// browser. Nothing a reader pastes or drops leaves their machine; only the
-// code is looked up.
+// Two halves. The top is about the note you are writing: certify it, see its
+// code, notice when the text has drifted from what was certified. The bottom
+// is for readers: paste any inkk code and see what the ledger recorded. The
+// lookup is a security-definer RPC, so it works for logged-out readers checking
+// an exported PDF. Optionally a reader pastes the text they are holding and we
+// confirm its fingerprint matches — without inkk ever storing a copy.
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../supabase";
-import { parseVerifyCode, sha256hex, sealUrl } from "../verify/code";
+import { parseVerifyCode, sha256hex } from "../verify/code";
 import { compareText } from "../verify/sketch";
-import { readFile } from "../lib/filestamp";
-
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-function fmtDate(iso) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-}
 
 // The public certificate for a code: the /api/verify route, or the database
-// function behind it where the route isn't deployed yet.
+// function behind it where the route can't answer.
 async function fetchCert(code) {
   try {
     const res = await fetch(`/api/verify?code=${encodeURIComponent(code)}`);
     if ((res.headers.get("content-type") || "").includes("json")) {
       const out = await res.json();
-      if (res.ok && out.ok) return { cert: out.cert };
-      if (res.status === 404 && out.error === "not_found") return { cert: null };
+      if (res.ok && out.ok) return { row: out.cert };
+      if (res.status === 404 && out.error === "not_found") return { row: null };
     }
-  } catch { /* fall through */ }
+  } catch { /* fall through to the database function */ }
   if (!supabase) return { error: "offline" };
   const { data, error } = await supabase.rpc("verify_by_code", { p_code: code });
   if (error) return { error: "error" };
-  const row = Array.isArray(data) ? data[0] : data;
-  return { cert: row || null };
+  return { row: (Array.isArray(data) ? data[0] : data) || null };
 }
 
-function matchLine(m) {
-  if (!m) return null;
-  if (m.state === "match") return "The text matches the certificate.";
-  if (m.state === "partial") return `${Math.round((m.ratio || 0) * 100)}% of the certified sentences are here unchanged.`;
-  if (m.state === "differs") return "The text doesn't match the certificate.";
-  return "This certificate can't be compared with text.";
+function fmtDate(iso) {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+  } catch { return ""; }
 }
 
-function Certificate({ cert, text, onText, fileName }) {
-  const [match, setMatch] = useState(null);
+function Certificate({ cert }) {
+  const [sample, setSample]     = useState("");
+  const [match, setMatch]       = useState(null);   // null | "match" | "partial" | "differ" | "unavailable"
+  const [ratio, setRatio]       = useState(null);
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
-    if (!text || !text.trim()) { setMatch(null); return; }
+    const text = sample.trim();
+    if (!text) { setMatch(null); return; }
     let live = true;
-    const t = setTimeout(async () => {
-      try {
-        const m = await compareText({ contentHash: cert.content_hash, sketch: cert.text_sketch }, text, sha256hex);
-        if (live) setMatch(m);
-      } catch { if (live) setMatch({ state: "unknown" }); }
-    }, 250);
-    return () => { live = false; clearTimeout(t); };
-  }, [text, cert.content_hash, cert.text_sketch]);
+    setChecking(true);
+    // Whole text first (either fingerprint), then sentence by sentence when
+    // the certificate carries sentence fingerprints.
+    compareText({ contentHash: cert.content_hash, sketch: cert.text_sketch }, text, sha256hex).then(m => {
+      if (!live) return;
+      setChecking(false);
+      setRatio(m.ratio);
+      setMatch(m.state === "match" ? "match" : m.state === "partial" ? "partial" : m.state === "differs" ? "differ" : "unavailable");
+    }).catch(() => { if (live) { setChecking(false); setMatch("unavailable"); } });
+    return () => { live = false; };
+  }, [sample, cert.content_hash, cert.text_sketch]);
 
   const verified = !!cert.verified;
+
   return (
-    <section className="cert">
-      <dl className="facts">
-        <dt>Status</dt><dd className="strong">{verified ? "Verified" : "Recorded"}</dd>
-        {cert.score_tier && (<><dt>Signal</dt><dd>{cert.score_tier}{cert.human_score != null ? `, ${cert.human_score}` : ""}</dd></>)}
-        {cert.title && (<><dt>Title</dt><dd className="writer">{cert.title}</dd></>)}
-        {(cert.author_name || cert.author_username) && (<><dt>Author</dt><dd>{cert.author_name || `@${cert.author_username}`}</dd></>)}
-        <dt>Certified</dt><dd>{fmtDate(cert.issued_at)}</dd>
-        {cert.word_count ? (<><dt>Length</dt><dd>{cert.word_count.toLocaleString()} words</dd></>) : null}
-        <dt>Code</dt><dd className="mono">{cert.code}</dd>
-      </dl>
-      <p className="cert-about">
-        {verified
-          ? "inkk recorded a person writing this: the rhythm, pauses and corrections of someone typing."
-          : "inkk recorded this being written, though its writing signal stayed below the verified level."}
-      </p>
-      <div className="check-text">
-        <label className="label" htmlFor="check-text">{fileName ? `Text of ${fileName}` : "Check the text"}</label>
-        <textarea
-          id="check-text"
-          className="field"
-          placeholder="Paste the text you received"
-          value={text}
-          onChange={e => onText(e.target.value)}
-          rows={4}
-        />
-        {match && <p className={`check-result${match.state === "match" ? " strong" : ""}`}>{matchLine(match)}</p>}
+    <div className="verify-cert">
+      <div className={`verify-cert-mark ${verified ? "is-verified" : ""}`}>
+        <span className="verify-cert-status">
+          {verified ? "Human-verified" : "Recorded in inkk"}
+        </span>
       </div>
-    </section>
+      <p className="verify-cert-lead">
+        {verified
+          ? "inkk recorded a strong human writing process for this piece. The rhythm, pauses and revisions were those of a person typing by hand."
+          : "This piece was written with inkk, but its human signal didn’t reach the verified threshold."}
+      </p>
+
+      <dl className="verify-cert-fields">
+        {cert.title && (<><dt>Title</dt><dd>{cert.title}</dd></>)}
+        {cert.author_name && (<><dt>Author</dt><dd>{cert.author_name}{cert.author_username ? ` · @${cert.author_username}` : ""}</dd></>)}
+        <dt>Certified</dt><dd>{fmtDate(cert.issued_at)}</dd>
+        <dt>Human signal</dt>
+        <dd>
+          <span className="verify-cert-tier">{cert.score_tier || "—"}</span>
+          {cert.human_score != null && <span className="verify-cert-score">{cert.human_score}<span className="verify-cert-score-denom">/100</span></span>}
+        </dd>
+        {cert.word_count != null && (<><dt>Length</dt><dd>{cert.word_count.toLocaleString()} words</dd></>)}
+        <dt>Code</dt><dd className="verify-cert-code">{cert.code}</dd>
+      </dl>
+
+      <p className="verify-cert-private">
+        The certificate binds one exact text. Check it matches your copy below.
+      </p>
+
+      <details className="verify-match">
+        <summary>Have a copy of the text? Check it matches.</summary>
+        <p className="verify-match-hint">
+          Paste the body of text here. We compare it to the certified original. Nothing
+          you paste is ever stored or shared.
+        </p>
+        <textarea
+          className="verify-match-input"
+          placeholder="Paste the text…"
+          value={sample}
+          onChange={e => setSample(e.target.value)}
+          rows={5}
+        />
+        {checking && <p className="verify-match-result checking">checking…</p>}
+        {!checking && match === "match"  && <p className="verify-match-result ok">✓ This text matches the certified original.</p>}
+        {!checking && match === "partial" && <p className="verify-match-result no">Part of this text matches the certified original: {Math.round((ratio || 0) * 100)}% of its sentences are unchanged. It may have been edited.</p>}
+        {!checking && match === "differ" && <p className="verify-match-result no">This text differs from the certified original. It may have been edited.</p>}
+        {!checking && match === "unavailable" && <p className="verify-match-result no">Couldn’t compute a fingerprint in this browser.</p>}
+      </details>
+    </div>
   );
 }
 
-function NoteSection({ note, user, certifying, onCertify, onSignIn, onWrite, onToast }) {
-  const copy = (text, what) => navigator.clipboard?.writeText(text).then(() => onToast?.(`${what} copied`));
+// The active note's certification card. `note` is null when there is nothing
+// to certify (no words yet); otherwise { id, title, words, verifyCode,
+// verifiedTier, scoreTier, humanScore, stale }.
+function NoteCard({ note, user, certifying, onCertify, onSignIn, onWrite, onLookup, onToast }) {
+  const [copied, setCopied] = useState(false);
+  const copy = (code) => {
+    navigator.clipboard?.writeText(code).then(() => {
+      setCopied(true);
+      onToast?.("Code copied.");
+      setTimeout(() => setCopied(false), 1800);
+    });
+  };
+
   if (!note) {
     return (
-      <section className="note-cert">
-        <p className="page-empty">Nothing to certify yet. <button className="text-btn is-ink" onClick={onWrite}>Write something</button></p>
+      <section className="cert-note-card cert-note-empty">
+        <span className="cert-note-label">This note</span>
+        <p className="cert-note-text">Write something first, then come back here to certify it.</p>
+        <button className="cert-note-btn" onClick={onWrite}>Write →</button>
       </section>
     );
   }
-  const current = note.verifyCode && !note.stale;
+
+  const hasCode = !!note.verifyCode;
+  const current = hasCode && !note.stale;
+
   return (
-    <section className="note-cert">
-      <dl className="facts">
-        <dt>Note</dt><dd className="writer">{note.title || "Untitled"}</dd>
-        {current && (<><dt>Code</dt><dd className="code">{note.verifyCode}</dd></>)}
-        {current && (<><dt>Signal</dt><dd>{note.verifiedTier ? "Verified" : "Recorded"}{note.humanScore != null ? `, ${note.humanScore}` : ""}</dd></>)}
-        <dt>{current ? "Bound to" : "Length"}</dt><dd>{note.words.toLocaleString()} {note.words === 1 ? "word" : "words"}</dd>
-        {note.verifyCode && note.stale && (<><dt>Status</dt><dd>Changed since it was certified</dd></>)}
-      </dl>
-      <div className="actions">
-        {current ? (
-          <>
-            <button className="btn btn-primary" onClick={() => copy(note.verifyCode, "Code")}>Copy code</button>
-            <button className="btn" onClick={() => copy(`inkk. ${sealUrl(note.verifyCode).replace("https://", "")}`, "Seal")}>Copy seal</button>
-          </>
-        ) : user ? (
-          <button className="btn btn-primary" onClick={onCertify} disabled={certifying}>{certifying ? "Certifying" : note.verifyCode ? "Certify again" : "Certify"}</button>
-        ) : (
-          <button className="btn btn-primary" onClick={onSignIn}>Sign in to certify</button>
-        )}
+    <section className={`cert-note-card${current ? " is-certified" : ""}`}>
+      <div className="cert-note-head">
+        <span className="cert-note-label">This note</span>
+        <span className="cert-note-title">{note.title || "Untitled"}</span>
+        <span className="cert-note-meta">{note.words.toLocaleString()} {note.words === 1 ? "word" : "words"}</span>
       </div>
+
+      {current && (
+        <>
+          <div className="cert-note-status">
+            <span className={`cert-note-tier${note.verifiedTier ? " is-verified" : ""}`}>
+              {note.verifiedTier ? "Human-verified" : "Certified"}
+            </span>
+            {note.scoreTier && (
+              <span className="cert-note-score">
+                {note.scoreTier}{note.humanScore != null ? ` · ${note.humanScore}/100` : ""}
+              </span>
+            )}
+          </div>
+          <button className="cert-note-code" title="Copy code" onClick={() => copy(note.verifyCode)}>
+            {note.verifyCode}
+            <span className="cert-note-copied">{copied ? "copied" : "copy"}</span>
+          </button>
+          <p className="cert-note-text">
+            Paste the code wherever the piece goes. Anyone can check it here, and it stays private until you share it.
+          </p>
+          <div className="cert-note-actions">
+            <button className="cert-note-btn" onClick={() => onLookup(note.verifyCode)}>Check this code</button>
+            <button className="cert-note-btn cert-note-btn-ghost" onClick={onCertify} disabled={certifying}>
+              {certifying ? "Certifying…" : "Re-certify"}
+            </button>
+          </div>
+        </>
+      )}
+
+      {hasCode && note.stale && (
+        <>
+          <p className="cert-note-text">
+            The text has changed since it was certified. Certify again to bind the current words to a fresh code.
+          </p>
+          <div className="cert-note-actions">
+            <button className="cert-note-btn" onClick={onCertify} disabled={certifying}>
+              {certifying ? "Certifying…" : "Re-certify"}
+            </button>
+            <button className="cert-note-btn cert-note-btn-ghost" onClick={() => onLookup(note.verifyCode)}>Old code</button>
+          </div>
+        </>
+      )}
+
+      {!hasCode && (
+        <>
+          <p className="cert-note-text">
+            Not certified yet. A certificate records the rhythm of how this note was written and binds it to a code readers can check.
+          </p>
+          <div className="cert-note-actions">
+            {user ? (
+              <button className="cert-note-btn" onClick={onCertify} disabled={certifying}>
+                {certifying ? "Certifying…" : "Certify this note"}
+              </button>
+            ) : (
+              <>
+                <button className="cert-note-btn" onClick={onSignIn}>Sign in to certify</button>
+                <span className="cert-note-hint">Certificates live in inkk’s ledger, so this needs an account.</span>
+              </>
+            )}
+          </div>
+        </>
+      )}
     </section>
   );
 }
 
 export function CertifyView({ initialCode = "", onStatus, user, note, certifying, onCertify, onSignIn, onWrite, onToast }) {
   const [input, setInput]   = useState(initialCode);
-  const [status, setStatus] = useState("idle"); // idle | loading | found | notfound | invalid | nocode | offline | error
+  const [status, setStatus] = useState("idle"); // idle|loading|found|notfound|invalid|offline|error
   const [cert, setCert]     = useState(null);
-  const [text, setText]     = useState("");
-  const [fileName, setFileName] = useState(null);
-  const [dragging, setDragging] = useState(false);
-  const fileRef = useRef(null);
 
+  // Let the shell react to the view's state (the backdrop wraps the intro
+  // box in a ring until a certificate expands the page).
   useEffect(() => { onStatus?.(status); }, [status, onStatus]);
 
   const lookup = useCallback(async (raw) => {
     const code = parseVerifyCode(raw);
     if (!code) { setStatus("invalid"); setCert(null); return; }
     setStatus("loading"); setCert(null);
-    const r = await fetchCert(code);
-    if (r.error) { setStatus(r.error); return; }
-    if (!r.cert) { setStatus("notfound"); return; }
-    setCert(r.cert); setStatus("found");
+    const { row, error } = await fetchCert(code);
+    if (error) { setStatus(error); return; }
+    if (!row) { setStatus("notfound"); return; }
+    setCert(row); setStatus("found");
   }, []);
 
+  // Auto-lookup when arriving via a /v/<code> deep link (e.g. from a PDF).
   useEffect(() => {
     if (initialCode && parseVerifyCode(initialCode)) { setInput(initialCode); lookup(initialCode); }
   }, [initialCode, lookup]);
 
-  const takeFile = useCallback(async (file) => {
-    if (!file) return;
-    setFileName(file.name);
-    try {
-      const r = await readFile(file);
-      setText(r.text || "");
-      if (r.code) { setInput(r.code); lookup(r.code); }
-      else { setCert(null); setStatus("nocode"); }
-    } catch {
-      setCert(null); setStatus("nocode");
-    }
+  const lookupAndScroll = useCallback((code) => {
+    setInput(code);
+    lookup(code);
+    // Bring the certificate into view once it renders.
+    setTimeout(() => document.querySelector(".verify-cert")?.scrollIntoView({ behavior: "smooth", block: "start" }), 250);
   }, [lookup]);
 
-  const submit = (e) => { e.preventDefault(); setFileName(null); lookup(input); };
+  const submit = (e) => { e.preventDefault(); lookup(input); };
 
   return (
-    <div
-      id="verify-view"
-      className={`page${dragging ? " is-dropping" : ""}`}
-      onDragOver={e => { if (Array.from(e.dataTransfer?.types || []).includes("Files")) { e.preventDefault(); setDragging(true); } }}
-      onDragLeave={e => { if (e.currentTarget === e.target) setDragging(false); }}
-      onDrop={e => { e.preventDefault(); setDragging(false); takeFile(e.dataTransfer?.files?.[0]); }}
-    >
-      <div className="page-inner">
-        <header className="page-head"><h1>Certify</h1></header>
+    <div id="verify-view" className="certify-view">
+      <div id="verify-inner">
+        <div className="verify-masthead">
+          <span className="verify-eyebrow">Authenticity</span>
+          <h1 className="verify-title">Certify</h1>
+          <p className="verify-sub">
+            A certificate proves a piece was written by hand: the rhythm, pauses and
+            revisions of a person typing. inkk keeps only a fingerprint of the text, never the words.
+          </p>
+        </div>
 
+        {/* A reader arriving from a PDF or a shared code (/v/<code>) wants the
+            certificate, not a card about a note they never wrote: the lookup
+            leads and the writer's card waits below it. In-app, the note comes first. */}
         {!initialCode && (
-          <NoteSection note={note} user={user} certifying={certifying} onCertify={onCertify} onSignIn={onSignIn} onWrite={onWrite} onToast={onToast} />
+          <NoteCard
+            note={note}
+            user={user}
+            certifying={certifying}
+            onCertify={onCertify}
+            onSignIn={onSignIn}
+            onWrite={onWrite}
+            onLookup={lookupAndScroll}
+            onToast={onToast}
+          />
         )}
 
-        <section className="lookup">
-          <h2>Check a code</h2>
-          <form className="lookup-form" onSubmit={submit}>
-            <input
-              className="field"
-              placeholder="INKK-XXXX-XXXX-XXXX"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              spellCheck={false}
-              autoCapitalize="characters"
-              aria-label="Certificate code"
-            />
-            <button className="btn" type="submit" disabled={status === "loading"}>{status === "loading" ? "Checking" : "Check"}</button>
-          </form>
-          <p className="lookup-hint">
-            Or drop a document here. <button className="text-btn" onClick={() => fileRef.current?.click()}>Choose a file</button>
-            <input ref={fileRef} type="file" hidden accept=".docx,.pdf,.png,.txt,.md,.html,.htm" onChange={e => takeFile(e.target.files?.[0])} />
-          </p>
+        <div className="verify-section-label">Verify a code</div>
+        <form className="verify-form" onSubmit={submit}>
+          <input
+            className="verify-input"
+            placeholder="INKK-XXXX-XXXX-XXXX"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            spellCheck={false}
+            autoCapitalize="characters"
+            aria-label="Verification code"
+          />
+          <button className="verify-submit" type="submit" disabled={status === "loading"}>
+            {status === "loading" ? "…" : "Verify"}
+          </button>
+        </form>
 
-          {status === "invalid"  && <p className="msg">That isn't an inkk code. Codes look like INKK-7F3A-9K2D-XQ4M.</p>}
-          {status === "notfound" && <p className="msg">No certificate has that code.</p>}
-          {status === "nocode"   && <p className="msg">{fileName ? `${fileName} doesn't carry an inkk code.` : "No inkk code found."}</p>}
-          {status === "offline"  && <p className="msg">Checking needs a connection.</p>}
-          {status === "error"    && <p className="msg">The ledger didn't answer. Try again in a moment.</p>}
-        </section>
+        {status === "invalid" && <p className="verify-msg verify-msg-warn">That doesn’t look like an inkk code. It should read like <span className="mono">INKK-XXXX-XXXX-XXXX</span>.</p>}
+        {status === "notfound" && <p className="verify-msg verify-msg-warn">No certificate matches that code. Check for a typo.</p>}
+        {status === "offline" && <p className="verify-msg verify-msg-warn">Verification needs a connection to inkk.</p>}
+        {status === "error" && <p className="verify-msg verify-msg-warn">Something went wrong looking that up. Try again in a moment.</p>}
 
-        {status === "found" && cert && <Certificate cert={cert} text={text} onText={setText} fileName={fileName} />}
+        {status === "found" && cert && <Certificate cert={cert} />}
 
         {initialCode && note && (
-          <NoteSection note={note} user={user} certifying={certifying} onCertify={onCertify} onSignIn={onSignIn} onWrite={onWrite} onToast={onToast} />
+          <div className="cert-note-after">
+            <NoteCard
+              note={note}
+              user={user}
+              certifying={certifying}
+              onCertify={onCertify}
+              onSignIn={onSignIn}
+              onWrite={onWrite}
+              onLookup={lookupAndScroll}
+              onToast={onToast}
+            />
+          </div>
         )}
       </div>
     </div>
