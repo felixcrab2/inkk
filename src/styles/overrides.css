@@ -47,7 +47,7 @@ body { font-variant-numeric: lining-nums tabular-nums; }
    separating, so a divider inside it would be double furniture) */
 
 /* verify heading is interface, not authored writing — every width */
-.verify-title { font-family: var(--font-ui); font-weight: 600; letter-spacing: -0.02em; }
+.verify-title { font-family: var(--font-serif); font-weight: 400; letter-spacing: -0.01em; }
 .verify-sub { font-family: var(--font-ui); }
 
 /* status dots come onto the palette: gold = settled, rubric-adjacent = attention */
@@ -333,3 +333,13 @@ body { font-variant-numeric: lining-nums tabular-nums; }
     overflow-y: auto;
   }
 }
+
+/* ─── The editor's two corners ───────────────────────────────────────────
+   The notes drawer on the left and the folded tools on the right are the only
+   chrome on the writing page: bare glyphs, no rail, that come forward on hover. */
+#top-bar-left .icon-btn, #tools .tools-toggle {
+  border: none; background: none; padding: 0; width: 34px; height: 30px;
+  color: var(--ink-4);
+}
+#top-bar-left .icon-btn:hover, #tools .tools-toggle:hover { color: var(--ink); background: none; border: none; }
+#top-bar-left .icon-btn svg, #tools .tools-toggle svg { width: 18px; height: 18px; }

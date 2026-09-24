@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Render the menu-bar tray icons: the wordmark "inkk." in EB Garamond (the repo's
-own src/assets/EBGaramond-Regular.ttf) as macOS *template* images — black
+Render the menu-bar tray icons: the wordmark "inkk." in IM Fell English (the repo's
+own src/assets/IMFellEnglish-Regular.ttf) as macOS *template* images — black
 glyphs on transparency. macOS recolours template images to match the menu bar,
 so they show white on a dark bar and black on a light one, like native icons.
 
@@ -14,7 +14,7 @@ import os
 from PIL import Image, ImageDraw, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-FONT = os.path.normpath(os.path.join(HERE, "..", "..", "src", "assets", "EBGaramond-Regular.ttf"))
+FONT = os.path.normpath(os.path.join(HERE, "..", "..", "src", "assets", "IMFellEnglish-Regular.ttf"))
 TEXT = "inkk."
 H1 = 15        # 1x wordmark height (px); menu bar is ~22px — kept a touch small
 DOT = 4        # 1x diameter of the "live" dot

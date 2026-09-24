@@ -113,7 +113,7 @@ function loadImg(src) {
 }
 
 function font(sizePt, italic = false, bold = false) {
-  return `${italic ? "italic" : "normal"} ${bold ? "600" : "400"} ${sizePt * PX}px "Cormorant Garamond", "EB Garamond", Georgia, serif`;
+  return `${italic ? "italic" : "normal"} ${bold ? "600" : "400"} ${sizePt * PX}px "IM Fell English", Georgia, serif`;
 }
 
 // Width of `text` if drawn with per-character tracking (canvas has no native

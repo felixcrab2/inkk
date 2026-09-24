@@ -1,342 +1,221 @@
-// Notes — your writing, in one place.
+// Notes — an index of your writing.
 //
-// Every note lives on this device (localStorage) and, once you sign in, in your
-// account too so it follows you between devices. Signed-out writers see exactly
-// the same list; an account only adds sync, certification and the research
-// controls. This page replaced the old social profile: no followers, no
-// published list, no avatar upload — a default drop-cap initial is the picture.
+// One serif for the words, one sans for the furniture, and as little furniture
+// as possible: a heading, the list, and a quiet footer. Notes live on this
+// device; an account only adds sync, certification and the research controls.
 
 import { useEffect, useState } from "react";
 import { DropCapAvatar } from "../components/DropCapAvatar";
 import { PrivacyModal, TermsModal } from "../components/Legal";
 import { stripHtml, docTitle, wordCount } from "../lib/docs";
-import { formatDate, formatJoined, formatWritingTime } from "../lib/format";
 import { fetchMyContribution, upsertProfile, generateUniqueUsername } from "../lib/profile";
 import { flushNow as syncFlushNow } from "../telemetry/sync";
 import { countForUser as countLocalEvents } from "../telemetry/store";
 
+// "Today", "Yesterday", "12 March", "12 March 2025".
+function whenLabel(ms) {
+  const d = new Date(ms), now = new Date();
+  const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((day(now) - day(d)) / 86400000);
+  if (diff <= 0) return "Today";
+  if (diff === 1) return "Yesterday";
+  const opts = { day: "numeric", month: "long" };
+  if (d.getFullYear() !== now.getFullYear()) opts.year = "numeric";
+  return d.toLocaleDateString(undefined, opts);
+}
+
 export function NotesView({
-  user, profile, docs, activeId, streak, dropCapImages,
+  user, profile, docs, activeId, dropCapImages,
   onSignIn, onCreateAccount, onSignOut,
   onOpenDoc, onNewDoc, onDeleteDoc, onDownloadDoc, onCertifyDoc, onOpenVerify,
   researchOptIn, onToggleOptIn, onDownloadData, onDeleteData,
-  onChangePassword, onProfileUpdate, onToast,
+  onChangePassword, onProfileUpdate,
 }) {
-  const [optBusy, setOptBusy]         = useState(false);
-  const [delBusy, setDelBusy]         = useState(false);
-  const [confirmDel, setConfirmDel]   = useState(false);
-  const [showPrivacy, setShowPrivacy] = useState(false);
-  const [showTerms, setShowTerms]     = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-  const [copiedCode, setCopiedCode]   = useState(null);
+  const [confirmData, setConfirmData]   = useState(false);
+  const [optBusy, setOptBusy]           = useState(false);
+  const [dataBusy, setDataBusy]         = useState(false);
+  const [showPrivacy, setShowPrivacy]   = useState(false);
+  const [showTerms, setShowTerms]       = useState(false);
   const [contribution, setContribution] = useState(null);
   const [pendingLocal, setPendingLocal] = useState(0);
-  const [editing, setEditing]         = useState(false);
-  const [editUsername, setEditUsername] = useState("");
-  const [editDisplayName, setEditDisplayName] = useState("");
-  const [saving, setSaving]           = useState(false);
-  const [editError, setEditError]     = useState("");
+  const [editing, setEditing]           = useState(false);
+  const [editName, setEditName]         = useState("");
+  const [saving, setSaving]             = useState(false);
+  const [editError, setEditError]       = useState("");
 
-  const copyCode = (code) => {
-    navigator.clipboard?.writeText(code).then(() => {
-      setCopiedCode(code);
-      setTimeout(() => setCopiedCode(c => (c === code ? null : c)), 1800);
-    });
-  };
-
-  // Research contribution: the synced total plus what is still queued on this
-  // device, so recording is visible immediately and a stalled upload is
-  // obvious instead of looking like a frozen number.
+  // Research contribution: synced total plus what is still queued here, so a
+  // stalled upload is visible instead of looking like a frozen number.
   useEffect(() => {
     if (!user || !researchOptIn) { setContribution(null); setPendingLocal(0); return; }
     let alive = true;
     const refresh = async () => {
       try { syncFlushNow?.(); } catch {}
-      const [contrib, pending] = await Promise.all([
-        fetchMyContribution(user.id),
-        countLocalEvents(user.id),
-      ]);
+      const [contrib, pending] = await Promise.all([fetchMyContribution(user.id), countLocalEvents(user.id)]);
       if (!alive) return;
       if (contrib) setContribution(contrib);
       setPendingLocal(pending || 0);
     };
     refresh();
     const id = setInterval(refresh, 4000);
-    const onVis = () => { if (!document.hidden) refresh(); };
-    document.addEventListener("visibilitychange", onVis);
-    window.addEventListener("focus", refresh);
-    return () => {
-      alive = false;
-      clearInterval(id);
-      document.removeEventListener("visibilitychange", onVis);
-      window.removeEventListener("focus", refresh);
-    };
+    return () => { alive = false; clearInterval(id); };
   }, [user, researchOptIn]);
 
   const notes = (docs || [])
     .filter(d => stripHtml(d.content).trim().length > 0 || stripHtml(d.title || "").trim().length > 0)
     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-  const totalWords = notes.reduce((sum, d) => sum + wordCount(d.content), 0);
-  const certified  = notes.filter(d => d.verifyCode).length;
 
-  const avatarLetter = (profile?.username?.[0] || user?.email?.[0] || "i");
-  const heading = user
-    ? (profile?.display_name || (profile?.username ? `@${profile.username}` : user.email))
-    : "Your notes";
+  const name = profile?.display_name || profile?.username || user?.email?.split("@")[0] || "";
+  const initial = (profile?.username?.[0] || user?.email?.[0] || "i");
 
-  const startEdit = () => {
-    setEditUsername(profile?.username || "");
-    setEditDisplayName(profile?.display_name || "");
-    setEditError("");
-    setEditing(true);
-  };
-
-  // Only the display name is editable here: it is the byline on downloaded
-  // pages and the author name on certificates. The handle stays as it was
-  // set at sign-up (it is part of every certificate already issued).
+  const startEdit = () => { setEditName(profile?.display_name || ""); setEditError(""); setEditing(true); };
   const saveEdit = async () => {
-    const newDisplayName = editDisplayName.trim();
-    setSaving(true);
-    setEditError("");
+    const newName = editName.trim();
+    setSaving(true); setEditError("");
     const handle = profile?.username || await generateUniqueUsername(user.email?.split("@")[0] || "writer");
-    const err = await upsertProfile(user.id, handle, newDisplayName || null);
+    const err = await upsertProfile(user.id, handle, newName || null);
     setSaving(false);
     if (err) { setEditError(err); return; }
-    onProfileUpdate?.({ ...profile, username: handle, display_name: newDisplayName || null });
+    onProfileUpdate?.({ ...profile, username: handle, display_name: newName || null });
     setEditing(false);
   };
 
-  return (
-    <div id="profile-container" className="notes-view">
-      <header id="profile-header">
-        <div id="profile-head-row">
-          <div id="profile-avatar-wrap">
-            <DropCapAvatar letter={avatarLetter} dropCapImages={dropCapImages} size={64} />
-          </div>
-          <div id="profile-identity">
-            <h1 id="profile-username">{heading}</h1>
-            {user && profile?.display_name && profile?.username && (
-              <div id="profile-displayname">@{profile.username}</div>
-            )}
-            {user
-              ? (user.created_at && <div id="profile-joined">Member since {formatJoined(user.created_at)}</div>)
-              : <div id="profile-joined">Kept on this device</div>}
-          </div>
-          {user && <button className="profile-edit-btn" onClick={startEdit}>Edit name</button>}
-        </div>
+  const contributed = (Number(contribution?.event_count) || 0) + pendingLocal;
 
-        <div id="profile-stats">
-          <div className="stat-fig">
-            <span className="stat-fig-num">{notes.length}</span>
-            <span className="stat-fig-label">{notes.length === 1 ? "Note" : "Notes"}</span>
+  return (
+    <div id="profile-container" className="nt">
+      <div className="nt-inner">
+        <header className="nt-head">
+          <div className="nt-headline">
+            <h1 className="nt-title">Notes</h1>
+            <button className="nt-new" onClick={onNewDoc}>New note</button>
           </div>
-          <div className="stat-fig">
-            <span className="stat-fig-num">{totalWords.toLocaleString()}</span>
-            <span className="stat-fig-label">Words</span>
-          </div>
-          {certified > 0 && (
-            <div className="stat-fig">
-              <span className="stat-fig-num">{certified}</span>
-              <span className="stat-fig-label">Certified</span>
-            </div>
+          {user && (
+            <button className="nt-who" onClick={startEdit} title="Change your name">
+              <DropCapAvatar letter={initial} dropCapImages={dropCapImages} size={30} />
+              <span className="nt-who-name">{name}</span>
+            </button>
           )}
-          {streak > 0 && (
-            <div className="stat-fig">
-              <span className="stat-fig-num">{streak}</span>
-              <span className="stat-fig-label">Day streak</span>
-            </div>
+        </header>
+
+        {notes.length === 0 ? (
+          <p className="nt-empty">Nothing here yet. <button className="nt-link" onClick={onNewDoc}>Start writing</button></p>
+        ) : (
+          <ol className="nt-list">
+            {notes.map((d) => {
+              const title = stripHtml(d.title || "") || docTitle(d.content);
+              const wc = wordCount(d.content);
+              const confirming = confirmDeleteId === d.id;
+              return (
+                <li key={d.id} className={`nt-row${d.id === activeId ? " is-open" : ""}`}>
+                  <button className="nt-open" onClick={() => onOpenDoc(d.id)}>
+                    <span className="nt-row-title">{title || "Untitled"}</span>
+                    <span className="nt-row-meta">
+                      {whenLabel(d.updatedAt)} · {wc.toLocaleString()} {wc === 1 ? "word" : "words"}
+                      {d.verifyCode && <> · <span className="nt-certified">certified</span></>}
+                    </span>
+                  </button>
+                  {!confirming ? (
+                    <span className="nt-row-actions">
+                      {d.verifyCode
+                        ? <button className="nt-act" onClick={() => onOpenVerify?.(d.verifyCode)}>Code</button>
+                        : (wc > 0 && <button className="nt-act" onClick={() => onCertifyDoc(d.id)}>Certify</button>)}
+                      {wc > 0 && <button className="nt-act" onClick={() => onDownloadDoc(d.id)}>Download</button>}
+                      <button className="nt-act" onClick={() => setConfirmDeleteId(d.id)}>Delete</button>
+                    </span>
+                  ) : (
+                    <span className="nt-row-actions is-confirm">
+                      <span className="nt-confirm-q">Delete this note?</span>
+                      <button className="nt-act" onClick={() => setConfirmDeleteId(null)}>Keep</button>
+                      <button className="nt-act is-danger" onClick={() => { onDeleteDoc(d.id); setConfirmDeleteId(null); }}>Delete</button>
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        )}
+
+        <footer className="nt-foot">
+          {!user ? (
+            <p className="nt-foot-line">
+              Notes stay on this device. <button className="nt-link" onClick={onSignIn}>Sign in</button> to keep them across devices and to certify them,
+              or <button className="nt-link" onClick={onCreateAccount || onSignIn}>create an account</button>.
+            </p>
+          ) : (
+            <>
+              <div className="nt-research">
+                <label className="nt-switch">
+                  <input
+                    type="checkbox"
+                    checked={!!researchOptIn}
+                    disabled={optBusy}
+                    onChange={async (e) => { setOptBusy(true); await onToggleOptIn(e.target.checked); setOptBusy(false); }}
+                  />
+                  <span className="nt-switch-track" aria-hidden="true"><span className="nt-switch-thumb" /></span>
+                  <span className="nt-switch-label">
+                    {researchOptIn ? "Sharing your writing rhythm with the study" : "Not sharing your writing rhythm with the study"}
+                  </span>
+                </label>
+                {researchOptIn && contributed > 0 && (
+                  <p className="nt-foot-line nt-research-count">
+                    {contributed.toLocaleString()} events contributed{pendingLocal > 0 ? ", uploading" : ""}.
+                    {" "}<button className="nt-link" onClick={onDownloadData}>Download my data</button>
+                    {" · "}
+                    {!confirmData
+                      ? <button className="nt-link" onClick={() => setConfirmData(true)}>Delete my data</button>
+                      : <>
+                          <span>Delete everything captured?</span>{" "}
+                          <button className="nt-link" onClick={() => setConfirmData(false)}>Keep</button>{" · "}
+                          <button className="nt-link is-danger" disabled={dataBusy} onClick={async () => { setDataBusy(true); await onDeleteData(); setDataBusy(false); setConfirmData(false); }}>
+                            {dataBusy ? "Deleting…" : "Delete"}
+                          </button>
+                        </>}
+                  </p>
+                )}
+              </div>
+              <p className="nt-foot-line nt-account">
+                <button className="nt-link" onClick={onChangePassword}>Change password</button>
+                {" · "}
+                <button className="nt-link" onClick={onSignOut}>Sign out</button>
+              </p>
+            </>
           )}
-        </div>
-      </header>
+          <p className="nt-foot-line nt-legal">
+            <button className="nt-link" onClick={() => setShowPrivacy(true)}>Privacy</button>
+            {" · "}
+            <button className="nt-link" onClick={() => setShowTerms(true)}>Terms</button>
+            {" · "}
+            <a className="nt-link" href="mailto:hello@inkk.site?subject=Hello%20inkk">hello@inkk.site</a>
+          </p>
+        </footer>
+      </div>
 
       {editing && (
-        <div className="pe-overlay" onClick={() => { if (!saving) { setEditing(false); setEditError(""); } }}>
+        <div className="pe-overlay" onClick={() => { if (!saving) setEditing(false); }}>
           <div className="pe-modal" onClick={e => e.stopPropagation()}>
             <h2 className="pe-title">Your name</h2>
-            <p className="pe-body">It appears on your certificates and as the byline of downloaded pages.</p>
+            <p className="pe-body">The byline on downloaded pages and the author on certificates.</p>
             <label className="pe-field">
-              <span className="pe-label">Name</span>
               <input
                 className="pe-input"
                 type="text"
-                value={editDisplayName}
-                onChange={e => setEditDisplayName(e.target.value)}
+                value={editName}
+                onChange={e => setEditName(e.target.value)}
                 placeholder="How you'd like to be credited"
                 maxLength={50}
                 autoFocus
               />
             </label>
-            {editUsername && <p className="pe-body">Your handle stays @{editUsername}.</p>}
+            {profile?.username && <p className="pe-body">Your handle stays @{profile.username}.</p>}
             {editError && <p className="pe-error">{editError}</p>}
             <div className="pe-actions">
-              <button className="pe-btn" onClick={() => { setEditing(false); setEditError(""); }} disabled={saving}>Cancel</button>
+              <button className="pe-btn" onClick={() => setEditing(false)} disabled={saving}>Cancel</button>
               <button className="pe-btn pe-btn-primary" onClick={saveEdit} disabled={saving}>{saving ? "Saving…" : "Save"}</button>
             </div>
           </div>
         </div>
       )}
-
-      {!user && (
-        <div className="notes-signin-card">
-          <p className="notes-signin-text">
-            Notes stay on this device. Sign in to keep them across devices and to certify them.
-          </p>
-          <div className="notes-signin-actions">
-            <button className="profile-cta" onClick={onSignIn}>Sign in</button>
-            <button className="profile-cta-ghost" onClick={onCreateAccount || onSignIn}>Create account</button>
-          </div>
-        </div>
-      )}
-
-      <section className="profile-section">
-        <div className="profile-section-head">
-          <h2 className="profile-section-label">Notes<span className="section-count">{notes.length}</span></h2>
-          <button className="section-action" onClick={onNewDoc}>New note</button>
-        </div>
-        <p className="profile-section-sub">Saved as you type. Only you can see them.</p>
-
-        <div className="profile-list">
-          {notes.length === 0 && (
-            <p className="notes-empty">Nothing here yet. <button className="notes-empty-link" onClick={onNewDoc}>Start writing →</button></p>
-          )}
-          {notes.map((d, idx) => {
-            const title = stripHtml(d.title || "") || docTitle(d.content);
-            const wc = wordCount(d.content);
-            const confirming = confirmDeleteId === d.id;
-            const isActive = d.id === activeId;
-            return (
-              <article
-                key={d.id}
-                className={`profile-article-card${isActive ? " is-active" : ""}`}
-                style={{ "--card-index": idx }}
-                onClick={() => !confirming && onOpenDoc(d.id)}
-              >
-                <div className="pac-main">
-                  <span className="pac-title">{title || "Untitled"}</span>
-                  <span className="pac-meta">
-                    {wc} {wc === 1 ? "word" : "words"} · {formatDate(new Date(d.updatedAt).toISOString())}
-                    {d.writingTimeSecs > 60 && ` · ${formatWritingTime(d.writingTimeSecs)} writing`}
-                  </span>
-                  {d.verifyCode && (
-                    <div className="pac-code" onClick={e => e.stopPropagation()}>
-                      <span className="pac-code-mark" aria-hidden="true">◇</span>
-                      <button className="pac-code-val" title="Copy verification code" onClick={() => copyCode(d.verifyCode)}>
-                        {d.verifyCode}
-                        <span className="pac-code-copied">{copiedCode === d.verifyCode ? "copied" : "copy"}</span>
-                      </button>
-                      <button className="pac-code-link" onClick={() => onOpenVerify?.(d.verifyCode)}>Verify →</button>
-                    </div>
-                  )}
-                </div>
-                {!confirming ? (
-                  <div className="pac-actions" onClick={e => e.stopPropagation()}>
-                    {!d.verifyCode && wc > 0 && (
-                      <button className="pac-btn" onClick={() => onCertifyDoc(d.id)}>Certify</button>
-                    )}
-                    {wc > 0 && (
-                      <button className="pac-btn" onClick={() => onDownloadDoc(d.id)}>Download</button>
-                    )}
-                    <button className="pac-btn pac-btn-danger" onClick={() => setConfirmDeleteId(d.id)}>Delete</button>
-                  </div>
-                ) : (
-                  <div className="pac-confirm" onClick={e => e.stopPropagation()}>
-                    <button className="pac-btn" onClick={() => setConfirmDeleteId(null)}>Cancel</button>
-                    <button className="pac-btn pac-btn-danger" onClick={() => { onDeleteDoc(d.id); setConfirmDeleteId(null); }}>Delete</button>
-                  </div>
-                )}
-              </article>
-            );
-          })}
-        </div>
-      </section>
-
-      {user && (
-        <section id="research-section">
-          <div className="profile-section-head">
-            <h2 className="profile-section-label">Research</h2>
-          </div>
-          <p id="research-blurb">
-            When you write in inkk, the rhythm of your typing (pauses, revisions, bursts) is captured as part of a study into what distinguishes human writing from machine-generated text. You can turn this off at any time.
-          </p>
-
-          {researchOptIn && ((Number(contribution?.event_count) || 0) + pendingLocal) > 0 && (() => {
-            const synced = Number(contribution?.event_count) || 0;
-            const total = synced + pendingLocal;
-            return (
-              <div id="contribution-card">
-                <div id="contribution-num">{total.toLocaleString()}</div>
-                <div id="contribution-label">events contributed to the inkk writing study</div>
-                <div id="contribution-status" className={pendingLocal > 0 ? "syncing" : "synced"}>
-                  {pendingLocal > 0
-                    ? <><span className="research-pulse" aria-hidden="true" />{pendingLocal.toLocaleString()} events studied, uploading…</>
-                    : "all events uploaded"}
-                </div>
-                {contribution?.first_t && (
-                  <div id="contribution-since">since {formatDate(new Date(Number(contribution.first_t)).toISOString())}</div>
-                )}
-              </div>
-            );
-          })()}
-
-          <label className="research-toggle">
-            <input
-              type="checkbox"
-              checked={!!researchOptIn}
-              disabled={optBusy}
-              onChange={async (e) => {
-                setOptBusy(true);
-                await onToggleOptIn(e.target.checked);
-                setOptBusy(false);
-              }}
-            />
-            <span className="research-toggle-track" aria-hidden="true"><span className="research-toggle-thumb" /></span>
-            <span className="research-toggle-label">{researchOptIn ? "Sharing on" : "Sharing off"}</span>
-          </label>
-
-          {researchOptIn && (
-            <div id="research-controls">
-              <button className="text-btn" onClick={onDownloadData}>Download my data</button>
-              {!confirmDel ? (
-                <button className="text-btn text-btn-danger" onClick={() => setConfirmDel(true)}>Delete my data</button>
-              ) : (
-                <div className="research-confirm">
-                  <span>Delete all your captured writing-process data?</span>
-                  <button className="text-btn" onClick={() => setConfirmDel(false)}>Cancel</button>
-                  <button
-                    className="text-btn text-btn-danger"
-                    disabled={delBusy}
-                    onClick={async () => { setDelBusy(true); await onDeleteData(); setDelBusy(false); setConfirmDel(false); }}
-                  >{delBusy ? "Deleting…" : "Yes, delete"}</button>
-                </div>
-              )}
-            </div>
-          )}
-
-          <div id="research-legal-links">
-            <button type="button" className="tos-link" onClick={() => setShowPrivacy(true)}>Privacy Policy</button>
-            <span className="research-legal-dot">·</span>
-            <button type="button" className="tos-link" onClick={() => setShowTerms(true)}>Terms</button>
-          </div>
-        </section>
-      )}
-
-      <div id="account-footer">
-        {user && (<>
-          <button className="account-link" onClick={onChangePassword}>Change password</button>
-          <span className="account-dot">·</span>
-        </>)}
-        <a className="account-link" href="mailto:hello@inkk.site?subject=Hello%20inkk">Contact</a>
-        {!user && (<>
-          <span className="account-dot">·</span>
-          <button className="account-link" onClick={() => setShowPrivacy(true)}>Privacy</button>
-          <span className="account-dot">·</span>
-          <button className="account-link" onClick={() => setShowTerms(true)}>Terms</button>
-        </>)}
-        {user && (<>
-          <span className="account-dot">·</span>
-          <button className="account-link account-signout" onClick={onSignOut}>Sign out</button>
-        </>)}
-      </div>
 
       {showPrivacy && <PrivacyModal onClose={() => setShowPrivacy(false)} />}
       {showTerms   && <TermsModal   onClose={() => setShowTerms(false)} />}

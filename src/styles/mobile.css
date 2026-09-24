@@ -37,7 +37,7 @@
     text-align: left;
     text-wrap: initial;
     font-size: var(--t-xl);
-    font-weight: 600;
+    font-weight: 400;          /* Fell has one weight; no faux bold */
     margin-bottom: 10px;
     padding: 0;
   }
@@ -299,8 +299,8 @@
   /* ── scale with real contrast ── */
   
   
-  .verify-title     { font-size: var(--t-3xl) !important; font-weight: 600 !important;
-                      letter-spacing: -0.02em !important; }
+  .verify-title     { font-size: var(--t-3xl) !important; font-weight: 400 !important;
+                      letter-spacing: -0.01em !important; }
   
 
   /* ── Dürer, doing a job ──────────────────────────────────────────────────

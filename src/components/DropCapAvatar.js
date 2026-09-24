@@ -31,7 +31,7 @@ export function DropCapAvatar({ letter, avatarData, dropCapImages, size = 36 }) 
   }
   return (
     <div style={{ ...circleStyle, background: "var(--text)", color: "var(--bg)",
-      fontFamily: '"Cormorant Garamond", serif', fontSize: size * 0.44 }}>
+      fontFamily: '"IM Fell English", serif', fontSize: size * 0.44 }}>
       {(letter || "?").toUpperCase()}
     </div>
   );

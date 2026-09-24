@@ -1,13 +1,9 @@
 import "./styles/index.css";
-import "@fontsource/eb-garamond/400.css";
-import "@fontsource/eb-garamond/500.css";
-import "@fontsource/cormorant-garamond/400.css";
-import "@fontsource/cormorant-garamond/500.css";
-import "@fontsource/cormorant-garamond/600.css";
-import "@fontsource/cormorant-garamond/700.css";
+import "@fontsource/im-fell-english/400.css";
+import "@fontsource/im-fell-english/400-italic.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { Menu, Check, Download, Maximize2, Minimize2, Plus, Trash2, Type, MoreHorizontal, Eye, EyeOff } from "lucide-react";
+import { Menu, Check, Download, Maximize2, Minimize2, Plus, Trash2, Type, MoreHorizontal, X, Eye, EyeOff } from "lucide-react";
 import { PenNib as PPen, Notebook as PNotes, SealCheck as PSeal } from "@phosphor-icons/react";
 import { jsPDF } from "jspdf";
 import { supabase } from "./supabase";
@@ -58,6 +54,7 @@ export default function App() {
   const [legalPage, setLegalPage]     = useState(() => pathToLegal(window.location.pathname));
   const viewRef = useRef(pathToView(window.location.pathname));
   useEffect(() => { viewRef.current = view; }, [view]);
+  useEffect(() => { if (view !== "editor") setToolsOpen(false); }, [view]);
   const explicitSignOutRef = useRef(false);   // only a deliberate Sign out wipes local notes
   const inAppDepthRef = useRef(0);            // history entries this app pushed; Escape only goes back over those
   const [certMenuOpen, setCertMenuOpen] = useState(false);
@@ -68,6 +65,7 @@ export default function App() {
     window.location.pathname.startsWith("/v/") ? window.location.pathname.slice(3) : "");
   const [font, setFont]               = useState(() => localStorage.getItem("inkk_font") || "garamond");
   const [titleCapsOn, setTitleCapsOn] = useState(() => localStorage.getItem("inkk_title_caps") !== "0");
+  const [toolsOpen, setToolsOpen]     = useState(false);   // the editor's tools row, folded away until asked for
   const [showLanding, setShowLanding] = useState(() =>
     !localStorage.getItem("inkk_visited") ||
     !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()));
@@ -1345,6 +1343,7 @@ export default function App() {
         if (authOpen) return;       // auth modal closes only via its × button
         if (focusMode) { exitFocusMode(); return; }
         if (certMenuOpen) { setCertMenuOpen(false); return; }
+        if (toolsOpen) { setToolsOpen(false); return; }
         if (downloadModalOpen) { setDownloadModalOpen(false); return; }
         setPanelOpen(false); setHsModalOpen(false); setHsScoreOpen(false);
         if (view !== "editor") {
@@ -1357,7 +1356,7 @@ export default function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [openDownloadModal, view, focusMode, certMenuOpen, toggleFocusMode, exitFocusMode, downloadModalOpen, authOpen, onInput, onTitleInput, navigate]);
+  }, [openDownloadModal, view, focusMode, certMenuOpen, toolsOpen, toggleFocusMode, exitFocusMode, downloadModalOpen, authOpen, onInput, onTitleInput, navigate]);
 
   // ─ mount ────────────────────────────────────────────────────────────────────
 
@@ -1485,7 +1484,6 @@ export default function App() {
   const menuClass = menuVisible ? "menu-visible" : "menu-hidden";
 
   const sortedDocs   = [...docs].sort((a, b) => b.updatedAt - a.updatedAt);
-  const noteCount    = docs.filter(d => stripHtml(d.content).trim() || stripHtml(d.title || "").trim()).length;
   const hasContent   = words > 0;
   const activeDoc      = docs.find(d => d.id === activeId);
   const activeCert     = activeDoc?.verifyCode || null;
@@ -1562,14 +1560,12 @@ export default function App() {
         <div id="top-bar-left">
           {isEditor && (
             <button
-              className="icon-btn icon-btn-labelled"
+              className="icon-btn"
               onClick={() => setPanelOpen(v => !v)}
               title="Open notes"
               aria-label="Open notes"
             >
               <Menu size={18} />
-              <span className="icon-btn-label">Notes</span>
-              {docs.length > 1 && <span className="icon-btn-count">{docs.length}</span>}
             </button>
           )}
         </div>
@@ -1577,6 +1573,12 @@ export default function App() {
           <span id="brand" onClick={() => navigate("editor")} style={{ cursor: "pointer" }} role="button" tabIndex={0}>inkk.</span>
         </div>
         <div id="top-bar-right">
+          {/* The tools live behind one quiet control. A page that is just paper and
+              a sentence shouldn't carry a toolbar; open it when you want it. */}
+          {isEditor && (
+            <div id="tools" className={`${menuClass}${toolsOpen ? " is-open" : ""}`}>
+              {toolsOpen && (
+                <div id="tools-row">
           {isEditor && supabase && hasContent && (
             <div id="cert-menu-wrap">
               <button
@@ -1668,6 +1670,19 @@ export default function App() {
               {focusMode ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
             </button>
           )}
+                </div>
+              )}
+              <button
+                className="icon-btn tools-toggle"
+                onClick={() => setToolsOpen(v => !v)}
+                aria-expanded={toolsOpen}
+                aria-label={toolsOpen ? "Hide tools" : "Tools"}
+                title={toolsOpen ? "Hide tools" : "Certify, preview, download…"}
+              >
+                {toolsOpen ? <X size={15} /> : <MoreHorizontal size={16} />}
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
@@ -1735,44 +1750,25 @@ export default function App() {
             const doc = docs.find(d => d.id === activeId);
             const wtSecs = doc?.writingTimeSecs || 0;
             const saving = saveStatus === "saving";
-            const statusText = saving
-              ? (user && online ? "saving…" : "saving locally…")
-              : (!user
-                ? "saved on this device"
-                : (online ? "saved" : "offline, saved locally, will sync"));
+            const statusText = saving ? "saving…" : (user && !online ? "offline · saved here" : "saved");
+            const sf = doc?.scoreFeatures;
+            const hasScore = doc?.humanScore != null && doc?.scoreTier && (sf?.confidence || 0) > 0.08;
+            const tierList = ["Faint", "Developing", "Strong", "Distinct"];
+            const filled = hasScore ? tierList.indexOf(doc.scoreTier) + 1 : 0;
+            void wtSecs;
             return (
               <div className="writing-stats">
                 <span className="ws-stat">{words.toLocaleString()} {words === 1 ? "word" : "words"}</span>
-                {wtSecs >= 30 && (<>
+                {hasScore && (<>
                   <span className="ws-sep">·</span>
-                  <span className="ws-stat">{formatWritingTime(wtSecs)} writing</span>
+                  <button className="ws-process-btn" onClick={() => setHsScoreOpen(true)} title={`${doc.scoreTier} human signal — view the writing process`} aria-label={`${doc.scoreTier} human signal`}>
+                    {tierList.map((_, i) => (
+                      <span key={i} className={`hs-dot-xs ${i < filled ? "on" : "off"}`} />
+                    ))}
+                  </button>
                 </>)}
-                {liveStats.events > 0 && researchOptIn && user && (<>
-                  <span className="ws-sep">·</span>
-                  <span className="ws-stat">{liveStats.events.toLocaleString()} events</span>
-                </>)}
-                {(() => {
-                  const sf = doc?.scoreFeatures;
-                  const hasScore = doc?.humanScore != null && doc?.scoreTier && (sf?.confidence || 0) > 0.08;
-                  if (!hasScore) return null;
-                  const tierList = ["Faint","Developing","Strong","Distinct"];
-                  const filled = tierList.indexOf(doc.scoreTier) + 1;
-                  return (<>
-                    <span className="ws-sep">·</span>
-                    <button className="ws-stat ws-process-btn" onClick={() => setHsScoreOpen(true)} title="View writing process signal">
-                      {tierList.map((_, i) => (
-                        <span key={i} className={`hs-dot-xs ${i < filled ? "on" : "off"}`} />
-                      ))}
-                      <span style={{ marginLeft: 5 }}>{doc.scoreTier}</span>
-                      <span className="ws-process-expand">↗</span>
-                    </button>
-                  </>);
-                })()}
                 <span className="ws-sep">·</span>
-                <span className={`ws-status ${saving ? "saving" : (online ? "ok" : "off")}`}>
-                  <span className="hs-status-dot" aria-hidden="true" />
-                  {statusText}
-                </span>
+                <span className={`ws-status ${saving ? "saving" : (online ? "ok" : "off")}`}>{statusText}</span>
               </div>
             );
           })()}
@@ -1978,7 +1974,6 @@ export default function App() {
         <button className={`nav-tab ${view === "notes" ? "active" : ""}`} {...tabTouch(() => navigate("notes"))}>
           <PNotes size={19} weight="light" />
           <span className="nav-label">Notes</span>
-          {noteCount > 1 && <span className="nav-count">{noteCount}</span>}
         </button>
         <button className={`nav-tab ${view === "certify" ? "active" : ""}${activeCert && !certStale ? " has-cert" : ""}`} {...tabTouch(() => navigate("certify"))}>
           <PSeal size={19} weight="light" />

@@ -308,5 +308,5 @@
 .ws-process-btn:hover { color: var(--text); background: rgba(0,0,0,0.05); }
 .ws-process-expand { font-size: var(--t-xs); opacity: 0.45; margin-left: 2px; }
 .ws-process-btn:hover .ws-process-expand { opacity: 1; }
-.hs-dot-xs { width: 4px; height: 4px; border-radius: 50%; background: #dcdcdc; display: inline-block; }
-.hs-dot-xs.on { background: #2a2a2a; }
+.hs-dot-xs { width: 4px; height: 4px; border-radius: 50%; background: rgba(62, 50, 36, 0.16); display: inline-block; }
+.hs-dot-xs.on { background: var(--ink-3); }

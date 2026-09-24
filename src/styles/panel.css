@@ -142,15 +142,11 @@
   flex-wrap: nowrap;
   white-space: nowrap;
   justify-content: center;
-  gap: 7px;
-  padding: 6px 14px;
-  background: rgba(249, 249, 249, 0.78);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  border-radius: 99px;
+  gap: 8px;
+  padding: 4px 10px;
   font-size: var(--t-xs);
-  letter-spacing: 0.03em;
-  color: var(--muted);
+  letter-spacing: 0.01em;
+  color: var(--ink-4);
 }
 /* On phones, shrink the line so the whole thing stays on one row. */
 @media (max-width: 600px) {
@@ -163,7 +159,7 @@
   }
   .writing-stats .ws-process-btn { padding: 1px 3px; }
 }
-.ws-stat       { color: var(--text); }
+.ws-stat       { color: var(--ink-3); }
 
 .ws-sep        { color: var(--subtle); }
 .ws-status     { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }

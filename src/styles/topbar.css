@@ -19,7 +19,7 @@
 #top-bar-right { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 
 #brand {
-  font-family: "EB Garamond", Georgia, serif;
+  font-family: "IM Fell English", Georgia, serif;
   font-size: var(--t-lg);
   font-weight: 500;
   color: var(--text);
@@ -134,3 +134,9 @@ body.is-mobile .focus-btn {       /* Fullscreen */
   inset: 0;
   z-index: 150;
 }
+
+/* ─── Tools, folded away ─────────────────────────────────────────────────
+   One control on the right; the row of actions appears beside it on demand. */
+#tools { display: inline-flex; align-items: center; gap: 8px; }
+#tools-row { display: inline-flex; align-items: center; gap: 8px; animation: viewIn 0.18s ease; }
+#tools .tools-toggle { width: 30px; padding: 0; justify-content: center; }

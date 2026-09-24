@@ -28,12 +28,12 @@
   border: none;
   outline: none;
   font-family: var(--font-serif);
-  /* Cormorant title shown as typed (natural case) at tight spacing. The measure
-     is narrower than the body so a long title wraps to a second line sooner and
-     never runs wider than the prose below it. */
-  font-weight: 600;
+  /* Fell has one weight; the title is the same face as the prose, a size up,
+     at its natural fit. The measure is narrower than the body so a long title
+     wraps sooner and never runs wider than the prose below it. */
+  font-weight: 400;
   font-style: normal;
-  font-size: clamp(1.02rem, 1.6vw, 1.2rem);
+  font-size: clamp(1.25rem, 2vw, 1.5rem);
   color: var(--text);
   padding: 0 8px;
   margin-bottom: 22px;
@@ -103,8 +103,8 @@
   white-space: pre-wrap;
   overflow-wrap: break-word;
   font-family: var(--font-serif);
-  font-size: var(--t-lg);
-  line-height: 1.55;
+  font-size: 1.16rem;
+  line-height: 1.5;
   color: var(--text);
   padding: 0 8px 8px;
   outline: none;
