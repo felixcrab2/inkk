@@ -33,6 +33,10 @@ async function draw(name, face, size) {
   canvas.width += canvas.width % 2;
   canvas.height += canvas.height % 2;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  // On white, not transparent: a dark-mode mail window would otherwise show
+  // black ink on black, and the code is read against a light ground.
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.font = font;
   ctx.fillStyle = INK;
   ctx.textBaseline = "alphabetic";

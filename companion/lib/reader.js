@@ -111,9 +111,14 @@ async function readVisibleText(bundleId) {
 }
 
 const DOC_EXT = /\.(docx|pdf|pages|rtf|rtfd|doc|odt|txt|md|markdown|html?)$/i;
+// Apps whose windows are documents but don't always say which file they show.
+const DOCUMENT_APPS = new Set(["com.microsoft.Word", "org.libreoffice.script", "com.apple.iWork.Pages", "com.apple.TextEdit", "com.apple.Preview", "com.adobe.Reader", "com.adobe.Acrobat.Pro"]);
+const FIND_CACHE_MS = 30000;
+const findCache = new Map();   // "bundle|title" → { path, at }
 
-// A window's document: its AXDocument when the app publishes one, else a file
-// whose name matches the window title that was changed in the last two days.
+// A window's document: its AXDocument when the app publishes one; otherwise,
+// for a document app or a title that is a file name, the file with that name
+// changed in the last two days (cached, so asking often costs nothing).
 async function readDocumentPath(front, win) {
   const doc = win && win.document;
   if (doc && doc.startsWith("file://")) {
@@ -122,17 +127,23 @@ async function readDocumentPath(front, win) {
       if (fs.existsSync(p)) return p;
     } catch { /* not a file URL */ }
   }
-  const title = String((win && win.title) || (front && front.title) || "").replace(/\s+[-—–]\s+(Edited|Locked|Saved|Word|Pages|Preview)$/i, "").trim();
+  const title = String((win && win.title) || (front && front.title) || "").replace(/\s+[-—–]\s+(Edited|Locked|Saved|Word|Pages|Preview|Compatibility Mode)$/i, "").trim();
   if (!title || title.length < 3 || /^(Untitled|Document\d*|Inbox|New Message)\b/i.test(title)) return null;
+  if (!DOC_EXT.test(title) && !(front && DOCUMENT_APPS.has(front.bundleId))) return null;
+  const key = `${front && front.bundleId}|${title}`;
+  const hit = findCache.get(key);
+  if (hit && Date.now() - hit.at < FIND_CACHE_MS) return hit.path;
   const base = title.replace(/["\\*]/g, "");
   const query = DOC_EXT.test(base)
     ? `kMDItemFSName == "${base}"c && kMDItemContentModificationDate >= $time.today(-2)`
     : `kMDItemFSName == "${base}.*"c && kMDItemContentModificationDate >= $time.today(-2)`;
   const out = await exec("mdfind", ["-onlyin", require("node:os").homedir(), query], { timeout: 2500, maxBuffer: 1024 * 1024 });
   const hits = out.split("\n").filter((p) => p && DOC_EXT.test(p) && !path.basename(p).startsWith("~$"));
-  if (!hits.length) return null;
   hits.sort((a, b) => { try { return fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs; } catch { return 0; } });
-  return hits[0];
+  const found = hits[0] || null;
+  findCache.set(key, { path: found, at: Date.now() });
+  if (findCache.size > 200) findCache.delete(findCache.keys().next().value);
+  return found;
 }
 
 module.exports = { readFocusedText, readVisibleText, readWindow, readDocumentPath, pidOf };

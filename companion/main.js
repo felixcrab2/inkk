@@ -245,7 +245,16 @@ function routeKey(k) {
 // first key after such a spell re-polls the front app and every key that
 // arrives meanwhile waits (with its own timestamp) so it lands in the right
 // session rather than the previous app's.
+// Modifier keys held right now (by keycode), so a synthetic paste can wait
+// for the writer to let go of the shortcut that triggered it.
+const MODIFIER_NAMES = ["Ctrl", "CtrlRight", "Alt", "AltRight", "Shift", "ShiftRight", "Meta", "MetaRight"];
+const modifierCodes = new Set(MODIFIER_NAMES.map((n) => UiohookKey && UiohookKey[n]).filter((c) => c != null));
+const modifiersDown = new Set();
+
 function onKey(type, e) {
+  if (modifierCodes.has(e.keycode)) {
+    if (type === "keydown") modifiersDown.add(e.keycode); else modifiersDown.delete(e.keycode);
+  }
   const t = Date.now();
   const k = { type, keycode: e.keycode, shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey,
               at: { t, pt: performance.now() } };
@@ -608,9 +617,13 @@ async function signHere(target) {
     const rendered = await signature.renderName({ BrowserWindow, dir: __dirname, name, code: r.cert.code, face: settings.signatureFace });
     const p = signature.clipboardPayload({ nativeImage, rendered, name, code: r.cert.code, seal: sealUrl(r.cert.code) });
     clipboard.write({ text: p.text, html: p.html, image: p.image });
-    // Paste where the caret is. The keys we send are not the writer's.
+    // Paste where the caret is, once the shortcut's keys are up (⌃⌥ held
+    // down would turn ⌘V into another command). The keys we send are not the
+    // writer's.
+    for (let waited = 0; modifiersDown.size && waited < 2500; waited += 30) await new Promise((res) => setTimeout(res, 30));
+    modifiersDown.clear();
     ignoreKeysUntil = Date.now() + PASTE_GUARD_MS;
-    await new Promise((res) => setTimeout(res, 60));
+    await new Promise((res) => setTimeout(res, 40));
     uIOhook.keyTap(UiohookKey.V, [UiohookKey.Meta]);
   } catch (e) {
     console.warn("[inkk] sign:", e.message);
@@ -763,6 +776,22 @@ async function probe() {
     seal: seal && { code: seal.code, source: seal.source, found: !!seal.cert, match: seal.match },
     auth: { signedIn: authState.signedIn, anonymous: authState.anonymous }, shortcutOk,
   };
+  // Can this build draw a signed name whose ink reads back as its code?
+  try {
+    const code = "INKK-4B7N-R2XE-8KMT";
+    const r = await signature.renderName({ BrowserWindow, dir: __dirname, name: (settings.signatureName || accountName || "Ada Writer").trim(), code, face: settings.signatureFace });
+    const img = nativeImage.createFromDataURL(r.dataUrl);
+    const size = img.getSize();
+    // As it shows in an email: over white paper.
+    const px = img.toBitmap();
+    for (let i = 0; i < px.length; i += 4) {
+      const a = px[i + 3] / 255;
+      for (let c = 0; c < 3; c++) px[i + c] = Math.round(px[i + c] * a + 255 * (1 - a));
+      px[i + 3] = 255;
+    }
+    const found = mark ? mark.decodeMarks({ width: size.width, height: size.height, data: px }, { format: "bgra" }) : [];
+    out.signature = { width: r.width, height: r.height, reads: found.some((f) => f.code === code) };
+  } catch (e) { out.signature = { error: e.message }; }
   // Does a signed-in request reach /api/certify with its token intact? An
   // incomplete body is refused after the sign-in check and before anything is
   // written, so this proves the account works without issuing a certificate.
