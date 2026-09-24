@@ -30,6 +30,20 @@
 // that doesn't have them yet the row is written without them rather than the
 // certificate failing (docs/backend-changes-2026-09.md).
 //
+// A signed name (source "signature") may also bring the picture of the name:
+// web mail drops pictures pasted into it, so the email links to a copy kept
+// with the certificate and served by /api/sig at /s/<code>.png. It is stored
+// once, on a new code or on one of the caller's codes that has none yet, and
+// never replaced: the picture already in someone's inbox must not change.
+// The link comes back only for the picture that is stored: a retry (the same
+// name, face and code, drawn again) gets it, a different picture for a code
+// that already has one does not, and the response says signatureConflict so
+// the caller can sign under a fresh code. A code whose fingerprint the caller
+// is about to find stale (its contentHash differs from the ledger's) is given
+// no picture: the caller will sign under a fresh code anyway.
+// Like the sketch it only ever adds to a certificate: a bad picture, or a
+// database without the column, costs the writer nothing but the link.
+//
 // Needs SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (server-only env; never shipped
 // to the browser). If they're missing the route fails soft (ok:false) so a
 // misconfig never blocks the writer — they keep their draft, they just don't
@@ -38,6 +52,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { extractFeatures } from "../src/telemetry/features.js";
 import { computeScore } from "../src/telemetry/score.js";
+import { signaturePngBytes, signatureUrl } from "./sig.mjs";
 
 const VERIFIED_TIERS = new Set(["Strong", "Distinct"]);
 const MAX_CLIENT_EVENTS = 60000;   // bound per-request work
@@ -46,7 +61,7 @@ const SKETCH_ENTRY = /^[0-9a-f]{10}$/;
 const SKETCH_MAX = 600;            // same cap as src/verify/sketch.js
 const BINDINGS = new Set(["text", "session", "file"]);
 const SOURCES = new Set(["web", "companion", "file", "signature"]);
-const NEW_COLUMNS = ["text_sketch", "binding"];
+const NEW_COLUMNS = ["text_sketch", "binding", "signature_png"];
 
 function serviceClient() {
   const url = process.env.SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL;
@@ -87,6 +102,35 @@ export function cleanSketch(v) {
     if (out.length >= SKETCH_MAX) break;
   }
   return out.length ? out : null;
+}
+
+// The picture of a signed name as base64 (a data: URL is accepted too), or
+// null when it is not a PNG of a signature's size (api/sig.mjs decides).
+export function cleanSignaturePng(v) {
+  if (typeof v !== "string") return null;
+  const png = signaturePngBytes(v.replace(/^data:image\/png;base64,/i, ""));
+  return png ? png.toString("base64") : null;
+}
+
+// A picture for a code that is already in the ledger: added only where there
+// is none. Where there is one, the link is the caller's only if it is this
+// very picture (a retry); a different one would show the old picture under
+// the new name or face, so it gets no link and is told of the conflict.
+//   → "stored" | "conflict" | null (nothing stored, nothing to say)
+async function addSignature(svc, code, uid, png) {
+  try {
+    const { data, error } = await svc.from("verifications")
+      .update({ signature_png: png })
+      .eq("code", code).eq("user_id", uid).is("signature_png", null)
+      .select("code");
+    if (error) return null;
+    if (Array.isArray(data) && data.length) return "stored";
+    const had = await svc.from("verifications").select("signature_png")
+      .eq("code", code).eq("user_id", uid).maybeSingle();
+    const held = !had.error && had.data ? had.data.signature_png : null;
+    if (typeof held !== "string" || !held) return null;
+    return held === png ? "stored" : "conflict";
+  } catch { return null; }
 }
 
 // What the certificate is bound to. Callers say so; when an older caller
@@ -162,6 +206,7 @@ export function createCertifyHandler({ getClient = serviceClient, authenticate =
     const clientEvents = Array.isArray(body.events) ? body.events.slice(0, MAX_CLIENT_EVENTS) : [];
     const sketch = cleanSketch(body.sketch);
     const binding = bindingOf(body);
+    const signaturePng = body.source === "signature" ? cleanSignaturePng(body.signaturePng) : null;
 
     // The caller must own the document they're certifying. A missing documents
     // row passes: the companion certifies sessions that only exist on the Mac.
@@ -177,6 +222,7 @@ export function createCertifyHandler({ getClient = serviceClient, authenticate =
     // A code already in the ledger keeps its original verdict (the ledger is an
     // immutable, append-only record). Otherwise recompute from the reassembled trace.
     let humanScore = null, scoreTier = null, verified = false, storedHash = null, sketchStored = false;
+    let signatureStored = false, signatureConflict = false;
     try {
       const existingCols = "human_score, score_tier, verified, user_id, content_hash";
       let found = await svc
@@ -194,6 +240,13 @@ export function createCertifyHandler({ getClient = serviceClient, authenticate =
         verified   = !!existing.verified;
         storedHash = existing.content_hash || null;
         sketchStored = Array.isArray(existing.text_sketch) && existing.text_sketch.length > 0;
+        // Only on a code the caller keeps: one whose ledger fingerprint differs
+        // from the text now is abandoned for a fresh code, picture and all.
+        if (signaturePng && (!contentHash || !storedHash || storedHash === contentHash)) {
+          const added = await addSignature(svc, code, uid, signaturePng);
+          signatureStored = added === "stored";
+          signatureConflict = added === "conflict";
+        }
       } else {
         const byId = new Map();
         for (const e of clientEvents) if (e && e.id) byId.set(e.id, e);
@@ -215,21 +268,30 @@ export function createCertifyHandler({ getClient = serviceClient, authenticate =
           human_score: humanScore, score_tier: scoreTier, verified,
         };
         const write = (r) => svc.from("verifications").upsert(r, { onConflict: "code", ignoreDuplicates: true });
-        let { error: writeErr } = await write({ ...row, text_sketch: sketch, binding });
-        if (writeErr && isUnknownColumnError(writeErr)) {
-          ({ error: writeErr } = await write(row));
-        } else if (!writeErr) {
-          sketchStored = !!sketch;
+        // Newest columns first, then without each: a database the September
+        // migrations have only partly reached still keeps what it can.
+        const withSketch = { ...row, text_sketch: sketch, binding };
+        const attempts = signaturePng ? [{ ...withSketch, signature_png: signaturePng }, withSketch, row] : [withSketch, row];
+        let written = null;
+        for (const attempt of attempts) {
+          const { error } = await write(attempt);
+          if (!error) { written = attempt; break; }
+          if (!isUnknownColumnError(error)) break;
         }
         // A code the ledger doesn't hold would never verify: say so, rather than
         // hand the writer a dead code.
-        if (writeErr) { res.status(200).json({ ok: false, error: "Could not record the certificate" }); return; }
+        if (!written) { res.status(200).json({ ok: false, error: "Could not record the certificate" }); return; }
+        sketchStored = !!sketch && "text_sketch" in written;
+        signatureStored = "signature_png" in written;
       }
     } catch {
       res.status(200).json({ ok: false, error: "Scoring failed" }); return;
     }
 
-    res.status(200).json({ ok: true, code, verified, tier: scoreTier, score: humanScore, contentHash: storedHash || contentHash, sketchStored });
+    const out = { ok: true, code, verified, tier: scoreTier, score: humanScore, contentHash: storedHash || contentHash, sketchStored };
+    if (signatureStored) out.signatureUrl = signatureUrl(code);
+    else if (signatureConflict) out.signatureConflict = true;
+    res.status(200).json(out);
   };
 }
 

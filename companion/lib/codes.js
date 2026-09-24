@@ -10,6 +10,7 @@
 "use strict";
 
 const { randomBytes, createHash } = require("node:crypto");
+const zw = require("./zw");
 
 const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
@@ -32,7 +33,9 @@ function sessionHash(sessionId) {
 
 // Codes and seal links as they appear in the wild: "INKK-7F3A-9K2D-XQ4M",
 // "inkk.site/v/INKK-…", with the usual typing slips (o→0, i/l→1) tolerated
-// the same way the website's parseVerifyCode tolerates them.
+// the same way the website's parseVerifyCode tolerates them. Then the codes no
+// one can see: the one a signed name carries after it in zero-width characters
+// (lib/zw.js), wherever the name arrived as text.
 const CODE_RE = /\b[Ii][Nn][Kk][Kk][-‐-―\s]?([0-9A-Za-z]{4})[-‐-―\s]?([0-9A-Za-z]{4})[-‐-―\s]?([0-9A-Za-z]{4})\b/g;
 function normaliseCode(a, b, c) {
   const fix = (s) => s.toUpperCase().replace(/O/g, "0").replace(/[IL]/g, "1").replace(/U/g, "V");
@@ -40,6 +43,10 @@ function normaliseCode(a, b, c) {
   if (!/^[0-9A-HJKMNP-TV-Z]{12}$/.test(body)) return null;
   return `INKK-${body.slice(0, 4)}-${body.slice(4, 8)}-${body.slice(8, 12)}`;
 }
+// "INKK-XXXX-XXXX-XXXX" and "INKK-0000-0000-0000" are how codes are written
+// in instructions and placeholders, not codes anyone was given.
+const isPlaceholder = (code) => /^INKK-(.)\1{3}-\1{4}-\1{4}$/.test(code);
+
 function findCodes(text) {
   const out = [];
   const seen = new Set();
@@ -48,7 +55,10 @@ function findCodes(text) {
   let m;
   while ((m = CODE_RE.exec(text))) {
     const code = normaliseCode(m[1], m[2], m[3]);
-    if (code && !seen.has(code)) { seen.add(code); out.push(code); }
+    if (code && !isPlaceholder(code) && !seen.has(code)) { seen.add(code); out.push(code); }
+  }
+  for (const code of zw.decodeAll(text)) {
+    if (!seen.has(code)) { seen.add(code); out.push(code); }
   }
   return out;
 }

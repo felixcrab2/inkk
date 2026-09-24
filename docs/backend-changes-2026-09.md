@@ -335,3 +335,74 @@ another host drops the `Authorization` header. Everything that calls the API
 from outside the website (the companion) uses `https://www.inkk.site`
 directly; keep the domain setup that way round, or add the apex as the
 primary domain and update `companion/.env.local`.
+
+## 11. Signed names that survive web mail
+
+When a writer signs an email with the desktop companion (⌃⌥S), their name
+goes in as a picture linked to its certificate. Apple Mail keeps a pasted
+picture, but web mail does not: Gmail throws away a picture pasted as a
+`data:` URL and sends only the plain-text part. So for mail written in a
+browser (and in Outlook) the companion now sends the picture along with the
+certificate, and the email links to a copy kept with it:
+
+```
+https://www.inkk.site/s/INKK-XXXX-XXXX-XXXX.png
+```
+
+`vercel.json` rewrites that path to `/api/sig`, which serves the picture. The
+picture is stored in a new column:
+
+```sql
+alter table public.verifications add column if not exists signature_png text;
+```
+
+- **What it holds.** The PNG of the signed name, base64, at most 200 KB (a
+  signed name is far smaller). `/api/certify` accepts it only on a signature
+  certificate, only if it is a PNG the size of a line of type (at most
+  4096 x 512 pixels), and stores it once: on a new code, or on one of the
+  caller's own codes that has none yet. It is never replaced, because the
+  copy already in someone's inbox must not change. The response carries
+  `signatureUrl` only when the stored picture is the one just sent (a retry
+  gets it); a different picture for a code that already has one gets
+  `signatureConflict: true` instead, so the companion signs under a fresh
+  code rather than link to the old name or face. A code whose stored
+  fingerprint differs from the one sent (the companion will abandon it) is
+  given no picture.
+- **Public by code.** Anyone with the code can fetch the picture, exactly
+  as anyone with the code can open the certificate at `/v/<code>`. It has to
+  be: the recipient's mail fetches it without signing in, usually through a
+  proxy (Gmail's). It shows the name the writer signed with and nothing
+  else. It is served with `Cache-Control: public, max-age=31536000,
+  immutable`, so mail proxies keep their copy: deleting a certificate
+  removes the picture from inkk.site, but not from copies already fetched.
+  `/api/verify` and `verify_by_code` never return it.
+- **Until this runs**, `/api/certify` writes certificates without the
+  picture (nothing fails; its response just carries no `signatureUrl`), the
+  companion pastes the picture itself as before, and `/s/…` answers 404.
+
+Nothing else to configure: `/api/sig` uses the same service-role key as
+`/api/verify` (section 8).
+
+The plain-text part of a signed name changed too, with no backend change:
+it used to be the name followed by a visible `inkk. inkk.site/v/…` line,
+which is what a Gmail recipient saw. Now it is the name alone, with its code
+after it in zero-width characters (`companion/lib/zw.js`) that inkk on a
+reader's Mac reads back. The run opens and closes with a zero width
+non-joiner, so a name in a joining script (Arabic, Persian, Urdu) keeps the
+shape of its last letter. The same characters are removed before any text is
+fingerprinted (`src/verify/sketch.js`), so a signed name never changes a
+certificate's match.
+
+Check it after signing a name in a browser:
+
+```sql
+select code, length(signature_png) as base64_chars
+from public.verifications
+where signature_png is not null
+order by issued_at desc limit 5;
+```
+
+```sh
+curl -sI https://www.inkk.site/s/INKK-XXXX-XXXX-XXXX.png
+# HTTP/2 200, content-type: image/png, cache-control: public, max-age=31536000, immutable
+```

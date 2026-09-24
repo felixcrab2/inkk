@@ -8,7 +8,7 @@
     "build": "node build.js",
     "start": "npm run build && electron .",
     "dev": "npm run build && electron . --inspect",
-    "test": "node --test capture.test.js lib/sessions.test.js lib/codes.test.js lib/api.test.js lib/auth.test.js lib/lookup.test.js lib/docmeta.test.js lib/receiver.test.js lib/stamp.test.js lib/mark.test.js",
+    "test": "node --test capture.test.js lib/*.test.js",
     "dist": "npm run build && electron-builder --mac dmg",
     "release": "./scripts/release.sh",
     "install-cert": "./scripts/install-cert.sh"

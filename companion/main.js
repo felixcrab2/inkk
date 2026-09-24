@@ -20,7 +20,7 @@
 
 "use strict";
 
-const { app, Tray, Menu, BrowserWindow, ipcMain, clipboard, nativeImage, screen, shell, globalShortcut, Notification, nativeTheme } = require("electron");
+const { app, Tray, Menu, BrowserWindow, ipcMain, clipboard, nativeImage, screen, shell, globalShortcut, Notification, nativeTheme, safeStorage } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
 const crypto = require("node:crypto");
@@ -41,6 +41,7 @@ const { createAuth } = require("./lib/auth");
 const { createLookup } = require("./lib/lookup");
 const { createReceiver } = require("./lib/receiver");
 const { createStamper } = require("./lib/stamp");
+const { createPieces } = require("./lib/pieces");
 
 // Native + generated modules are optional at runtime: a missing one is
 // reported in State.error rather than crashing the agent at login.
@@ -158,7 +159,7 @@ let seal = null;                         // what the receiver found in front (li
 let lastStamp = null;                    // the last document stamped
 let signing = false;
 let shortcutOk = false;
-let api = null, auth = null, lookup = null, receiver = null, stamper = null;
+let api = null, auth = null, lookup = null, receiver = null, stamper = null, pieces = null;
 const notified = new Map();              // `${code}|${bundleId}` → when
 const keyQueue = [];
 const KEYMAP = buildKeymap(UiohookKey);
@@ -175,7 +176,7 @@ function getState() {
     launchAtLogin: settings.launchAtLogin,
     ignoredApps: settings.ignoredApps.slice(),
     frontApp: lastOtherFront,
-    active: store ? store.active() : null,
+    active: store ? activeView() : null,
     supabaseConfigured: SUPABASE_CONFIGURED,
     auth: { ...authState, needed: authNeeded },
     settings: {
@@ -192,6 +193,19 @@ function getState() {
   };
 }
 
+// The session being written in, seen as its piece when it has one.
+function activeView() {
+  const a = store.active();
+  if (!a) return null;
+  const p = pieces && a.pieceId ? pieces.get(a.pieceId) : null;
+  if (!p) return a;
+  const v = pieceView(p);
+  return {
+    ...a, code: v.code, cert: v.cert, keystrokes: v.keystrokes, activeMs: v.activeMs, wordsEst: v.wordsEst,
+    piece: { id: v.id, label: v.label, sessions: v.sessions, startedAt: v.startedAt },
+  };
+}
+
 // Pushes are coalesced: many keystrokes → at most four State pushes a second.
 const pending = { state: false, sessions: false };
 let pushTimer = null;
@@ -202,7 +216,11 @@ function push(what) {
     pushTimer = null;
     if (!win || win.isDestroyed()) return;
     if (pending.state) { pending.state = false; win.webContents.send("inkk:state", getState()); }
-    if (pending.sessions) { pending.sessions = false; win.webContents.send("inkk:sessions", store.list()); }
+    if (pending.sessions) {
+      pending.sessions = false;
+      win.webContents.send("inkk:sessions", store.list());
+      if (pieces) win.webContents.send("inkk:pieces", pieces.list().map((p) => pieceView(p)));
+    }
     refreshTray();
   }, PUSH_MIN_MS);
 }
@@ -228,7 +246,7 @@ function routeKey(k) {
   if (!front) return;
   const name = KEYMAP.get(k.keycode);
   if (!name) return;
-  const base = { bundleId: front.bundleId, app: front.name, name, at: k.at };
+  const base = { bundleId: front.bundleId, app: front.name, docKey: front.docKey || "", docLabel: front.docLabel || front.name, name, at: k.at };
   if (k.type === "keydown") {
     const mods = modString(k);
     store.keyEvent({ ...base, type: "keydown", mods });
@@ -482,26 +500,135 @@ async function accessToken() {
   return { error: "Couldn't start an inkk account." };
 }
 
-// The most recent session in an app: the open one, or one that ended lately.
-function sessionFor(bundleId) {
+// The most recent session in an app, preferring the document in front: the
+// open one, or one that ended lately.
+function sessionFor(bundleId, docKey = null) {
   if (!store || !bundleId) return null;
   const t = Date.now();
-  return store.list().find((s) => s.bundleId === bundleId && (s.endedAt == null || t - s.lastKeyAt < RECENT_SESSION_MS)) || null;
+  const recent = store.list().filter((s) => s.bundleId === bundleId && (s.endedAt == null || t - s.lastKeyAt < RECENT_SESSION_MS));
+  return (docKey != null && recent.find((s) => (s.docKey || "") === docKey)) || recent[0] || null;
+}
+
+// ── pieces: picking up where you left off ────────────────────────────────────
+// A piece is one piece of writing across however many sittings it took. While
+// someone types, the text in front is read, fingerprinted sentence by
+// sentence with a key only this Mac has, compared with the pieces it already
+// knows, and dropped. A match continues that piece: same code, and its
+// certificate is scored from every sitting's rhythm. Nothing but the salted
+// fingerprints is kept.
+const IDENTIFY_AFTER_KEYS = 8;         // the document has been typed into: read it
+const IDENTIFY_EVERY_MS = 45000;       // …and again while writing continues
+const IDENTIFY_MIN_NEW_KEYS = 30;
+const identified = new Map();          // sessionId → { at, keys }
+let identifying = false;
+
+function piecesSecret() {
+  const file = path.join(DATA_DIR, "pieces.key");
+  try {
+    const raw = fs.readFileSync(file);
+    const key = safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(raw) : raw.toString("utf8");
+    const buf = Buffer.from(key, "hex");
+    if (buf.length === 32) return buf;
+  } catch { /* first run, or unreadable: make a new one */ }
+  const buf = crypto.randomBytes(32);
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    const hex = buf.toString("hex");
+    fs.writeFileSync(file, safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(hex) : hex, { mode: 0o600 });
+  } catch (e) { console.warn("[inkk] pieces key not saved:", e.message); }
+  return buf;
+}
+
+const fileUrlPath = (u) => { try { return u && u.startsWith("file://") ? decodeURIComponent(new URL(u).pathname) : null; } catch { return null; } };
+
+// Given the text now in the session's document, find (or start) its piece.
+function identifyWith(sess, text, front) {
+  if (!pieces || !sess) return null;
+  try {
+    const r = pieces.identify({
+      sessionId: sess.id, bundleId: sess.bundleId, app: sess.app,
+      docKey: sess.docKey || "", docLabel: sess.docLabel || sess.app,
+      docPath: front && (front.docKey || "") === (sess.docKey || "") ? fileUrlPath(front.document) : null,
+      text: text || "", code: sess.code,
+    });
+    identified.set(sess.id, { at: Date.now(), keys: sess.keystrokes });
+    if (r && sess.pieceId !== r.pieceId) { store.link(sess.id, r.pieceId); push("state"); push("sessions"); }
+    return r ? pieces.get(r.pieceId) : null;
+  } catch (e) { console.warn("[inkk] identify:", e.message); return null; }
+}
+
+// Called every few seconds: the session being written in, when its document
+// is the one in front, is identified once it has a few keys and then now and
+// again while it grows.
+async function identifyActive() {
+  if (!pieces || identifying || !store) return;
+  const s = store.active();
+  if (!s || s.endedAt != null) return;
+  const front = context.current();
+  if (!front || front.bundleId !== s.bundleId || (front.docKey || "") !== (s.docKey || "")) return;
+  const last = identified.get(s.id);
+  const due = !last ? s.keystrokes >= IDENTIFY_AFTER_KEYS : (Date.now() - last.at >= IDENTIFY_EVERY_MS && s.keystrokes - last.keys >= IDENTIFY_MIN_NEW_KEYS);
+  if (!due) return;
+  identifying = true;
+  try { identifyWith(s, await reader.readFocusedText(s.bundleId), front); }
+  finally { identifying = false; }
+}
+
+// What the popover shows for a piece: totals across its sittings.
+function pieceView(p, withScore = false) {
+  if (!p) return null;
+  const byId = new Map(store.list().map((x) => [x.id, x]));
+  const sess = p.sessions.map((id) => byId.get(id)).filter(Boolean);
+  const view = {
+    id: p.id, label: p.docLabel || p.app, app: p.app, bundleId: p.bundleId, code: p.code,
+    cert: p.cert || null, certs: p.certs || [], sessions: sess.length,
+    startedAt: Math.min(p.createdAt, ...sess.map((x) => x.startedAt)), lastAt: Math.max(p.lastAt || 0, ...sess.map((x) => x.lastKeyAt)),
+    keystrokes: sess.reduce((n, x) => n + (x.keystrokes | 0), 0),
+    activeMs: sess.reduce((n, x) => n + (x.activeMs | 0), 0),
+    wordsEst: sess.reduce((n, x) => n + (x.wordsEst | 0), 0),
+    live: sess.some((x) => x.endedAt == null),
+  };
+  if (withScore && scoring) {
+    const events = pieceEvents(p);
+    if (events.length >= 8) {
+      const full = scoring.computeScore(scoring.extractFeatures(events, { words: view.wordsEst }));
+      view.score = { score: full.score, tier: full.tier };
+      view.full = { thinking_pauses: full.thinking_pauses, typo_corrections: full.typo_corrections };
+    }
+  }
+  return view;
+}
+
+// Every sitting's events, in time order, as one document.
+function pieceEvents(p) {
+  const seen = new Set();
+  const all = [];
+  for (const id of p.sessions) for (const e of store.eventsOf(id)) {
+    if (!e || seen.has(e.id)) continue;
+    seen.add(e.id);
+    all.push({ ...e, doc_id: p.id });
+  }
+  all.sort((a, b) => (a.t || 0) - (b.t || 0));
+  return all.slice(-MAX_CERTIFY_EVENTS);
 }
 
 function isMine(code) {
   if (!store || !code) return false;
-  return store.list().some((s) => s.code === code || (s.cert && s.cert.code === code) || (s.certs || []).some((c) => c.code === code));
+  const has = (x) => x.code === code || (x.cert && x.cert.code === code) || (x.certs || []).some((c) => c.code === code);
+  return store.list().some(has) || (!!pieces && pieces.list().some(has));
 }
 
 // Issue (or re-affirm) a certificate for a session, bound to `text` when there
 // is enough of it and to the session otherwise. Every caller comes through
 // here: the popover's Certify, a saved document, a signed email.
 //   → { ok: true, cert } | { ok: false, error, needsAuth? }
-async function issue({ sessionId, text, source = "companion", binding = null, filePath = null, authorName = null }) {
+async function issue({ sessionId, text, source = "companion", binding = null, filePath = null, authorName = null, signatureFor = null }) {
   const sess = sessionId && store.get(sessionId);
   if (!sess) return { ok: false, error: "That session is no longer here." };
   if (!scoring) return { ok: false, error: "This build of inkk is incomplete." };
+  // The piece this writing belongs to: identified from the text now, so a
+  // certificate always covers every sitting of it.
+  const piece = (text && identifyWith(sess, text, context.current())) || (pieces && pieces.pieceOf(sessionId)) || null;
 
   let contentHash, sketch = null, wordCount, charCount;
   const canonical = text ? scoring.canonicalText(text) : "";
@@ -512,8 +639,8 @@ async function issue({ sessionId, text, source = "companion", binding = null, fi
     charCount = canonical.length;
     binding = binding || "text";
   } else {
-    contentHash = codes.sessionHash(sessionId);
-    wordCount = sess.wordsEst | 0;
+    contentHash = codes.sessionHash(piece ? piece.id : sessionId);
+    wordCount = piece ? pieceView(piece).wordsEst : (sess.wordsEst | 0);
     binding = "session";
   }
 
@@ -523,13 +650,18 @@ async function issue({ sessionId, text, source = "companion", binding = null, fi
     return { ok: false, error: t.error, needsAuth: !!t.needsAuth };
   }
 
-  let events = store.eventsOf(sessionId).slice(-MAX_CERTIFY_EVENTS).map(slimEvent);
+  const docId = piece ? piece.id : sessionId;
+  let events = (piece ? pieceEvents(piece) : store.eventsOf(sessionId).slice(-MAX_CERTIFY_EVENTS)).map(slimEvent);
   const name = authorName || (await auth.authorName()) || null;
-  const payloadFor = (code, evs) => ({
-    docId: sessionId, code, contentHash, wordCount, charCount, sketch, binding, source,
+  let code = piece ? pieces.codeFor(piece.id, contentHash) : store.codeFor(sessionId, contentHash);
+  // A signed name is drawn with its code before the certificate is issued, so
+  // the picture goes up with it and can be served from inkk.site.
+  let rendered = signatureFor ? await signatureFor(code) : null;
+  const payloadFor = (c, evs) => ({
+    docId, code: c, contentHash, wordCount, charCount, sketch, binding, source,
     title: null, authorName: name, authorUsername: null, events: evs,
+    ...(rendered && rendered.code === c ? { signaturePng: rendered.dataUrl.replace(/^data:image\/png;base64,/, "") } : {}),
   });
-  let code = store.codeFor(sessionId, contentHash);
   let payload = payloadFor(code, events);
   // Keep the most recent part of a very long trace; the score is computed from
   // what is sent, and the tail is the writing closest to the finished text.
@@ -547,8 +679,11 @@ async function issue({ sessionId, text, source = "companion", binding = null, fi
   }
   // The ledger already binds this code to other words (a copy of the session
   // log from before a reinstall, say): this version gets a code of its own.
-  if (r.ok && r.result.contentHash && r.result.contentHash !== contentHash) {
+  // …and likewise when the code already carries a different signed name (the
+  // name or its face changed): a fresh code keeps each picture with its own.
+  if (r.ok && ((r.result.contentHash && r.result.contentHash !== contentHash) || r.result.signatureConflict)) {
     code = codes.makeCode();
+    if (signatureFor) rendered = await signatureFor(code);
     r = await api.certify(payloadFor(code, events), t.token);
   }
   if (!r.ok) {
@@ -564,6 +699,7 @@ async function issue({ sessionId, text, source = "companion", binding = null, fi
     contentHash: out.contentHash || contentHash, sketchStored: !!out.sketchStored,
     ...(filePath ? { file: path.basename(filePath) } : {}),
   };
+  if (piece) pieces.setCert(piece.id, cert);
   store.setCert(sessionId, cert);
   authNeeded = false;
   stamper?.remember({ code: cert.code, sessionId, contentHash: cert.contentHash, sketch });
@@ -572,7 +708,8 @@ async function issue({ sessionId, text, source = "companion", binding = null, fi
     score_tier: cert.tier, human_score: cert.score, author_name: name, issued_at: new Date(cert.issuedAt).toISOString(), binding,
   });
   push("state");
-  return { ok: true, cert };
+  push("sessions");
+  return { ok: true, cert, signatureUrl: out.signatureUrl || null, rendered: rendered && rendered.code === cert.code ? rendered : null };
 }
 
 // The popover's Certify: the piece is read from the app it was written in,
@@ -580,8 +717,22 @@ async function issue({ sessionId, text, source = "companion", binding = null, fi
 async function certifySession(sessionId) {
   const sess = sessionId && store.get(sessionId);
   if (!sess) return { ok: false, error: "That session is no longer here." };
-  const text = await reader.readFocusedText(sess.bundleId);
+  // The popover is in front; the document behind it is the one to read, and
+  // only if it is this session's document.
+  const behind = lastOtherFront;
+  const sameDoc = behind && behind.bundleId === sess.bundleId && (behind.docKey || "") === (sess.docKey || "");
+  const text = sameDoc || !sess.docKey ? await reader.readFocusedText(sess.bundleId) : "";
   return issue({ sessionId, text, source: "companion" });
+}
+
+// A piece from Recent: certified through its most recent sitting.
+async function certifyPiece(pieceId) {
+  const p = pieces && pieces.get(pieceId);
+  if (!p || !p.sessions.length) return { ok: false, error: "That piece is no longer here." };
+  const byId = new Map(store.list().map((x) => [x.id, x]));
+  const latest = p.sessions.map((id) => byId.get(id)).filter(Boolean).sort((a, b) => b.lastKeyAt - a.lastKeyAt)[0];
+  if (!latest) return { ok: false, error: "That piece is no longer here." };
+  return certifySession(latest.id);
 }
 
 // ── signing an email ─────────────────────────────────────────────────────────
@@ -603,19 +754,23 @@ async function signHere(target) {
   try {
     const front = target || (await context.pollNow()) || context.current();
     if (!front || !front.bundleId || front.bundleId === OWN_BUNDLE_ID) return;
-    const sess = sessionFor(front.bundleId);
+    const sess = sessionFor(front.bundleId, front.docKey || "");
     if (!sess) { notify("Nothing to sign yet", `Write in ${front.name || "this app"} first, then sign.`); return; }
-    const text = await reader.readFocusedText(front.bundleId);
     const name = (settings.signatureName || accountName || "").trim();
     if (!name) { notify("Add your name", "Set the name you sign with in inkk's settings."); showWindow(); return; }
-    const r = await issue({ sessionId: sess.id, text, source: "signature", binding: "text", authorName: name });
+    const text = await reader.readFocusedText(front.bundleId);
+    const draw = async (code) => ({ code, ...(await signature.renderName({ BrowserWindow, dir: __dirname, name, code, face: settings.signatureFace })) });
+    const r = await issue({ sessionId: sess.id, text, source: "signature", binding: "text", authorName: name, signatureFor: draw });
     if (!r.ok) {
       if (r.needsAuth) showWindow();
       else notify("Not signed", r.error || "The certificate couldn't be issued.");
       return;
     }
-    const rendered = await signature.renderName({ BrowserWindow, dir: __dirname, name, code: r.cert.code, face: settings.signatureFace });
-    const p = signature.clipboardPayload({ nativeImage, rendered, name, code: r.cert.code, seal: sealUrl(r.cert.code) });
+    const rendered = r.rendered || (await draw(r.cert.code));
+    // Web mail keeps pictures that live at an https address and drops pasted
+    // ones; Mail and other native apps keep the picture inside the email.
+    const imageUrl = signature.usesHostedImage(front.bundleId) && r.signatureUrl ? r.signatureUrl : null;
+    const p = signature.clipboardPayload({ nativeImage, rendered, name, code: r.cert.code, seal: sealUrl(r.cert.code), imageUrl });
     clipboard.write({ text: p.text, html: p.html, image: p.image });
     // Paste where the caret is, once the shortcut's keys are up (⌃⌥ held
     // down would turn ⌘V into another command). The keys we send are not the
@@ -718,6 +873,16 @@ function registerIpc() {
   h("endSession", (id) => { store.end(id || undefined); push("state"); push("sessions"); });
   h("deleteSession", (id) => { store.delete(id); push("state"); push("sessions"); });
   h("certify", (id) => certifySession(typeof id === "object" && id ? id.sessionId : id));
+  h("getPieces", () => (pieces ? pieces.list().map((p) => pieceView(p)) : []));
+  h("getPiece", (id) => (pieces ? pieceView(pieces.get(id), true) : null));
+  h("certifyPiece", (id) => certifyPiece(id));
+  h("deletePiece", (id) => {
+    const p = pieces && pieces.get(id);
+    if (!p) return;
+    for (const sid of p.sessions) store.delete(sid);
+    pieces.remove(id);
+    push("state"); push("sessions");
+  });
   h("sign", async () => {
     // The popover is in front; sign in the app that was in front before it.
     const target = lastOtherFront;
@@ -776,6 +941,12 @@ async function probe() {
     seal: seal && { code: seal.code, source: seal.source, found: !!seal.cert, match: seal.match },
     auth: { signedIn: authState.signedIn, anonymous: authState.anonymous }, shortcutOk,
   };
+  // Can the text in front be fingerprinted for pieces? Counts only; nothing
+  // is identified or stored.
+  try {
+    const t = f ? await reader.readFocusedText(f.bundleId) : "";
+    out.pieces = { focusedChars: t.length, fingerprints: pieces ? pieces.fingerprint(t).length : null, known: pieces ? pieces.list().length : null, docKey: !!(context.current() || {}).docKey };
+  } catch (e) { out.pieces = { error: e.message }; }
   // Can this build draw a signed name whose ink reads back as its code?
   try {
     const code = "INKK-4B7N-R2XE-8KMT";
@@ -842,6 +1013,18 @@ if (!app.requestSingleInstanceLock()) {
       onChange: (what) => { push("state"); if (what === "sessions") push("sessions"); },
     });
     store.load();
+    pieces = createPieces({
+      dir: DATA_DIR, secret: piecesSecret(), genId: randomUUID, genCode: codes.makeCode, scoring,
+      onChange: () => { push("state"); push("sessions"); },
+    });
+    pieces.load();
+    // A session index rebuilt from its event files has forgotten its piece.
+    const summaries = new Map(store.list().map((x) => [x.id, x]));
+    for (const p of pieces.list()) for (const sid of p.sessions) {
+      const sess = summaries.get(sid);
+      if (sess && !sess.pieceId) store.link(sid, p.id);
+    }
+    setInterval(() => { identifyActive(); }, 3000);
 
     context = createContextPoller({ onChange: (cur) => {
       if (cur && cur.bundleId && cur.bundleId !== OWN_BUNDLE_ID) lastOtherFront = cur;
@@ -874,9 +1057,13 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 app.on("window-all-closed", (e) => e.preventDefault());   // stay alive in the tray
-app.on("will-quit", () => { try { globalShortcut.unregisterAll(); } catch { /* none */ } });
+app.on("will-quit", () => {
+  try { globalShortcut.unregisterAll(); } catch { /* none */ }
+  try { helper.stop(); } catch { /* already gone */ }
+});
 app.on("before-quit", () => {
   try { store?.closeAll(); } catch (e) { console.warn("[inkk] flush on quit:", e.message); }
+  try { pieces?.flush(); } catch (e) { console.warn("[inkk] pieces on quit:", e.message); }
   stopHook();
   context?.stop();
   signature.dispose();

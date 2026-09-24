@@ -57,3 +57,28 @@ test("legacy certificates (normalised text, no sketch) still match exactly", asy
   const legacy = { contentHash: sha(normalizePlainText(PIECE)), sketch: null };
   assert.equal((await compareText(legacy, PIECE, sha)).state, "match");
 });
+
+// The run a signed name carries (companion/lib/zw.js): only the two joiners.
+const HIDDEN = "\u200D\u200C\u200D\u200D\u200C\u200D\u200C\u200C".repeat(9) + "\u200C\u200D\u200C\u200D";
+
+test("zero-width characters, a signed name's hidden code among them, never change a fingerprint", async () => {
+  const signed = `${PIECE}\n\nBest,\nAda Writer${HIDDEN}`;
+  const plain = `${PIECE}\n\nBest,\nAda Writer`;
+  assert.equal(canonicalText(signed), canonicalText(plain));
+  assert.equal(await textFingerprint(signed, sha), await textFingerprint(plain, sha));
+  assert.deepEqual(await textSketch(signed, sha), await textSketch(plain, sha));
+  // Inside words they are removed, not turned into spaces.
+  assert.equal(canonicalText("mor\u200Bning\u2060 li\uFEFFght\u200C"), "morning light");
+  const cert = { contentHash: await textFingerprint(PIECE, sha), sketch: await textSketch(PIECE, sha) };
+  assert.equal((await compareText(cert, `${PIECE}\n\nAda Writer${HIDDEN}`, sha)).state, "match");
+});
+
+test("certificates issued while zero-width characters still counted keep matching", async () => {
+  const { normalizePlainText } = await import("./code.js");
+  const withJoiner = `${PIECE} A family: \u{1F468}\u200D\u{1F469}\u200D\u{1F467}.`;
+  // canonicalText as it was: the seal removed, the joiners kept.
+  const before = { contentHash: sha(normalizePlainText(withJoiner)), sketch: null };
+  assert.notEqual(before.contentHash, await textFingerprint(withJoiner, sha));
+  const sealed = `${withJoiner}\n\ninkk. inkk.site/v/INKK-7F3A-9K2D-XQ4M`;
+  assert.equal((await compareText(before, sealed, sha)).state, "match");
+});

@@ -193,6 +193,15 @@ create index if not exists verifications_doc_idx on public.verifications(doc_id,
 alter table public.verifications add column if not exists text_sketch text[];
 alter table public.verifications add column if not exists binding text;
 
+-- September 2026: the picture of a signed name (base64 PNG, at most 200 KB),
+-- for names signed in web mail, which drops pictures pasted into it. Served to
+-- anyone with the code at https://www.inkk.site/s/<code>.png by /api/sig, so it
+-- is public by code exactly like the certificate itself (it shows the name the
+-- writer signed with, nothing more). /api/certify writes it once per code and
+-- never replaces it; /api/sig serves only a real PNG of a signature's size,
+-- whatever a row holds. Never returned by /api/verify or verify_by_code.
+alter table public.verifications add column if not exists signature_png text;
+
 alter table public.verifications enable row level security;
 
 -- Owners can see/insert/delete their own certificate rows. Public verification

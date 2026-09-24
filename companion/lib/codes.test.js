@@ -29,3 +29,16 @@ test("codes are found in prose, links and with typing slips, and deduplicated", 
   assert.deepStrictEqual(findCodes(""), []);
   assert.deepStrictEqual(findCodes("nothing here"), []);
 });
+
+test("codes hidden after a signed name are found after the visible ones", () => {
+  const zw = require("./zw");
+  const hidden = "INKK-0000-1111-2222";
+  const text = `See INKK-7F3A-9K2D-XQ4M.\n\nBest,\nAda Writer${zw.encode(hidden)}\nAda Writer${zw.encode("INKK-7F3A-9K2D-XQ4M")}`;
+  assert.deepStrictEqual(findCodes(text), ["INKK-7F3A-9K2D-XQ4M", hidden]);
+  assert.deepStrictEqual(findCodes(`Ada Writer${zw.encode(hidden)}`), [hidden]);
+});
+
+test("placeholders in instructions are not codes", () => {
+  const { findCodes } = require("./codes");
+  assert.deepStrictEqual(findCodes("Codes look like INKK-XXXX-XXXX-XXXX or INKK-0000-0000-0000; mine is INKK-4B7N-R2XE-8KMT."), ["INKK-4B7N-R2XE-8KMT"]);
+});

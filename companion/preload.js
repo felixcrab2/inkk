@@ -29,6 +29,10 @@ contextBridge.exposeInMainWorld("inkk", {
   endSession: (id) => invoke("endSession", id ?? null),
   deleteSession: (id) => invoke("deleteSession", id),
   certify: (sessionId) => invoke("certify", sessionId),
+  getPieces: () => invoke("getPieces"),
+  getPiece: (id) => invoke("getPiece", id),
+  certifyPiece: (id) => invoke("certifyPiece", id),
+  deletePiece: (id) => invoke("deletePiece", id),
   sign: () => invoke("sign"),
   previewSignature: () => invoke("previewSignature"),
 
@@ -61,5 +65,6 @@ contextBridge.exposeInMainWorld("inkk", {
   // pushes from main
   onState: (cb) => on("state", cb),
   onSessions: (cb) => on("sessions", cb),
+  onPieces: (cb) => on("pieces", cb),
   onShown: (cb) => on("shown", () => cb()),
 });

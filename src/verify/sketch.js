@@ -22,15 +22,27 @@ const SEAL_PATTERNS = [
   /\bINKK[-‐-― ]?[0-9A-Za-z]{4}[-‐-― ]?[0-9A-Za-z]{4}[-‐-― ]?[0-9A-Za-z]{4}\b/gi,
 ];
 
+// Zero-width characters: the code a signed name carries after it
+// (companion/lib/zw.js), and the joiners, word joiners and byte-order marks
+// editors scatter. None of them is something anyone wrote, so none of them may
+// change a fingerprint. They are removed, not turned into spaces: they sit
+// inside words.
+const INVISIBLE = /[\u200B-\u200D\u2060\uFEFF]/g;
+
 export const SKETCH_HEX = 10;        // 40-bit prefixes: tiny, and collisions are irrelevant at this scale
 export const SKETCH_MAX = 600;       // sentences kept per certificate
 export const SENTENCE_MIN = 16;      // shorter fragments ("Thanks," "Best,") carry no signal
 
-// The text a certificate is about: normalised, with any seal removed.
-export function canonicalText(input) {
-  let t = normalizePlainText(input || "");
+function withoutSeals(normalised) {
+  let t = normalised;
   for (const re of SEAL_PATTERNS) t = t.replace(re, " ");
   return t.replace(/\s+/g, " ").trim();
+}
+
+// The text a certificate is about: normalised, with any seal and any
+// zero-width character removed.
+export function canonicalText(input) {
+  return withoutSeals(normalizePlainText(String(input || "").replace(INVISIBLE, "")));
 }
 
 // Sentences of a canonical text. Splits after . ! ? … (and any closing quote or
@@ -113,6 +125,12 @@ export async function compareText({ contentHash, sketch }, observed, sha256hex) 
   if (contentHash) {
     const whole = await textFingerprint(observed, sha256hex);
     if (whole && whole === contentHash) return { state: "match", ratio: 1 };
+    // Certificates issued before zero-width characters were removed kept them
+    // (the joiner inside an emoji, say).
+    if (/[\u200B-\u200D\u2060]/.test(observed)) {
+      const kept = withoutSeals(normalizePlainText(observed));
+      if (kept && (await sha256hex(kept)) === contentHash) return { state: "match", ratio: 1 };
+    }
     // Certificates issued before canonicalText hashed normalizePlainText directly.
     const legacy = await sha256hex(normalizePlainText(observed));
     if (legacy === contentHash) return { state: "match", ratio: 1 };

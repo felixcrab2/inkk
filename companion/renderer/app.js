@@ -13,6 +13,7 @@ const state = {
   screen: "home",          // setup | home | session | settings | signin
   app: null,               // State pushed by main
   sessions: [],            // SessionSummary[], newest first
+  pieces: [],              // pieces of writing, each across its sittings, newest first
   sessionId: null,
   detail: null,
   confirmDelete: false,
@@ -100,7 +101,7 @@ function header({ back = false, title = "" } = {}) {
 
 // The code, and what can be done with it. A code is there from the first
 // keystroke; Certify binds it and puts the seal on the clipboard.
-function codeBlock(x, meta = "") {
+function codeBlock(x, meta = [], kind = "session") {
   const cert = x.cert;
   const busy = state.busy === x.id;
   const flash = state.flash && state.flash.id === x.id ? state.flash.text : null;
@@ -110,11 +111,12 @@ function codeBlock(x, meta = "") {
   const note = flash || err || (cert ? certNote(cert) : null);
   const buttons = cert
     ? `<button class="b p" data-action="copy-seal" data-id="${esc(x.id)}" data-code="${esc(cert.code)}">Copy seal</button>
-       <button class="b" data-action="certify" data-id="${esc(x.id)}"${busy ? " disabled" : ""}>${busy ? "Certifying" : "Certify again"}</button>
+       <button class="b" data-action="certify" data-id="${esc(x.id)}" data-kind="${kind}"${busy ? " disabled" : ""}>${busy ? "Certifying" : "Certify again"}</button>
        <button class="b" data-action="open" data-url="${SITE}/v/${esc(cert.code)}">Open</button>`
-    : `<button class="b p" data-action="certify" data-id="${esc(x.id)}"${busy ? " disabled" : ""}>${busy ? "Certifying" : "Certify"}</button>`;
+    : `<button class="b p" data-action="certify" data-id="${esc(x.id)}" data-kind="${kind}"${busy ? " disabled" : ""}>${busy ? "Certifying" : "Certify"}</button>`;
+  const lines = (Array.isArray(meta) ? meta : [meta]).filter(Boolean);
   return `<div class="code${cert ? "" : " pending"}">${esc(code)}</div>
-    ${meta ? `<div class="meta">${esc(meta)}</div>` : ""}
+    ${lines.map((m) => `<div class="meta">${esc(m)}</div>`).join("")}
     ${note ? `<div class="meta">${esc(note)}</div>` : ""}
     <div class="btns">${buttons}${x.endedAt == null && x.id === state.app?.active?.id ? `<button class="b" data-action="end" data-id="${esc(x.id)}">End</button>` : ""}</div>`;
 }
@@ -125,11 +127,21 @@ function certNote(cert) {
   return `${v ? "Verified" : "Recorded"}, bound to ${what}`;
 }
 
+// The piece being written. When it was started in an earlier sitting, it says
+// so: the code and the counts are the whole piece's.
 function activeSection(a) {
+  const title = (a.piece && a.piece.label) || a.docLabel || a.app;
+  const lines = [`${fmtNum(a.keystrokes)} keystrokes in ${fmtDuration(a.activeMs)}`];
+  if (a.piece && a.piece.sessions > 1) lines.push(`Continued from ${sinceLabel(a.piece.startedAt)}`);
   return `<section class="sec">
-    <div class="line"><span class="big">${esc(a.app)}</span><span class="meta">${esc(scoreText(a.score))}</span></div>
-    ${codeBlock(a, `${fmtNum(a.keystrokes)} keystrokes in ${fmtDuration(a.activeMs)}`)}
+    <div class="line"><span class="big">${esc(title)}</span><span class="meta">${esc(scoreText(a.score))}</span></div>
+    ${codeBlock(a, lines)}
   </section>`;
+}
+
+function sinceLabel(ts) {
+  const w = when(ts);
+  return /^(Now|\d+ min ago)$/.test(w) ? "earlier today" : w.replace(/^Today, /, "today at ");
 }
 
 function idleSection(s) {
@@ -185,14 +197,20 @@ function stampSection(st) {
     <button class="row" data-action="reveal" data-path="${esc(st.path)}"><span class="n">${esc(st.name)}</span><span class="r">Code added&nbsp;&nbsp;${esc(when(st.at))}</span></button><div class="list-end"></div>`;
 }
 
+// Pieces of writing, and any sitting that never became one (too little text
+// to recognise), newest first.
 function recentSection() {
-  const activeId = state.app?.active?.id;
-  const past = state.sessions.filter((x) => x.id !== activeId).slice(0, 6);
-  if (!past.length) return "";
+  const active = state.app?.active;
+  const activePiece = active?.piece?.id;
+  const items = [
+    ...state.pieces.filter((p) => p.id !== activePiece).map((p) => ({ screen: "piece", id: p.id, label: p.label, lastAt: p.lastAt, cert: p.cert })),
+    ...state.sessions.filter((x) => !x.pieceId && x.id !== active?.id).map((x) => ({ screen: "session", id: x.id, label: x.docLabel || x.app, lastAt: x.lastKeyAt, cert: x.cert })),
+  ].sort((a, b) => b.lastAt - a.lastAt).slice(0, 6);
+  if (!items.length) return "";
   return `<div class="sep"></div><section class="sec tight"><div class="lab">Recent</div></section>
-    ${past.map((x) => `<button class="row" data-action="go" data-screen="session" data-id="${esc(x.id)}">
-      <span class="n">${esc(x.app)}</span>
-      <span class="r">${x.cert ? `<b>${(x.cert.verified || verifiedTier(x.cert.tier)) ? "Verified" : "Recorded"}</b>` : ""}${esc(when(x.lastKeyAt))}</span>
+    ${items.map((x) => `<button class="row" data-action="go" data-screen="${x.screen}" data-id="${esc(x.id)}">
+      <span class="n">${esc(x.label)}</span>
+      <span class="r">${x.cert ? `<b>${(x.cert.verified || verifiedTier(x.cert.tier)) ? "Verified" : "Recorded"}</b>` : ""}${esc(when(x.lastAt))}</span>
     </button>`).join("")}<div class="list-end"></div>`;
 }
 
@@ -269,6 +287,33 @@ function screenSession() {
       : `<button data-action="delete-ask">Delete session</button><span></span>`}</footer>`;
 }
 
+function screenPiece() {
+  const d = state.detail;
+  if (!d) return header({ back: true, title: "" }) + `<section class="sec"><div class="meta">${state.detailMissing ? "This piece is no longer here." : ""}</div></section>`;
+  const f = d.full || {};
+  const rows = [
+    ["App", d.app],
+    ["Started", when(d.startedAt)],
+    ["Last written", when(d.lastAt)],
+    ["Sittings", fmtNum(d.sessions)],
+    ["Writing time", fmtDuration(d.activeMs)],
+    ["Keystrokes", fmtNum(d.keystrokes)],
+    ["Words, about", fmtNum(d.wordsEst)],
+    ["Pauses to think", fmtNum(f.thinking_pauses)],
+    ["Corrections", fmtNum(f.typo_corrections)],
+  ];
+  return header({ back: true, title: d.label })
+    + `<section class="sec">
+      <div class="line"><span class="big">${esc(d.score?.tier || "No signal yet")}</span><span class="meta">${d.score ? `${esc(d.score.score)} of 100` : ""}</span></div>
+      <dl class="kv">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
+    </section><div class="sep"></div>
+    <section class="sec">${codeBlock(d, [], "piece")}</section>
+    <div class="sep"></div>
+    <footer class="foot">${state.confirmDelete
+      ? `<span>Delete this piece and its record?</span><span><button data-action="delete-confirm" data-id="${esc(d.id)}" data-kind="piece">Delete</button>&nbsp;&nbsp;&nbsp;<button data-action="delete-cancel">Keep</button></span>`
+      : `<button data-action="delete-ask">Delete piece</button><span></span>`}</footer>`;
+}
+
 function screenSignIn() {
   const c = state.signin;
   return header({ back: true, title: "Sign in" })
@@ -339,7 +384,7 @@ function appName(id) {
 /* ═══ Render ═════════════════════════════════════════════════════════════ */
 
 const root = document.getElementById("root");
-const SCREENS = { setup: screenSetup, home: screenHome, session: screenSession, settings: screenSettings, signin: screenSignIn };
+const SCREENS = { setup: screenSetup, home: screenHome, session: screenSession, piece: screenPiece, settings: screenSettings, signin: screenSignIn };
 
 function render() {
   const active = document.activeElement;
@@ -363,11 +408,11 @@ function fit() {
 async function go(screen, id = null) {
   state.screen = screen;
   state.confirmDelete = false;
-  if (screen === "session") {
+  if (screen === "session" || screen === "piece") {
     state.sessionId = id; state.detail = null; state.detailMissing = false;
     render();
-    const d = await window.inkk.getSession(id);
-    if (state.screen !== "session" || state.sessionId !== id) return;
+    const d = screen === "piece" ? await window.inkk.getPiece(id) : await window.inkk.getSession(id);
+    if (state.screen !== screen || state.sessionId !== id) return;
     if (d) state.detail = d; else state.detailMissing = true;
   }
   if (screen === "settings") loadPreview();
@@ -393,11 +438,11 @@ function flash(id, text) {
   flashTimer = setTimeout(() => { state.flash = null; render(); }, 2200);
 }
 
-async function certify(id) {
+async function certify(id, kind = "session") {
   if (!id || state.busy) return;
   state.busy = id; state.error = null; render();
   try {
-    const r = await window.inkk.certify(id);
+    const r = kind === "piece" ? await window.inkk.certifyPiece(id) : await window.inkk.certify(id);
     if (r?.ok) {
       await window.inkk.copyText(sealLine(r.cert.code));
       flash(id, "Certified. The seal is copied.");
@@ -411,6 +456,7 @@ async function certify(id) {
   } finally {
     state.busy = null;
     if (state.screen === "session" && state.sessionId === id) state.detail = await window.inkk.getSession(id);
+    if (state.screen === "piece" && state.sessionId === id) state.detail = await window.inkk.getPiece(id);
     render();
   }
 }
@@ -436,7 +482,7 @@ const ACTIONS = {
   back: () => { state.pending = null; home(); },
   open: (el) => window.inkk.openExternal(el.dataset.url),
   reveal: (el) => window.inkk.revealFile(el.dataset.path),
-  certify: (el) => certify(el.dataset.id),
+  certify: (el) => certify(el.dataset.id, el.dataset.kind),
   "copy-seal": async (el) => { await window.inkk.copyText(sealLine(el.dataset.code)); flash(el.dataset.id, "Seal copied"); render(); },
   sign: () => window.inkk.sign(),
   end: (el) => window.inkk.endSession(el.dataset.id),
@@ -470,7 +516,11 @@ const ACTIONS = {
   quit: () => window.inkk.quit(),
   "delete-ask": () => { state.confirmDelete = true; render(); },
   "delete-cancel": () => { state.confirmDelete = false; render(); },
-  "delete-confirm": async (el) => { await window.inkk.deleteSession(el.dataset.id); home(); },
+  "delete-confirm": async (el) => {
+    if (el.dataset.kind === "piece") await window.inkk.deletePiece(el.dataset.id);
+    else await window.inkk.deleteSession(el.dataset.id);
+    home();
+  },
 };
 
 root.addEventListener("click", (e) => {
@@ -521,7 +571,8 @@ async function handOverOldSession() {
 
 (async function boot() {
   if (!window.inkk) { root.innerHTML = `<section class="sec">This page needs the inkk app.</section>`; return; }
-  const [s, list] = await Promise.all([window.inkk.getState(), window.inkk.getSessions()]);
+  const [s, list, ps] = await Promise.all([window.inkk.getState(), window.inkk.getSessions(), window.inkk.getPieces?.() ?? []]);
+  state.pieces = ps || [];
   state.app = s;
   state.sessions = list || [];
   handOverOldSession();
@@ -534,18 +585,23 @@ async function handOverOldSession() {
     if (state.screen === "signin" || (state.screen === "settings" && root.contains(document.activeElement) && document.activeElement.dataset.field)) return;
     render();
   });
+  window.inkk.onPieces?.((l) => { state.pieces = l || []; });
   window.inkk.onSessions(async (l) => {
     state.sessions = l || [];
     if (state.screen === "session" && state.sessionId) {
       const d = await window.inkk.getSession(state.sessionId);
       if (state.screen === "session" && d) state.detail = d;
     }
+    if (state.screen === "piece" && state.sessionId) {
+      const d = await window.inkk.getPiece(state.sessionId);
+      if (state.screen === "piece" && d) state.detail = d;
+    }
     if (state.screen !== "signin" && state.screen !== "settings") render();
   });
   window.inkk.onShown(async () => {
-    const [ns, nl] = await Promise.all([window.inkk.getState(), window.inkk.getSessions()]);
-    state.app = ns; state.sessions = nl || [];
-    if (state.screen === "session" || state.screen === "settings" || state.screen === "signin") render();
+    const [ns, nl, np] = await Promise.all([window.inkk.getState(), window.inkk.getSessions(), window.inkk.getPieces?.() ?? []]);
+    state.app = ns; state.sessions = nl || []; state.pieces = np || [];
+    if (state.screen === "session" || state.screen === "piece" || state.screen === "settings" || state.screen === "signin") render();
     else home();
   });
   setInterval(() => { if (state.screen === "setup") window.inkk.getState().then((n) => { state.app = n; if (!needsSetup(n)) home(); else render(); }); }, 1500);

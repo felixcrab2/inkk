@@ -1,13 +1,21 @@
 // inkk companion — writing-session model + persistence.
 //
-// A "session" is one stretch of typing in one app. Sessions are keyed by the
-// front app's bundle id and may be open concurrently (drafting in Notes while
-// answering mail is two sessions, not one), and each one carries the exact
-// writing_event_batches trace that capture.js reconstructs from physical keys —
-// key_char always null, so the store holds the RHYTHM of writing and, by
-// construction, never the words.
+// A "session" is one stretch of typing in one document of one app. Sessions
+// are keyed by the front app's bundle id and the document in front of it (the
+// docKey lib/context.js derives from the window: a file path or a title, ""
+// when it can't tell) and may be open concurrently: drafting in Notes while
+// answering mail is two sessions, and so are two letters open side by side in
+// Pages. Each one carries the exact writing_event_batches trace that capture.js
+// reconstructs from physical keys — key_char always null, so the store holds
+// the RHYTHM of writing and, by construction, never the words. The document's
+// key and label live on the summary only, never in the trace that is sent to
+// inkk.site at certify time.
 //
-// Lifecycle:  first keystroke in an app → openFor()  … typing …  → closed after
+// A session can be linked to a piece (lib/pieces.js): the piece of writing its
+// typing went into, so a letter picked up again tomorrow is one piece written
+// over two sittings rather than two unrelated sessions.
+//
+// Lifecycle:  first keystroke in a document → openFor()  … typing …  → closed after
 // IDLE_MS without keys (closeIdle, driven by a 30s timer in main), on an
 // explicit end(), on quit (closeAll), or when the day changes.
 //
@@ -37,8 +45,8 @@ const RETENTION_DAYS = 60;
 const RETENTION_MAX = 400;
 const MAX_EVENTS_IN_MEMORY = 60000;    // /api/certify caps events at 60000 too
 const TRIM_CHUNK = 2000;               // …kept as a ring: drop the oldest chunk when full
-const MIN_KEEP_KEYSTROKES = 40;
-const MAX_VERSIONS = 20;               // earlier certificates kept per session        // shorter sessions (Spotlight, a filename) are noise and are dropped on close
+const MIN_KEEP_KEYSTROKES = 40;        // shorter sessions (Spotlight, a filename) are noise and are dropped on close
+const MAX_VERSIONS = 20;               // earlier certificates kept per session
 
 // A keydown that would put text on the page: printable keys, Enter,
 // Backspace/Delete, without a ⌘/Ctrl chord. Only these OPEN a session; a lone
@@ -81,7 +89,8 @@ function createStore({ dir, now = Date.now, hrnow = null, genId, genCode = null,
 
   const summaries = new Map();   // id → SessionSummary (open and closed)
   const live = new Map();        // id → in-memory state for OPEN sessions
-  const openByApp = new Map();   // bundleId → id of the open session for that app
+  const openByDoc = new Map();   // routeKey(bundleId, docKey) → id of the open session for that document
+  const pressedIn = new Map();   // key name → the session that key's press went to
   const fullCache = new Map();   // id → last full computeScore() output
   let activeId = null;           // session that got the most recent keystroke
   let indexDirtyAt = null;
@@ -91,9 +100,55 @@ function createStore({ dir, now = Date.now, hrnow = null, genId, genCode = null,
   const markIndex = () => { if (indexDirtyAt === null) indexDirtyAt = now(); };
 
   // ── open / route ──────────────────────────────────────────────────────────
-  function openFor(bundleId, app) {
-    const existing = openByApp.get(bundleId);
-    if (existing) return existing;
+  // A route is one app and one document; a newline never occurs in a bundle id.
+  const routeKey = (bundleId, docKey) => `${bundleId}\n${docKey || ""}`;
+
+  // The open session that keys typed in this app and document continue, or
+  // null. A known document has its own session. An unknown one ("": no helper,
+  // no Accessibility, a read that failed for a moment) is not a new document:
+  // it continues whichever of the app's sessions was typed in last, which is
+  // exactly one session per app, as before, when no document is ever known.
+  // And an app's first keys can come before its document is known (the helper
+  // still starting, Accessibility granted mid-letter): that nameless session
+  // was this document all along, so the document continues it.
+  function continuing(bundleId, docKey) {
+    const own = openByDoc.get(routeKey(bundleId, docKey));
+    if (own) return own;
+    if (docKey) return openByDoc.get(routeKey(bundleId, "")) || null;
+    let last = null;
+    for (const id of live.keys()) {
+      const s = summaries.get(id);
+      if (s.bundleId === bundleId && (!last || s.lastKeyAt > last.lastKeyAt)) last = s;
+    }
+    return last ? last.id : null;
+  }
+
+  // A nameless session takes the document it turned out to be, and a label
+  // keeps up with what the document is called. An unknown document never
+  // renames a known one.
+  function nameDoc(id, docKey, docLabel) {
+    const s = summaries.get(id);
+    if (!docKey || (s.docKey && s.docKey !== docKey)) return;
+    let renamed = false;
+    if (!s.docKey) {
+      openByDoc.delete(routeKey(s.bundleId, ""));
+      s.docKey = docKey;
+      openByDoc.set(routeKey(s.bundleId, docKey), id);
+      renamed = true;
+    }
+    if (docLabel && s.docLabel !== docLabel) { s.docLabel = docLabel; renamed = true; }
+    if (!renamed) return;
+    markIndex();
+    emit("sessions");
+  }
+
+  // `doc` is { docKey, docLabel } (or just the docKey). A caller that passes
+  // only the bundle id gets the app's current session, as it always has.
+  function openFor(bundleId, app, doc) {
+    const d = typeof doc === "string" ? { docKey: doc } : (doc || {});
+    const docKey = d.docKey || "", docLabel = d.docLabel || "";
+    const existing = continuing(bundleId, docKey);
+    if (existing) { nameDoc(existing, docKey, docLabel); return existing; }
     const t = now();
     const id = genId();
     const cap = createCapture({
@@ -104,6 +159,7 @@ function createStore({ dir, now = Date.now, hrnow = null, genId, genCode = null,
     cap.start({ platform: process.platform, app, bundle_id: bundleId, surface: "companion" });
     const summary = {
       id, app, bundleId,
+      docKey, docLabel, pieceId: null,    // the piece is linked once its text has been recognised
       code: genCode ? genCode() : null,   // ready from the first keystroke; certifying binds it
       startedAt: t, endedAt: null, lastKeyAt: t,
       keystrokes: 0, deletions: 0, pastes: 0, wordsEst: 0, activeMs: 0,
@@ -111,7 +167,7 @@ function createStore({ dir, now = Date.now, hrnow = null, genId, genCode = null,
     };
     summaries.set(id, summary);
     live.set(id, { cap, events: [], pending: [], spaceDowns: 0, scoredAt: 0, scoreDirty: false });
-    openByApp.set(bundleId, id);
+    openByDoc.set(routeKey(bundleId, docKey), id);
     drain(id);
     markIndex();
     emit("sessions");
@@ -135,25 +191,39 @@ function createStore({ dir, now = Date.now, hrnow = null, genId, genCode = null,
     return fresh.length;
   }
 
-  // One physical key event from the hook, already attributed to an app.
-  //   { bundleId, app, type: 'keydown'|'keyup'|'paste', name, mods, len, at: { t, pt } }
-  function keyEvent({ bundleId, app, type, name, mods, len, at }) {
+  // One physical key event from the hook, already attributed to an app and,
+  // when the helper could tell, to the document in front of it.
+  //   { bundleId, app, docKey, docLabel, type: 'keydown'|'keyup'|'paste', name, mods, len, at: { t, pt } }
+  function keyEvent({ bundleId, app, docKey, docLabel, type, name, mods, len, at }) {
     if (!bundleId) return null;
     const t = at?.t ?? now();
-    // An open session that has been idle past the limit (the Mac slept, or a
-    // long break), or that started on another calendar day, ends where it left
-    // off before this key can extend it — the 30s idle timer doesn't run
-    // through sleep, so this is the check that actually catches that case.
-    const existing = openByApp.get(bundleId);
-    if (existing) {
-      const es = summaries.get(existing);
-      const idle = t - es.lastKeyAt;
-      if (idle >= IDLE_MS || (dayKey(t) !== dayKey(es.startedAt) && idle >= DAY_CHANGE_GRACE_MS)) close(existing, es.lastKeyAt);
+    const doc = { docKey: docKey || "", docLabel: docLabel || "" };
+    // A release goes where its press went, even when the app or document in
+    // front changed while the key was held (⌘Tab, ⌘` to the next window, a
+    // poll landing mid-key), so every session's dwell times pair up. A
+    // physical key is held only once at a time, so the key's name alone says
+    // which press this is, and whichever app the release lands in consumes it.
+    // But only while that session is still going: a release after the session
+    // went stale (a press whose release was never seen, then a sleep) takes
+    // the normal path below, which ends the session where it left off rather
+    // than let the release stretch it across the gap.
+    const pressedId = name ? pressedIn.get(name) : undefined;
+    if (type === "keyup" && name) pressedIn.delete(name);
+    let id = type === "keyup" && live.has(pressedId) && !isStale(pressedId, t) ? pressedId : null;
+    if (!id) {
+      // The session this key would continue, if it has been idle past the
+      // limit (the Mac slept, or a long break) or started on another calendar
+      // day, ends where it left off before this key can extend it — the 30s
+      // idle timer doesn't run through sleep, so this is the check that
+      // actually catches that case.
+      for (let c = continuing(bundleId, doc.docKey); c && isStale(c, t); c = continuing(bundleId, doc.docKey)) {
+        close(c, summaries.get(c).lastKeyAt);
+      }
+      if (!continuing(bundleId, doc.docKey) && !(type === "keydown" && isTextKey(name, mods))) return null;
+      id = openFor(bundleId, app || bundleId, doc);
     }
-    if (!openByApp.get(bundleId) && !(type === "keydown" && isTextKey(name, mods))) return null;
-    const id = openFor(bundleId, app || bundleId);
     const s = summaries.get(id), l = live.get(id);
-    if (type === "keydown") l.cap.keydown(name, mods || "", at);
+    if (type === "keydown") { l.cap.keydown(name, mods || "", at); if (name) pressedIn.set(name, id); }
     else if (type === "keyup") l.cap.keyup(name, at);
     else if (type === "paste") l.cap.paste(len || 0, at);
     else return id;
@@ -195,11 +265,14 @@ function createStore({ dir, now = Date.now, hrnow = null, genId, genCode = null,
     score(id);
     s.endedAt = end;
     live.delete(id);
-    if (openByApp.get(s.bundleId) === id) openByApp.delete(s.bundleId);
+    const route = routeKey(s.bundleId, s.docKey);
+    if (openByDoc.get(route) === id) openByDoc.delete(route);
     if (activeId === id) activeId = null;
     // A few keys in a Save dialog or Spotlight is not a writing session: drop it
-    // rather than let it clutter Recent. Anything certified is always kept.
-    if (s.keystrokes < MIN_KEEP_KEYSTROKES && !s.cert) {
+    // rather than let it clutter Recent. Anything certified is always kept, and
+    // so is anything already part of a piece, whose certificate is scored from
+    // the rhythm of every session in it.
+    if (s.keystrokes < MIN_KEEP_KEYSTROKES && !s.cert && !s.pieceId) {
       summaries.delete(id);
       fullCache.delete(id);
       rmQuiet(eventsFile(id));
@@ -212,15 +285,19 @@ function createStore({ dir, now = Date.now, hrnow = null, genId, genCode = null,
     emit("sessions");
   }
 
+  // Over: idle past the limit, or — since a session never spans a calendar
+  // day — open since another day and quiet for a minute (an author
+  // mid-sentence at 00:00 isn't cut off).
+  function isStale(id, t) {
+    const s = summaries.get(id);
+    const idle = t - s.lastKeyAt;
+    return idle >= IDLE_MS || (dayKey(t) !== dayKey(s.startedAt) && idle >= DAY_CHANGE_GRACE_MS);
+  }
+
   function closeIdle(nowMs = now()) {
     const closed = [];
-    for (const [id] of live) {
-      const s = summaries.get(id);
-      const idle = nowMs - s.lastKeyAt;
-      if (idle >= IDLE_MS) { close(id, s.lastKeyAt); closed.push(id); continue; }
-      // A session never spans a calendar day: close at the first quiet minute
-      // after midnight (an author mid-sentence at 00:00 isn't cut off).
-      if (dayKey(nowMs) !== dayKey(s.startedAt) && idle >= DAY_CHANGE_GRACE_MS) { close(id, s.lastKeyAt); closed.push(id); }
+    for (const id of [...live.keys()]) {
+      if (isStale(id, nowMs)) { close(id, summaries.get(id).lastKeyAt); closed.push(id); }
     }
     return closed;
   }
@@ -250,6 +327,13 @@ function createStore({ dir, now = Date.now, hrnow = null, genId, genCode = null,
   const list = () => [...summaries.values()].sort((a, b) => b.lastKeyAt - a.lastKeyAt).map(s => ({ ...s }));
 
   const active = () => (activeId && live.has(activeId) ? { ...summaries.get(activeId) } : null);
+
+  // The open session the next key typed in this app and document would go
+  // to, or null when that key would start a new one.
+  function sessionFor(bundleId, docKey = "", nowMs = now()) {
+    const id = continuing(bundleId, docKey || "");
+    return id && !isStale(id, nowMs) ? { ...summaries.get(id) } : null;
+  }
 
   // All events for a session: the in-memory ring while open, the jsonl after —
   // in both cases the most recent MAX_EVENTS_IN_MEMORY, so a certificate is
@@ -288,6 +372,20 @@ function createStore({ dir, now = Date.now, hrnow = null, genId, genCode = null,
     s.code = cert.code;
     writeJsonAtomic(certFile(id), { ...cert, earlier: s.certs });
     markIndex();
+    emit("sessions");
+    return true;
+  }
+
+  // Tie a session to the piece of writing it belongs to (lib/pieces.js); null
+  // unties it. Written through at once rather than on the index debounce: the
+  // link is what lets a later certificate gather this session's rhythm.
+  function link(id, pieceId) {
+    const s = summaries.get(id);
+    if (!s) return false;
+    const next = pieceId || null;
+    if (s.pieceId === next) return true;
+    s.pieceId = next;
+    writeIndex();
     emit("sessions");
     return true;
   }
@@ -352,10 +450,14 @@ function createStore({ dir, now = Date.now, hrnow = null, genId, genCode = null,
     if (Array.isArray(arr)) {
       for (const s of arr) {
         if (!s || typeof s.id !== "string") continue;
+        // Sessions recorded before documents were told apart: an unknown document, no piece.
+        if (typeof s.docKey !== "string") s.docKey = "";
+        if (typeof s.docLabel !== "string") s.docLabel = "";
+        if (s.pieceId === undefined) s.pieceId = null;
         if (s.endedAt == null) {
           s.endedAt = s.lastKeyAt; indexDirtyAt = indexDirtyAt ?? 0;
           // …and the same rule close() applies: a few keys in a dialog is not a session.
-          if ((s.keystrokes | 0) < MIN_KEEP_KEYSTROKES && !s.cert) { rmQuiet(eventsFile(s.id)); continue; }
+          if ((s.keystrokes | 0) < MIN_KEEP_KEYSTROKES && !s.cert && !s.pieceId) { rmQuiet(eventsFile(s.id)); continue; }
         }
         summaries.set(s.id, s);
       }
@@ -367,7 +469,9 @@ function createStore({ dir, now = Date.now, hrnow = null, genId, genCode = null,
   }
 
   // Reconstruct summaries from sessions/events/*.jsonl (+ certs) when the
-  // index is unreadable. Scores are recomputed lazily by get().
+  // index is unreadable. Scores are recomputed lazily by get(). The trace
+  // never names the document, so a rebuilt session's is unknown and its piece
+  // link comes back from lib/pieces.js, which lists each piece's sessions.
   function rebuildFromEvents() {
     const out = [];
     let names = [];
@@ -381,6 +485,7 @@ function createStore({ dir, now = Date.now, hrnow = null, genId, genCode = null,
       const cert = readJson(certFile(id));
       const s = {
         id, app: start?.payload?.app || "Unknown app", bundleId: start?.payload?.bundle_id || "",
+        docKey: "", docLabel: "", pieceId: null,
         code: cert?.code || (genCode ? genCode() : null),
         startedAt: first.t, endedAt: last.t, lastKeyAt: last.t,
         keystrokes: 0, deletions: 0, pastes: 0, wordsEst: 0, activeMs: 0, score: null,
@@ -420,7 +525,7 @@ function createStore({ dir, now = Date.now, hrnow = null, genId, genCode = null,
 
   return {
     openFor, keyEvent, closeIdle, end, closeAll, delete: remove,
-    list, get, active, eventsOf, setCert, codeFor,
+    list, get, active, sessionFor, eventsOf, setCert, codeFor, link,
     tick, flush, load, prune,
     get openCount() { return live.size; },
   };
