@@ -182,12 +182,22 @@ test("a session left open by a crash is closed on load", async () => {
   const dir = tmpDir();
   const now = clock();
   const a = await newStore({ dir, now });
-  a.store.keyEvent({ ...NOTES, type: "keydown", name: "a" });
+  typeKeep(a.store, NOTES);
   now.advance(1100);
   a.store.tick();                     // index written with endedAt null, then the "process dies"
   const b = await newStore({ dir, now });
   b.store.load();
+  assert.strictEqual(b.store.list().length, 1);
   assert.strictEqual(b.store.list()[0].endedAt, b.store.list()[0].lastKeyAt);
+  // …whereas a crash after three keys leaves nothing behind
+  const dir2 = tmpDir();
+  const c = await newStore({ dir: dir2, now });
+  for (const ch of "saf") c.store.keyEvent({ ...NOTES, type: "keydown", name: ch });
+  now.advance(1100);
+  c.store.tick();
+  const d = await newStore({ dir: dir2, now });
+  d.store.load();
+  assert.strictEqual(d.store.list().length, 0);
 });
 
 test("retention prunes beyond 60 days and beyond 400 sessions", async () => {

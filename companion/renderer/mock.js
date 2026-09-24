@@ -104,7 +104,7 @@
     certify: async (input) => {
       await wait(600);
       const s = sessions.find((x) => x.id === input.sessionId);
-      if (!input.accessToken) return { ok: false, error: "Sign in to certify", needsAuth: true };
+      if (!input.accessToken && state.__requireAuth) return { ok: false, error: "Sign in to certify", needsAuth: true };
       const cert = { code: input.code, verified: true, tier: s?.score?.tier || "Strong", score: s?.score?.score || 70,
         issuedAt: Date.now(), title: input.title, wordCount: input.wordCount, contentHash: input.contentHash };
       if (s) s.cert = cert;

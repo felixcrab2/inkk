@@ -137,8 +137,10 @@ function createCapture({ userId, docId, sessionId, genId, now, hrnow }) {
     push({ kind: "paste", len_delta: n, caret_pos: caret, input_type: "insertFromPaste", payload: n ? { paste_len: n } : null, at });
   }
 
-  function stop() {
-    push({ kind: "session_end" });
+  // `at` lets an idle-closed session end at its last key, not at the moment
+  // the idle timer noticed (which would stretch total time and sink active_ratio).
+  function stop(at) {
+    push({ kind: "session_end", at });
   }
 
   return {

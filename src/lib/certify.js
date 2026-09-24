@@ -1,5 +1,5 @@
 import { supabase } from "../supabase";
-import { makeVerifyCode, hashContent, isVerifiedTier, normalizePlainText } from "../verify/code";
+import { makeVerifyCode, hashContent, isVerifiedTier } from "../verify/code";
 import { wordCount } from "../lib/docs";
 
 // Ask the server-side /api/certify endpoint to recompute the human-signal score
@@ -57,7 +57,7 @@ export async function issueCert({ doc, user, code, reuse, events, contentHash, t
   // gets to assert its own number.
   const server = await certifyViaServer({
     docId: doc.id, code, events, contentHash,
-    wordCount: wordCount(doc.content), charCount: normalizePlainText(doc.content).length, title, authorName, authorUsername,
+    wordCount: wordCount(doc.content), title, authorName, authorUsername,
   });
   if (server) {
     return { code, verified: !!server.verified, contentHash, isNew: !reuse };

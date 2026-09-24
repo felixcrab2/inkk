@@ -187,10 +187,11 @@ function createStore({ dir, now = Date.now, hrnow = null, genId, scoring = null,
   function close(id, endedAt) {
     const s = summaries.get(id), l = live.get(id);
     if (!s || !l) return;
-    l.cap.stop();
+    const end = endedAt ?? now();
+    l.cap.stop({ t: end });
     drain(id);
     score(id);
-    s.endedAt = endedAt ?? now();
+    s.endedAt = end;
     live.delete(id);
     if (openByApp.get(s.bundleId) === id) openByApp.delete(s.bundleId);
     if (activeId === id) activeId = null;
@@ -332,7 +333,11 @@ function createStore({ dir, now = Date.now, hrnow = null, genId, scoring = null,
     if (Array.isArray(arr)) {
       for (const s of arr) {
         if (!s || typeof s.id !== "string") continue;
-        if (s.endedAt == null) { s.endedAt = s.lastKeyAt; indexDirtyAt = indexDirtyAt ?? 0; }
+        if (s.endedAt == null) {
+          s.endedAt = s.lastKeyAt; indexDirtyAt = indexDirtyAt ?? 0;
+          // …and the same rule close() applies: a few keys in a dialog is not a session.
+          if ((s.keystrokes | 0) < MIN_KEEP_KEYSTROKES && !s.cert) { rmQuiet(eventsFile(s.id)); continue; }
+        }
         summaries.set(s.id, s);
       }
     }

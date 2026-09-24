@@ -46,19 +46,21 @@ async function readFrontApp() {
 function createContextPoller({ intervalMs = POLL_MS, onChange = null, read = readFrontApp } = {}) {
   let current = null;
   let timer = null;
-  let inFlight = false;
+  let flight = null;             // the poll in progress, so a second caller waits for its answer
 
-  async function pollNow() {
-    if (inFlight) return current;
-    inFlight = true;
-    try {
-      const next = await read();
-      const changed = (next?.bundleId || null) !== (current?.bundleId || null);
-      current = next;
-      if (changed && onChange) onChange(current);
-    } catch { /* keep the last answer */ }
-    finally { inFlight = false; }
-    return current;
+  function pollNow() {
+    if (flight) return flight;
+    flight = (async () => {
+      try {
+        const next = await read();
+        const changed = (next?.bundleId || null) !== (current?.bundleId || null);
+        current = next;
+        if (changed && onChange) onChange(current);
+      } catch { /* keep the last answer */ }
+      finally { flight = null; }
+      return current;
+    })();
+    return flight;
   }
 
   return {

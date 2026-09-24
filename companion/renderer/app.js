@@ -401,9 +401,14 @@ function authStep() {
   </form>`;
 }
 
+// The session a certify screen is about: the one it was opened for, else the live one.
+function certifySession() {
+  return state.sessions.find((x) => x.id === state.sessionId) || state.app?.active || null;
+}
+
 function screenCertify() {
   const c = state.certify;
-  const sess = state.sessions.find((x) => x.id === state.sessionId) || state.app?.active;
+  const sess = certifySession();
   return `<div class="view">
     <div class="h2">Certify${sess ? ` · ${esc(sess.app)}` : ""}</div>
     <p class="lead" style="margin-top:6px">Paste the finished text. It's fingerprinted on this Mac and only the fingerprint travels — inkk never stores your words.</p>
@@ -541,7 +546,7 @@ function render() {
   const active = document.activeElement;
   const keep = !active || !root.contains(active) ? null
     : active.dataset.field ? { field: active.dataset.field, start: active.selectionStart, end: active.selectionEnd }
-    : active.dataset.action ? { action: active.dataset.action, id: active.dataset.id, screen: active.dataset.screen, kind: active.dataset.kind, what: active.dataset.what }
+    : active.dataset.action ? { action: active.dataset.action, id: active.dataset.id, screen: active.dataset.screen, kind: active.dataset.kind, what: active.dataset.what, url: active.dataset.url }
     : null;
   const scrollY = root.scrollTop;
   const entering = state.screen !== renderedScreen;
@@ -554,8 +559,8 @@ function render() {
     if (el) { el.focus({ preventScroll: true }); try { el.setSelectionRange(keep.start, keep.end); } catch {} }
   } else if (keep?.action) {
     // A keyboard user on a row or button keeps their place across state pushes.
-    const sel = [`[data-action="${keep.action}"]`, keep.id && `[data-id="${keep.id}"]`, keep.screen && `[data-screen="${keep.screen}"]`,
-      keep.kind && `[data-kind="${keep.kind}"]`, keep.what && `[data-what="${keep.what}"]`].filter(Boolean).join("");
+    const q = (k, v) => (v ? `[data-${k}="${CSS.escape(v)}"]` : "");
+    const sel = q("action", keep.action) + q("id", keep.id) + q("screen", keep.screen) + q("kind", keep.kind) + q("what", keep.what) + q("url", keep.url);
     const el = root.querySelector(sel);
     if (el) el.focus({ preventScroll: true });
   }
@@ -583,7 +588,8 @@ async function go(screen, id = null, opts = {}) {
   state.confirmDelete = false;
   if (screen === "session") { state.sessionId = id; state.detail = null; state.detailMissing = false; }
   if (screen === "certify") {
-    if (id !== state.sessionId) resetCertify();
+    if (id !== state.certify.forId) resetCertify();
+    state.certify.forId = id;
     state.sessionId = id;
   }
   const hash = "#" + screen + (id && (screen === "session" || screen === "certify") ? "/" + id : "");
@@ -607,7 +613,7 @@ function goBack() {
 }
 
 function resetCertify() {
-  state.certify = { text: "", title: "", busy: false, error: null, code: null,
+  state.certify = { forId: null, text: "", title: "", busy: false, error: null, code: null,
     needsAuth: false, authEnter: false, email: "", password: "", authBusy: false, authError: null };
 }
 
@@ -616,6 +622,7 @@ async function routeFromHash() {
   const m = /^#([a-z]+)(?:\/(.+))?$/.exec(location.hash || "");
   if (!m) return go(needsWelcome(state.app) ? "welcome" : "home", null, { prev: null });
   const [, screen, id] = m;
+  if (needsWelcome(state.app)) return go("welcome", null, { prev: null });   // no hash skips onboarding
   if (screen === "result") {
     if (id) {
       const s = state.sessions.find((x) => x.id === id) || await window.inkk.getSession(id);
@@ -649,7 +656,7 @@ async function runCertify() {
   const c = state.certify;
   const text = c.text.trim();
   if (!text) { c.error = "Paste the finished text first."; render(); return; }
-  const sessionId = state.sessionId || state.app?.active?.id;
+  const sessionId = certifySession()?.id || null;
   if (!sessionId) { c.error = "There is no session to certify."; render(); return; }
   c.busy = true; c.error = null; render();
   try {
@@ -660,7 +667,7 @@ async function runCertify() {
     // Keep one code across an auth retry so the ledger never sees two.
     const code = c.code || (c.code = makeVerifyCode());
     const auth = await getAccessToken();
-    if (!auth.token && auth.reason !== "disabled") {
+    if (!auth.token && auth.reason === "offline") {
       c.error = "inkk.site can't be reached right now — check your connection and try again.";
       return;
     }

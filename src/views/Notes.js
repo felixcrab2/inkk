@@ -11,7 +11,7 @@ import { DropCapAvatar } from "../components/DropCapAvatar";
 import { PrivacyModal, TermsModal } from "../components/Legal";
 import { stripHtml, docTitle, wordCount } from "../lib/docs";
 import { formatDate, formatJoined, formatWritingTime } from "../lib/format";
-import { fetchMyContribution, upsertProfile } from "../lib/profile";
+import { fetchMyContribution, upsertProfile, generateUniqueUsername } from "../lib/profile";
 import { flushNow as syncFlushNow } from "../telemetry/sync";
 import { countForUser as countLocalEvents } from "../telemetry/store";
 
@@ -98,10 +98,11 @@ export function NotesView({
     const newDisplayName = editDisplayName.trim();
     setSaving(true);
     setEditError("");
-    const err = await upsertProfile(user.id, profile?.username || editUsername, newDisplayName || null);
+    const handle = profile?.username || await generateUniqueUsername(user.email?.split("@")[0] || "writer");
+    const err = await upsertProfile(user.id, handle, newDisplayName || null);
     setSaving(false);
     if (err) { setEditError(err); return; }
-    onProfileUpdate?.({ ...profile, display_name: newDisplayName || null });
+    onProfileUpdate?.({ ...profile, username: handle, display_name: newDisplayName || null });
     setEditing(false);
   };
 

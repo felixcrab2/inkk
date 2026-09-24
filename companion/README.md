@@ -132,6 +132,10 @@ App Store is not an option: its sandbox forbids the global input monitoring the
 companion depends on. `package.json` leaves notarization off for ordinary
 builds; `release.sh` turns it on.
 
+The renderer's Content-Security-Policy only allows connections to
+`https://*.supabase.co` and `https://inkk.site`; a self-hosted Supabase URL
+needs `companion/renderer/index.html` updated to match.
+
 Server side, the Supabase project must have **anonymous sign-ins enabled**
 (Authentication → Sign In / Providers → *Allow anonymous sign-ins*) for the
 account-free certification flow — see `docs/backend-changes-2026-09.md`.

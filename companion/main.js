@@ -107,6 +107,7 @@ let trayActive = null;
 let lastOtherFront = null;               // most recent front app that isn't inkk (what "Ignore <app>" offers)
 let blurHideAt = 0;
 let holdOpenUntil = 0;
+let holdTimer = null;
 let pauseTimer = null;
 let repoll = null;                       // in-flight front-app re-poll; keys queue behind it
 const keyQueue = [];
@@ -293,10 +294,20 @@ function createWindow() {
   win.loadFile(path.join(__dirname, "renderer", "index.html"));
   win.on("blur", () => {
     if (win.webContents.isDevToolsOpened()) return;
-    if (Date.now() < holdOpenUntil) return;       // an OS permission dialog took focus; stay put
+    if (Date.now() < holdOpenUntil) {
+      // An OS permission dialog took focus: stay put for now, but a window that
+      // never regains focus gets no second blur, so finish the job when the hold ends.
+      if (holdTimer) clearTimeout(holdTimer);
+      holdTimer = setTimeout(() => {
+        holdTimer = null;
+        if (win && !win.isDestroyed() && win.isVisible() && !win.isFocused()) { win.hide(); blurHideAt = Date.now(); }
+      }, Math.max(0, holdOpenUntil - Date.now()) + 50);
+      return;
+    }
     win.hide();
     blurHideAt = Date.now();
   });
+  win.on("focus", () => { if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; } });
   win.on("show", () => win.webContents.send("inkk:shown"));
   win.webContents.on("did-finish-load", () => { push("state"); push("sessions"); });
 }

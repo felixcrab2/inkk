@@ -59,6 +59,7 @@ export default function App() {
   const viewRef = useRef(pathToView(window.location.pathname));
   useEffect(() => { viewRef.current = view; }, [view]);
   const explicitSignOutRef = useRef(false);   // only a deliberate Sign out wipes local notes
+  const inAppDepthRef = useRef(0);            // history entries this app pushed; Escape only goes back over those
   const [certMenuOpen, setCertMenuOpen] = useState(false);
   const [certStale, setCertStale]       = useState(false);
   const [certConfirmOpen, setCertConfirmOpen] = useState(false); // mobile: explain Certify before acting
@@ -535,8 +536,10 @@ export default function App() {
   const navigate = useCallback((newView, opts = {}) => {
     const { code } = opts;
     const url = viewToPath(newView, code);
-    if (window.location.pathname !== url)
-      window.history.pushState({ view: newView, code }, "", url);
+    if (window.location.pathname !== url) {
+      window.history.pushState({ view: newView, code, fromApp: true }, "", url);
+      inAppDepthRef.current += 1;
+    }
     setView(newView);
     if (newView === "certify") setVerifyCode(code || "");
   }, []);
@@ -568,6 +571,7 @@ export default function App() {
       // no state at all) still resolve to the right view.
       const p = window.location.pathname;
       const newView = pathToView(p);
+      if (inAppDepthRef.current > 0) inAppDepthRef.current -= 1;
       setView(newView);
       setLegalPage(pathToLegal(p));
       if (newView === "certify") setVerifyCode(p.startsWith("/v/") ? p.slice(3) : "");
@@ -895,7 +899,8 @@ export default function App() {
   const signOut = useCallback(async () => {
     if (!supabase) return;
     explicitSignOutRef.current = true;
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) { explicitSignOutRef.current = false; addToast("Couldn't sign out. Try again."); return; }
     addToast("Signed out.");
   }, [addToast]);
 
@@ -1344,8 +1349,8 @@ export default function App() {
         setPanelOpen(false); setHsModalOpen(false); setHsScoreOpen(false);
         if (view !== "editor") {
           if (document.querySelector(".pe-overlay, .legal-overlay")) return;   // a dialog owns Escape
-          if (window.history.state?.view && window.history.length > 1) window.history.back();
-          else navigate("editor");
+          if (inAppDepthRef.current > 0) window.history.back();   // a previous entry of ours
+          else navigate("editor");                                // arrived from outside: don't leave the site
           return;
         }
       }
