@@ -13,9 +13,9 @@
   margin: 0;
   font-family: var(--font-serif);
   font-weight: 400;
-  font-size: var(--t-3xl);
+  font-size: var(--t-2xl);
   line-height: 1;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   color: var(--ink);
 }
 .nt-new {
@@ -52,8 +52,9 @@
 }
 .nt-row-title {
   font-family: var(--font-serif);
-  font-size: var(--t-xl);
-  line-height: 1.2;
+  font-size: var(--t-lg);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
   color: var(--ink);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }

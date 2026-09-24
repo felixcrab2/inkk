@@ -1,9 +1,12 @@
 import "./styles/index.css";
 import "@fontsource/im-fell-english/400.css";
 import "@fontsource/im-fell-english/400-italic.css";
+import "@fontsource/eb-garamond/400.css";
+import "@fontsource/eb-garamond/400-italic.css";
+import "@fontsource/eb-garamond/500.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { Menu, Check, Download, Maximize2, Minimize2, Plus, Trash2, Type, MoreHorizontal, X, Eye, EyeOff } from "lucide-react";
+import { Menu, Check, Download, Maximize2, Minimize2, Plus, Trash2, MoreHorizontal, X, Eye, EyeOff } from "lucide-react";
 import { PenNib as PPen, Notebook as PNotes, SealCheck as PSeal } from "@phosphor-icons/react";
 import { jsPDF } from "jspdf";
 import { supabase } from "./supabase";
@@ -63,7 +66,11 @@ export default function App() {
   const [certifying, setCertifying]   = useState(false);
   const [verifyCode, setVerifyCode]   = useState(() =>
     window.location.pathname.startsWith("/v/") ? window.location.pathname.slice(3) : "");
-  const [font, setFont]               = useState(() => localStorage.getItem("inkk_font") || "garamond");
+  const [font, setFont]               = useState(() => {
+    const v = localStorage.getItem("inkk_face");
+    return ["fell", "garamond", "sans"].includes(v) ? v : "fell";
+  });
+  const [faceMenuOpen, setFaceMenuOpen] = useState(false);
   const [titleCapsOn, setTitleCapsOn] = useState(() => localStorage.getItem("inkk_title_caps") !== "0");
   const [toolsOpen, setToolsOpen]     = useState(false);   // the editor's tools row, folded away until asked for
   const [showLanding, setShowLanding] = useState(() =>
@@ -119,7 +126,9 @@ export default function App() {
   useEffect(() => { profileRef.current = profile; }, [profile]);
   useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
   useEffect(() => { optInRef.current = researchOptIn; }, [researchOptIn]);
-  useEffect(() => { localStorage.setItem("inkk_font", font); }, [font]);
+  // The chosen face is a root attribute: the editor, the Notes index, the
+  // Certify page and the PDF renderer all read it from there.
+  useEffect(() => { localStorage.setItem("inkk_face", font); document.documentElement.dataset.face = font; }, [font]);
   useEffect(() => { localStorage.setItem("inkk_title_caps", titleCapsOn ? "1" : "0"); }, [titleCapsOn]);
   useEffect(() => {
     fetch("/drop_caps/manifest.json").then(r => r.json()).then(setDropCapImages).catch(() => {});
@@ -1343,6 +1352,7 @@ export default function App() {
         if (authOpen) return;       // auth modal closes only via its × button
         if (focusMode) { exitFocusMode(); return; }
         if (certMenuOpen) { setCertMenuOpen(false); return; }
+        if (faceMenuOpen) { setFaceMenuOpen(false); return; }
         if (toolsOpen) { setToolsOpen(false); return; }
         if (downloadModalOpen) { setDownloadModalOpen(false); return; }
         setPanelOpen(false); setHsModalOpen(false); setHsScoreOpen(false);
@@ -1356,7 +1366,7 @@ export default function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [openDownloadModal, view, focusMode, certMenuOpen, toolsOpen, toggleFocusMode, exitFocusMode, downloadModalOpen, authOpen, onInput, onTitleInput, navigate]);
+  }, [openDownloadModal, view, focusMode, certMenuOpen, toolsOpen, faceMenuOpen, toggleFocusMode, exitFocusMode, downloadModalOpen, authOpen, onInput, onTitleInput, navigate]);
 
   // ─ mount ────────────────────────────────────────────────────────────────────
 
@@ -1635,15 +1645,31 @@ export default function App() {
             </div>
           )}
           {isEditor && (
-            <button
-              className={`icon-btn title-caps-btn ${menuClass}${titleCapsOn ? " active" : ""}`}
-              onClick={() => setTitleCapsOn(v => !v)}
-              title={titleCapsOn
-                ? "Title auto-capitalisation is on. Click to turn off."
-                : "Title capitalisation is off. Click to turn on."}
-            >
-              <span className="title-caps-glyph">Aa</span>
-            </button>
+            <div id="face-menu-wrap">
+              <button
+                className={`icon-btn title-caps-btn ${menuClass}${faceMenuOpen ? " active" : ""}`}
+                onClick={() => setFaceMenuOpen(v => !v)}
+                title="Typeface"
+                aria-expanded={faceMenuOpen}
+              >
+                <span className="title-caps-glyph">Aa</span>
+              </button>
+              {faceMenuOpen && (
+                <div id="cert-menu" className="face-menu">
+                  <span className="cert-menu-label">Typeface</span>
+                  {[["fell", "Fell"], ["garamond", "Garamond"], ["sans", "Sans"]].map(([k, label]) => (
+                    <button key={k} className={`face-option${font === k ? " is-on" : ""}`} onClick={() => setFont(k)}>
+                      <span className={`face-sample face-${k}`} aria-hidden="true">Aa</span>
+                      <span>{label}</span>
+                    </button>
+                  ))}
+                  <label className="face-caps">
+                    <input type="checkbox" checked={titleCapsOn} onChange={e => setTitleCapsOn(e.target.checked)} />
+                    <span>Capitalise titles</span>
+                  </label>
+                </div>
+              )}
+            </div>
           )}
           {isEditor && hasContent && (
             <button
@@ -1733,12 +1759,6 @@ export default function App() {
                 </div>
               </div>
             ))}
-          </div>
-          <div id="panel-footer">
-            <button id="font-toggle" onClick={() => setFont(f => f === "garamond" ? "sans" : "garamond")}>
-              <Type size={13} />
-              {font === "garamond" ? "Garamond" : "Switzer"}
-            </button>
           </div>
         </div>
       )}
@@ -1834,7 +1854,7 @@ export default function App() {
           suppressContentEditableWarning
           spellCheck={false}
           data-placeholder="Title"
-          className={font === "garamond" ? "" : "font-sans"}
+          data-face={font}
           onInput={onTitleInput}
           onBlur={finalizeTitle}
           onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); finalizeTitle(); editorRef.current?.focus(); } }}
@@ -1844,7 +1864,7 @@ export default function App() {
           <div
             id="text"
             ref={editorRef}
-            className={font === "garamond" ? "" : "font-sans"}
+            data-face={font}
             contentEditable={editArmed || !isMobile()}
             suppressContentEditableWarning
             spellCheck={false}
@@ -2012,6 +2032,7 @@ export default function App() {
       {/* ── popover backdrop ── */}
       {isEditor && certMenuOpen && <div id="publish-menu-backdrop" onClick={() => setCertMenuOpen(false)} />}
       {isEditor && certConfirmOpen && <div id="publish-menu-backdrop" onClick={() => setCertConfirmOpen(false)} />}
+      {isEditor && faceMenuOpen && <div id="publish-menu-backdrop" onClick={() => setFaceMenuOpen(false)} />}
 
       {/* ── toasts ── */}
       <Toasts toasts={toasts} />

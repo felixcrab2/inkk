@@ -112,8 +112,19 @@ function loadImg(src) {
   });
 }
 
+// The page is set in the face the writer chose in the editor (the root's
+// data-face attribute), so the download matches what they were looking at.
+export const FACE_FAMILIES = {
+  fell:     '"IM Fell English", Georgia, serif',
+  garamond: '"EB Garamond", Georgia, serif',
+  sans:     '"Helvetica Neue", Helvetica, Arial, sans-serif',
+};
+function currentFamily() {
+  const face = (typeof document !== "undefined" && document.documentElement.dataset.face) || "fell";
+  return FACE_FAMILIES[face] || FACE_FAMILIES.fell;
+}
 function font(sizePt, italic = false, bold = false) {
-  return `${italic ? "italic" : "normal"} ${bold ? "600" : "400"} ${sizePt * PX}px "IM Fell English", Georgia, serif`;
+  return `${italic ? "italic" : "normal"} ${bold ? "600" : "400"} ${sizePt * PX}px ${currentFamily()}`;
 }
 
 // Width of `text` if drawn with per-character tracking (canvas has no native

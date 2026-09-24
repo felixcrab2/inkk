@@ -49,5 +49,13 @@
      else — the entire interface (nav, lists, panels, modals, stats, verify,
      profile, admin) — uses --font-ui. Swap --font-ui to restyle the whole UI. */
   --font-ui:     "Switzer", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, sans-serif;
-  --font-serif:  "IM Fell English", Georgia, serif;
+  --font-fell:     "IM Fell English", Georgia, serif;
+  --font-garamond: "EB Garamond", Georgia, serif;
+  --font-plain:    "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-serif:    var(--font-fell);   /* the writing face; switched by data-face on <html> */
 }
+
+/* The writer's face, chosen from the editor's Aa menu. Everything set in the
+   writing face (editor, Notes index, Certify headings, the PDF) follows. */
+:root[data-face="garamond"] { --font-serif: var(--font-garamond); }
+:root[data-face="sans"]     { --font-serif: var(--font-plain); }

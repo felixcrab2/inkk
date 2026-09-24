@@ -33,7 +33,9 @@
      wraps sooner and never runs wider than the prose below it. */
   font-weight: 400;
   font-style: normal;
-  font-size: clamp(1.25rem, 2vw, 1.5rem);
+  font-size: clamp(1.15rem, 1.7vw, 1.3rem);
+  font-kerning: normal;
+  text-rendering: optimizeLegibility;
   color: var(--text);
   padding: 0 8px;
   margin-bottom: 22px;
@@ -103,8 +105,10 @@
   white-space: pre-wrap;
   overflow-wrap: break-word;
   font-family: var(--font-serif);
-  font-size: 1.16rem;
-  line-height: 1.5;
+  font-size: 1.1rem;
+  line-height: 1.48;
+  font-kerning: normal;
+  text-rendering: optimizeLegibility;
   color: var(--text);
   padding: 0 8px 8px;
   outline: none;
@@ -154,3 +158,21 @@
    used to live with the reading view and are the only part of it that stays. */
 #reading-pages { display: flex; flex-direction: column; align-items: center; gap: 16px; }
 .reading-pages-loading { color: var(--ink-4); font-size: var(--t-sm); padding: 40px 0; text-align: center; }
+
+/* ─── Fit per face ───────────────────────────────────────────────────────
+   Fell is cut tight and dark; at screen sizes its default fit reads a touch
+   airy, so the letters and words are pulled in a little to match the printed
+   page. Garamond sits at its natural fit a size up; the plain sans a size down. */
+:root[data-face="fell"] #text {
+  letter-spacing: -0.018em; word-spacing: -0.045em; line-height: 1.42;
+  /* the site smooths type to look lighter; Fell wants its ink back */
+  -webkit-font-smoothing: auto; -moz-osx-font-smoothing: auto;
+}
+:root[data-face="fell"] #title-input {
+  letter-spacing: -0.022em; word-spacing: -0.045em;
+  -webkit-font-smoothing: auto; -moz-osx-font-smoothing: auto;
+}
+:root[data-face="garamond"] #text        { font-size: 1.18rem; line-height: 1.5; }
+:root[data-face="garamond"] #title-input { font-size: clamp(1.2rem, 1.8vw, 1.38rem); font-weight: 500; }
+:root[data-face="sans"] #text            { font-size: 1rem; line-height: 1.6; letter-spacing: -0.005em; }
+:root[data-face="sans"] #title-input     { font-size: clamp(1.05rem, 1.5vw, 1.2rem); font-weight: 500; letter-spacing: -0.015em; }
