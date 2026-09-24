@@ -7,3 +7,4 @@
 
 export { extractFeatures } from "../../src/telemetry/features.js";
 export { computeScore, CONTRIBUTOR_DESC } from "../../src/telemetry/score.js";
+export { normalizePlainText } from "../../src/verify/code.js";

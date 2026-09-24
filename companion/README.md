@@ -42,7 +42,19 @@ uiohook keydown/keyup ─▶ capture.js (physical keys → inkk telemetry events
 - **Paste** is recorded as an event with no length: the clipboard is never read
   (a background app reading it would trip macOS's pasteboard privacy alert).
   How much text arrived by pasting is inferred at certify time from the length
-  of the text you paste into the certify box versus what was typed.
+  of the finished text versus what was typed.
+- **Certify is one click.** Every session has its INKK code from the first
+  keystroke. Certifying reads the front document's text once through macOS
+  Accessibility (`lib/reader.js`, via System Events), fingerprints it on the
+  Mac, discards it, and binds the code in the ledger. Apps that don't expose
+  their text (some web editors) get a certificate bound to the session instead,
+  and the popover says so.
+- **It also receives.** Every few seconds the text the front window shows is
+  scanned on-device for an INKK code or seal link (`lib/codes.js` findCodes);
+  a code found is looked up with the public `verify_by_code` RPC and shown as
+  the seal of what you are reading. Off switch in Settings ("Notice seals").
+  Both reads need the Accessibility grant plus a one-time Automation prompt for
+  System Events (the `com.apple.security.automation.apple-events` entitlement).
 - **Password fields** are never seen: macOS enables secure input for them, which
   blocks the hook entirely.
 - **Ignored apps** (Terminal, iTerm, 1Password, Keychain Access, the login

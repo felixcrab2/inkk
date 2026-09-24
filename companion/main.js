@@ -22,6 +22,8 @@ const { randomUUID } = require("node:crypto");
 const { performance } = require("node:perf_hooks");
 
 const { createStore } = require("./lib/sessions");
+const codes = require("./lib/codes");
+const reader = require("./lib/reader");
 const { createContextPoller } = require("./lib/context");
 const permissions = require("./lib/permissions");
 const { buildKeymap, modString } = require("./lib/keymap");
@@ -68,7 +70,7 @@ const DEFAULT_IGNORED = [
 // ── settings (userData/inkk/settings.json) ───────────────────────────────────
 const DATA_DIR = path.join(app.getPath("userData"), "inkk");
 const SETTINGS_FILE = path.join(DATA_DIR, "settings.json");
-const settings = { onboarded: false, paused: null, launchAtLogin: false, ignoredApps: DEFAULT_IGNORED.slice() };
+const settings = { onboarded: false, paused: null, launchAtLogin: false, ignoredApps: DEFAULT_IGNORED.slice(), receive: true };
 
 function loadSettings() {
   try {
@@ -77,6 +79,7 @@ function loadSettings() {
     if (typeof s.paused === "number" || s.paused === null) settings.paused = s.paused;
     if (typeof s.launchAtLogin === "boolean") settings.launchAtLogin = s.launchAtLogin;
     if (Array.isArray(s.ignoredApps)) settings.ignoredApps = s.ignoredApps.filter(x => typeof x === "string");
+    if (typeof s.receive === "boolean") settings.receive = s.receive;
   } catch { /* first run */ }
 }
 
@@ -127,6 +130,8 @@ function getState() {
     frontApp: lastOtherFront,
     active: store ? store.active() : null,
     supabaseConfigured: SUPABASE_CONFIGURED,
+    receive: settings.receive,
+    seal,
     ...(startupErrors.length ? { error: startupErrors.join("; ") } : {}),
   };
 }
@@ -383,17 +388,34 @@ function slimEvent(e) {
   return o;
 }
 
+// One click. The session already has its code; this binds it. The text of the
+// piece is read from the app it was written in, through Accessibility, right
+// now and only now: fingerprinted here, never stored, never sent. If the app
+// won't expose its text, the certificate binds to the session itself and says so.
 async function certify(input) {
-  const { sessionId, text, title, accessToken, authorName, code, contentHash, wordCount, charCount } = input || {};
-  void text;                                          // the words never leave the renderer
-  if (!sessionId || !store.get(sessionId)) return { ok: false, error: "Session not found" };
-  if (!code || !contentHash) return { ok: false, error: "Missing code or content hash" };
+  const { sessionId, accessToken, authorName } = input || {};
+  const sess = sessionId && store.get(sessionId);
+  if (!sess) return { ok: false, error: "Session not found" };
   if (!accessToken) return { ok: false, error: "Sign in required", needsAuth: true };
+  const code = sess.code || codes.makeCode();
+
+  let contentHash, wordCount = 0, charCount = 0, binding = "session";
+  const raw = await reader.readFocusedText(sess.bundleId);
+  const text = scoring && scoring.normalizePlainText ? scoring.normalizePlainText(raw) : String(raw || "").replace(/\s+/g, " ").trim();
+  if (text.length >= 40) {
+    contentHash = codes.hashText(text);
+    wordCount = text.split(" ").filter(Boolean).length;
+    charCount = text.length;
+    binding = "text";
+  } else {
+    contentHash = codes.sessionHash(sessionId);
+    wordCount = sess.wordsEst | 0;
+  }
 
   let events = store.eventsOf(sessionId).slice(-MAX_CERTIFY_EVENTS).map(slimEvent);
   const bodyFor = (evs) => JSON.stringify({
-    docId: sessionId, code, contentHash, wordCount: wordCount | 0, charCount: charCount | 0,
-    title: title || null, authorName: authorName || null, authorUsername: null, events: evs,
+    docId: sessionId, code, contentHash, wordCount, charCount: charCount || undefined,
+    title: null, authorName: authorName || null, authorUsername: null, events: evs,
   });
   let body = bodyFor(events);
   // Keep the most recent part of a very long trace; the score is computed from
@@ -422,11 +444,66 @@ async function certify(input) {
   const cert = {
     code: out.code || code, verified: !!out.verified, tier: out.tier || null,
     score: typeof out.score === "number" ? out.score : null,
-    issuedAt: Date.now(), title: title || null, wordCount: wordCount | 0,
+    issuedAt: Date.now(), title: null, wordCount, binding,
     contentHash: out.contentHash || contentHash,
   };
   store.setCert(sessionId, cert);
   return { ok: true, cert };
+}
+
+// ── the receiver ─────────────────────────────────────────────────────────────
+// While you read, inkk notices. Every few seconds the text the front window
+// is showing is scanned, on this Mac, for an inkk code or seal link; a code
+// that turns up is looked up in the ledger and shown as the seal of what you
+// are reading. Nothing but the code leaves the machine, and nothing is kept.
+const RECEIVE_INTERVAL_MS = 4000;
+const RECEIVE_SETTLE_MS = 800;
+const sealCache = new Map();             // code → certificate row | null (not found)
+let seal = null;                         // { code, app, bundleId, cert, seenAt } | null
+let receiveTimer = null;
+let receiving = false;
+
+async function lookupCode(code) {
+  if (sealCache.has(code)) return sealCache.get(code);
+  if (!SUPABASE_CONFIGURED) return null;
+  try {
+    const res = await fetch(`${config.REACT_APP_SUPABASE_URL}/rest/v1/rpc/verify_by_code`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: config.REACT_APP_SUPABASE_ANON_KEY, Authorization: `Bearer ${config.REACT_APP_SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ p_code: code }),
+      signal: AbortSignal.timeout(8000),
+    });
+    const rows = res.ok ? await res.json() : null;
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    const cert = row && row.code ? row : null;
+    sealCache.set(code, cert);
+    return cert;
+  } catch { return null; }
+}
+
+async function receiveOnce() {
+  if (receiving) return;
+  if (!settings.receive || pausedUntil() || !permissions.bothGranted(perms)) { if (seal) { seal = null; push("state"); } return; }
+  const front = context.current();
+  if (!front || !front.bundleId || front.bundleId === OWN_BUNDLE_ID || settings.ignoredApps.includes(front.bundleId)) {
+    if (seal && front && front.bundleId !== OWN_BUNDLE_ID) { seal = null; push("state"); }
+    return;
+  }
+  receiving = true;
+  try {
+    const text = await reader.readVisibleText(front.bundleId);
+    const found = codes.findCodes(text);
+    if (!found.length) { if (seal && seal.bundleId === front.bundleId) { seal = null; push("state"); } return; }
+    const code = found[0];
+    const cert = await lookupCode(code);
+    const next = { code, app: front.name, bundleId: front.bundleId, cert, seenAt: Date.now() };
+    if (!seal || seal.code !== next.code || seal.bundleId !== next.bundleId) { seal = next; push("state"); }
+  } finally { receiving = false; }
+}
+
+function startReceiver() {
+  if (receiveTimer) return;
+  receiveTimer = setInterval(receiveOnce, RECEIVE_INTERVAL_MS);
 }
 
 // ── ipc ──────────────────────────────────────────────────────────────────────
@@ -446,6 +523,7 @@ function registerIpc() {
   h("setOnboarded", (v) => { settings.onboarded = !!v; saveSettings(); push("state"); });
   h("setPaused", (untilMs) => setPaused(untilMs));
   h("setLaunchAtLogin", (v) => setLaunchAtLogin(v));
+  h("setReceive", (v) => { settings.receive = !!v; saveSettings(); if (!settings.receive && seal) { seal = null; } push("state"); });
   h("setIgnoredApps", (list) => {
     settings.ignoredApps = [...new Set(list.filter(x => typeof x === "string" && x))];
     saveSettings(); push("state");
@@ -481,7 +559,7 @@ if (!app.requestSingleInstanceLock()) {
     schedulePauseExpiry();
 
     store = createStore({
-      dir: DATA_DIR, now: Date.now, hrnow: () => performance.now(), genId: randomUUID, scoring,
+      dir: DATA_DIR, now: Date.now, hrnow: () => performance.now(), genId: randomUUID, genCode: codes.makeCode, scoring,
       onChange: (what) => { push("state"); if (what === "sessions") push("sessions"); },
     });
     store.load();
@@ -489,6 +567,7 @@ if (!app.requestSingleInstanceLock()) {
     context = createContextPoller({ onChange: (cur) => {
       if (cur && cur.bundleId && cur.bundleId !== OWN_BUNDLE_ID) lastOtherFront = cur;
       push("state");
+      setTimeout(receiveOnce, RECEIVE_SETTLE_MS);   // a new window in front: look at it soon
     } });
     context.start();
 
@@ -503,6 +582,7 @@ if (!app.requestSingleInstanceLock()) {
     pollPermissions();
     setInterval(pollPermissions, PERM_POLL_MS);
     setInterval(() => { if (store.tick()) push("state"); }, TICK_MS);
+    startReceiver();
     setInterval(() => { if (store.closeIdle().length) { push("state"); push("sessions"); } }, IDLE_CHECK_MS);
 
     if (SMOKE) {

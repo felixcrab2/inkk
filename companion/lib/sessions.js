@@ -66,7 +66,7 @@ function slimScore(full) {
   };
 }
 
-function createStore({ dir, now = Date.now, hrnow = null, genId, scoring = null, onChange = null }) {
+function createStore({ dir, now = Date.now, hrnow = null, genId, genCode = null, scoring = null, onChange = null }) {
   if (!dir) throw new Error("sessions: dir is required");
   if (!genId) throw new Error("sessions: genId is required");
   const clockHr = hrnow || now;
@@ -103,6 +103,7 @@ function createStore({ dir, now = Date.now, hrnow = null, genId, scoring = null,
     cap.start({ platform: process.platform, app, bundle_id: bundleId, surface: "companion" });
     const summary = {
       id, app, bundleId,
+      code: genCode ? genCode() : null,   // ready from the first keystroke; certifying binds it
       startedAt: t, endedAt: null, lastKeyAt: t,
       keystrokes: 0, deletions: 0, pastes: 0, wordsEst: 0, activeMs: 0,
       score: null, cert: null,
@@ -359,11 +360,13 @@ function createStore({ dir, now = Date.now, hrnow = null, genId, scoring = null,
       if (!evs.length) continue;
       const first = evs[0], last = evs[evs.length - 1];
       const start = evs.find(e => e.kind === "session_start");
+      const cert = readJson(certFile(id));
       const s = {
         id, app: start?.payload?.app || "Unknown app", bundleId: start?.payload?.bundle_id || "",
+        code: cert?.code || (genCode ? genCode() : null),
         startedAt: first.t, endedAt: last.t, lastKeyAt: last.t,
         keystrokes: 0, deletions: 0, pastes: 0, wordsEst: 0, activeMs: 0, score: null,
-        cert: readJson(certFile(id)),
+        cert,
       };
       for (const e of evs) {
         if (e.kind === "input") s.keystrokes++;

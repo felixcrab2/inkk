@@ -22,7 +22,7 @@
   };
 
   const live = {
-    id: "s-live", app: "Notes", bundleId: "com.apple.Notes",
+    id: "s-live", code: "INKK-4B7N-R2XE-8KMT", app: "Notes", bundleId: "com.apple.Notes",
     startedAt: now - 12 * MIN, endedAt: null, lastKeyAt: now - 4000,
     keystrokes: 1240, deletions: 96, pastes: 0, wordsEst: 210, activeMs: 11.5 * MIN,
     score: { score: 72, tier: "Strong", confidence: 0.71, contributors: contributors({
@@ -30,7 +30,7 @@
     cert: null,
   };
   const past = [
-    { id: "s-1", app: "Pages", bundleId: "com.apple.iWork.Pages",
+    { id: "s-1", app: "Pages", bundleId: "com.apple.iWork.Pages", code: "INKK-7F3A-9K2D-XQ4M",
       startedAt: now - 3 * 60 * MIN, endedAt: now - 2 * 60 * MIN, lastKeyAt: now - 2 * 60 * MIN,
       keystrokes: 3480, deletions: 310, pastes: 1, wordsEst: 640, activeMs: 48 * MIN,
       score: { score: 84, tier: "Distinct", confidence: 0.93, contributors: contributors({
@@ -38,13 +38,13 @@
       cert: { code: "INKK-7F3A-9K2D-XQ4M", verified: true, tier: "Distinct", score: 84,
         issuedAt: now - 2 * 60 * MIN + 30000, title: "On slow mornings", wordCount: 641,
         contentHash: "9c1f4a" } },
-    { id: "s-2", app: "Google Chrome", bundleId: "com.google.Chrome",
+    { id: "s-2", app: "Google Chrome", bundleId: "com.google.Chrome", code: "INKK-2Q8V-M4TN-7HC1",
       startedAt: now - 26 * 60 * MIN, endedAt: now - 25 * 60 * MIN, lastKeyAt: now - 25 * 60 * MIN,
       keystrokes: 820, deletions: 52, pastes: 3, wordsEst: 150, activeMs: 9 * MIN,
       score: { score: 38, tier: "Developing", confidence: 0.4, contributors: contributors({
         variance: 0.5, pauses: 0.36, corrections: 0.3 }) },
       cert: null },
-    { id: "s-3", app: "Obsidian", bundleId: "md.obsidian",
+    { id: "s-3", app: "Obsidian", bundleId: "md.obsidian", code: "INKK-9X1D-K3PW-5RA6",
       startedAt: now - 4 * 24 * 60 * MIN, endedAt: now - 4 * 24 * 60 * MIN + 30 * MIN,
       lastKeyAt: now - 4 * 24 * 60 * MIN + 30 * MIN,
       keystrokes: 2120, deletions: 180, pastes: 0, wordsEst: 390, activeMs: 27 * MIN,
@@ -105,8 +105,8 @@
       await wait(600);
       const s = sessions.find((x) => x.id === input.sessionId);
       if (!input.accessToken && state.__requireAuth) return { ok: false, error: "Sign in to certify", needsAuth: true };
-      const cert = { code: input.code, verified: true, tier: s?.score?.tier || "Strong", score: s?.score?.score || 70,
-        issuedAt: Date.now(), title: input.title, wordCount: input.wordCount, contentHash: input.contentHash };
+      const cert = { code: s?.code || "INKK-4B7N-R2XE-8KMT", verified: true, tier: s?.score?.tier || "Strong", score: s?.score?.score || 70,
+        issuedAt: Date.now(), title: null, wordCount: 641, binding: "text", contentHash: "mock" };
       if (s) s.cert = cert;
       pushSessions();
       return { ok: true, cert };
@@ -114,6 +114,7 @@
     requestPermission: async (kind) => { await wait(300); state.permissions[kind] = "granted"; pushState(); return "granted"; },
     openPermissionSettings: async () => {},
     setOnboarded: async (v) => { state.onboarded = !!v; pushState(); },
+    setReceive: async (v) => { state.receive = !!v; pushState(); },
     setPaused: async (until) => { state.paused = until; pushState(); },
     setLaunchAtLogin: async (v) => { state.launchAtLogin = !!v; pushState(); },
     setIgnoredApps: async (list) => { state.ignoredApps = list.slice(); pushState(); },

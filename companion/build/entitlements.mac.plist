@@ -10,5 +10,9 @@
   <!-- Load the uiohook-napi native module. -->
   <key>com.apple.security.cs.disable-library-validation</key>
   <true/>
+  <!-- Ask System Events for the text of the document in front: once at certify
+       time (to fingerprint it) and while reading (to notice inkk codes). -->
+  <key>com.apple.security.automation.apple-events</key>
+  <true/>
 </dict>
 </plist>

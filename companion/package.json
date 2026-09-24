@@ -8,7 +8,7 @@
     "build": "node build.js",
     "start": "npm run build && electron .",
     "dev": "npm run build && electron . --inspect",
-    "test": "node --test capture.test.js lib/sessions.test.js",
+    "test": "node --test capture.test.js lib/sessions.test.js lib/codes.test.js",
     "dist": "npm run build && electron-builder --mac dmg",
     "release": "./scripts/release.sh",
     "install-cert": "./scripts/install-cert.sh"
@@ -55,7 +55,8 @@
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "extendInfo": {
-        "LSUIElement": true
+        "LSUIElement": true,
+        "NSAppleEventsUsageDescription": "inkk reads the text of the document in front only to fingerprint it when you certify, and to notice inkk codes in what you're reading. The text never leaves your Mac."
       },
       "notarize": false
     },

@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld("inkk", {
   setPaused: (untilMs) => invoke("setPaused", untilMs ?? null),
   setLaunchAtLogin: (v) => invoke("setLaunchAtLogin", !!v),
   setIgnoredApps: (list) => invoke("setIgnoredApps", Array.isArray(list) ? list : []),
+  setReceive: (v) => invoke("setReceive", !!v),
 
   // app
   relaunch: () => { ipcRenderer.send("inkk:relaunch"); },

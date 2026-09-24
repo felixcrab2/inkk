@@ -42,6 +42,7 @@ const state = {
   recordsOpen: false,      // "What inkk records" disclosure in Settings
   copied: null,            // which copy button just fired ("code" | "seal" | "panel")
   permTried: {},           // grants we have already asked macOS for this launch
+  certifyingId: null,      // session whose certificate is being issued right now
 };
 
 const supa = (SUPA_URL && SUPA_KEY) ? createClient(SUPA_URL, SUPA_KEY) : null;
@@ -204,6 +205,7 @@ function statusPill(s) {
   else if (s.needsRelaunch || !s.hookActive) { cls = "is-blocked"; text = s.needsRelaunch ? "Relaunch needed" : "Not recording"; }
   else if (isPaused(s)) { cls = "is-paused"; text = "Paused"; }
   else if (s.active) { cls = "is-live"; text = `Writing in ${s.active.app}`; }
+  else if (s.seal) { cls = "is-seal"; text = `Certified piece in ${s.seal.app}`; }
   return `<span id="status-pill" class="status-pill ${cls}"><span class="status-dot"></span><span class="status-pill-label">${esc(text)}</span></span>`;
 }
 
@@ -244,8 +246,8 @@ function screenWelcome() {
     ? `<button class="btn btn-primary btn-block" data-action="relaunch">Relaunch inkk</button>`
     : `<button class="btn btn-primary btn-block" data-action="start">Start</button>`;
   return `<div class="view">
-    <h1 class="h1">Proof you wrote it, from anywhere.</h1>
-    <p class="lead">inkk records the rhythm of your typing — never the letters — so any piece you write on this Mac can carry a human-verified code. It runs quietly in the menu bar.</p>
+    <h1 class="h1">Proof you wrote it.</h1>
+    <p class="lead">inkk keeps the rhythm of your typing, never the letters, so anything you write on this Mac can carry a code that says a person wrote it. Two permissions, then it disappears into the menu bar.</p>
     <div class="panel perm-list">
       ${permRow("accessibility", "Accessibility", "Lets the timing hook run alongside other apps.", p.accessibility)}
       ${permRow("inputMonitoring", "Input Monitoring", "To time key presses in any app. Letters are never read.", p.inputMonitoring)}
@@ -268,15 +270,46 @@ function liveSheet(a) {
   const notice = sc?.contributors?.length
     ? sc.contributors.slice(0, 2).map((c) => NOTICE[c.key] || c.label).join(" · ")
     : "Keep writing — the signal builds with a little more typing.";
-  return `<div class="panel">
-    <div class="live-head"><span class="h2">${esc(a.app)}</span><span class="live-tag">· live</span></div>
+  const busy = state.certifyingId === a.id;
+  return `<div class="panel live">
+    <div class="live-head"><span class="h2">${esc(a.app)}</span><span class="live-tag">live</span></div>
     ${scoreBlock(sc)}
     <p class="meta live-stats">${fmtNum(a.keystrokes)} keystrokes · ${fmtDuration(a.activeMs)} · ~${fmtNum(a.wordsEst)} words</p>
     <p class="meta live-notice">${esc(notice)}</p>
-    <div class="actions">
-      <button class="btn btn-primary" data-action="go" data-screen="certify" data-id="${esc(a.id)}">Certify this piece</button>
-      <button class="btn-text" data-action="end-session" data-id="${esc(a.id)}">End session</button>
-    </div>
+    ${codeLine(a, busy)}
+  </div>`;
+}
+
+// "INKK-… · certify" while pending, "INKK-… · human-verified" once bound.
+function codeLine(x, busy) {
+  const code = x.cert?.code || x.code;
+  if (!code) return "";
+  const verified = x.cert && (x.cert.verified || isVerifiedTier(x.cert.tier));
+  const state_ = x.cert
+    ? `<span class="${verified ? "rubric" : "meta"}">${verified ? "human-verified" : "recorded"}</span>`
+    : busy ? `<span class="meta">certifying…</span>`
+    : `<button class="act" data-action="certify" data-id="${esc(x.id)}">certify</button>`;
+  const copy = x.cert ? `<button class="act" data-action="copy" data-what="code-${esc(x.id)}" data-text="${esc(code)}">${state.copied === `code-${x.id}` ? "copied" : "copy"}</button>` : "";
+  return `<div class="code-row"><span class="code-text${x.cert ? "" : " is-pending"}">${esc(code)}</span><span class="code-state">${state_}${copy}</span></div>`;
+}
+
+// What the reader has open carries a seal: say what the ledger says about it.
+function sealBlock(seal) {
+  if (!seal) return "";
+  const c = seal.cert;
+  if (!c) return `<div class="seal">
+    <div class="label">In ${esc(seal.app)}</div>
+    <div class="seal-title">A code that isn't in the ledger.</div>
+    <p class="meta">${esc(seal.code)} · no certificate was issued for it, or it was deleted.</p>
+  </div>`;
+  const verified = !!c.verified;
+  const by = c.author_name || c.author_username || null;
+  const when = c.issued_at ? new Date(c.issued_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "";
+  return `<div class="seal${verified ? " is-verified" : ""}">
+    <div class="label">In ${esc(seal.app)}</div>
+    <div class="seal-title">${verified ? "Written by a person." : "Recorded in inkk."}</div>
+    <p class="meta">${c.title ? `${esc(c.title)} · ` : ""}${by ? `by ${esc(by)} · ` : ""}${esc(c.score_tier || "")}${c.human_score != null ? ` ${esc(c.human_score)}/100` : ""}${when ? ` · ${esc(when)}` : ""}</p>
+    <div class="code-row"><span class="code-text">${esc(seal.code)}</span><span class="code-state"><button class="act" data-action="open" data-url="${SITE}/v/${esc(seal.code)}">open</button></span></div>
   </div>`;
 }
 
@@ -303,10 +336,10 @@ function idleSheet(s) {
 
 function sessionRow(x) {
   const meta = `${fmtRelative(x.lastKeyAt)} · ${fmtDuration(x.activeMs)} · ${fmtNum(x.keystrokes)} keys`;
-  const cert = x.cert ? `<span class="chip">${ICON.tick}certified</span>` : "";
+  const cert = x.cert ? ` · <span class="${x.cert.verified || isVerifiedTier(x.cert.tier) ? "rubric" : ""}">certified</span>` : "";
   const tier = x.score?.tier || "";
   return `<button class="row" data-action="go" data-screen="session" data-id="${esc(x.id)}">
-    <span class="row-main"><span class="row-title"><span>${esc(x.app)}</span>${cert}</span><span class="row-meta">${esc(meta)}</span></span>
+    <span class="row-main"><span class="row-title">${esc(x.app)}</span><span class="row-meta">${esc(meta)}${cert}</span></span>
     <span class="row-side">${dots(tier)}<span class="row-tier">${esc(tier)}</span></span>
   </button>`;
 }
@@ -328,8 +361,9 @@ function recentList() {
 function screenHome() {
   const s = state.app;
   return `<div class="view">
-    ${s?.active ? liveSheet(s.active) : idleSheet(s)}
-    <div class="section"><div class="label">Recent</div>${recentList()}</div>
+    ${sealBlock(s?.seal)}
+    ${s?.active ? liveSheet(s.active) : (s?.seal ? "" : idleSheet(s))}
+    <div class="section recent-section">${recentList()}</div>
   </div>`;
 }
 
@@ -373,8 +407,7 @@ function screenSession() {
     ${contribs.length ? `<div class="section"><div class="label">Signals</div><div class="signals">${contribs.map((c) =>
       `<div class="signal"><span class="signal-label">${esc(c.label)}</span><span class="signal-val">${Math.round(clamp01(c.value) * 100)}</span>
        <div class="bar"><div class="bar-fill" style="width:${Math.round(clamp01(c.value) * 100)}%"></div></div></div>`).join("")}</div></div>` : ""}
-    ${d.cert ? certPanel(d.cert, d.id)
-      : `<div class="actions-col"><button class="btn btn-primary btn-block" data-action="go" data-screen="certify" data-id="${esc(d.id)}">Certify this piece</button></div>`}
+    <div class="section">${codeLine(d, state.certifyingId === d.id)}${d.cert ? `<p class="note code-note">${d.cert.binding === "session" ? "Bound to this session: the app didn't share its text." : "Bound to the text as it was when certified."} <button class="link-btn" data-action="open" data-url="${SITE}/v/${esc(d.cert.code)}">Open verification</button></p>` : ""}</div>
     <div class="foot-actions">${state.confirmDelete
       ? `<div class="confirm"><span>Delete this session?</span><button class="btn-text is-danger" data-action="delete-confirm" data-id="${esc(d.id)}">Delete</button><button class="btn-text" data-action="delete-cancel">Keep</button></div>`
       : `<button class="btn-text is-danger" data-action="delete-ask">Delete session</button>`}</div>
@@ -410,16 +443,9 @@ function screenCertify() {
   const c = state.certify;
   const sess = certifySession();
   return `<div class="view">
-    <div class="h2">Certify${sess ? ` · ${esc(sess.app)}` : ""}</div>
-    <p class="lead" style="margin-top:6px">Paste the finished text. It's fingerprinted on this Mac and only the fingerprint travels — inkk never stores your words.</p>
-    <div class="certify-form field-stack">
-      <textarea class="field" rows="7" placeholder="The finished piece" data-field="text" aria-label="Finished text">${esc(c.text)}</textarea>
-      <input class="field" type="text" placeholder="Title (optional)" data-field="title" aria-label="Title" value="${esc(c.title)}" />
-    </div>
+    <div class="h2">${sess ? esc(sess.app) : "Certify"}</div>
     ${c.error ? `<p class="err">${esc(c.error)}</p>` : ""}
-    ${c.needsAuth ? authStep() : `<div class="actions-col">
-      <button class="btn btn-primary btn-block" data-action="certify"${c.busy || !c.text.trim() ? " disabled" : ""}>${c.busy ? "Fingerprinting…" : "Get my code"}</button>
-    </div>`}
+    ${c.needsAuth ? authStep() : `<p class="lead">Certifying…</p>`}
   </div>`;
 }
 
@@ -429,7 +455,7 @@ function screenResult() {
   const cert = state.result;
   if (!cert) return `<div class="view"><p class="lead">No certificate to show.</p></div>`;
   const verified = cert.verified || isVerifiedTier(cert.tier);
-  const seal = `inkk. ${cert.code} · inkk.site/v/${cert.code}`;
+  const seal = `inkk. inkk.site/v/${cert.code}`;
   return `<div class="view result panel-in">
     <div class="label">Your code</div>
     <div class="code">${esc(cert.code)}</div>
@@ -438,13 +464,13 @@ function screenResult() {
       <span class="meta">·</span>
       <span>${esc(cert.tier)} ${esc(cert.score)}<span class="meta">/100</span></span>
     </div>
-    ${cert.title ? `<p class="meta" style="margin-top:6px">${esc(cert.title)} · ${fmtNum(cert.wordCount)} words</p>` : ""}
+    <p class="meta" style="margin-top:6px">${cert.binding === "session" ? "Bound to the writing session; the app didn't share its text." : `Bound to the text${cert.wordCount ? ` · ${fmtNum(cert.wordCount)} words` : ""}.`}</p>
     <div class="result-buttons">
-      <button class="btn btn-primary btn-block" data-action="copy" data-what="code" data-text="${esc(cert.code)}">${state.copied === "code" ? "Copied" : "Copy code"}</button>
-      <button class="btn btn-secondary btn-block" data-action="copy" data-what="seal" data-text="${esc(seal)}">${state.copied === "seal" ? "Copied" : "Copy seal"}</button>
-      <button class="btn-text" data-action="open" data-url="${SITE}/v/${esc(cert.code)}">${ICON.external}Open verification</button>
+      <button class="act act-lg" data-action="copy" data-what="code" data-text="${esc(cert.code)}">${state.copied === "code" ? "Copied" : "Copy the code"}</button>
+      <button class="act act-lg" data-action="copy" data-what="seal" data-text="${esc(seal)}">${state.copied === "seal" ? "Copied" : "Copy the seal"}</button>
+      <button class="act act-lg" data-action="open" data-url="${SITE}/v/${esc(cert.code)}">Open verification</button>
     </div>
-    <p class="note" style="margin-top:18px;text-align:center">Paste it wherever the piece goes.</p>
+    <p class="note" style="margin-top:18px">The seal is one line for the end of an email or a document: the word inkk. and the link that proves it.</p>
   </div>`;
 }
 
@@ -483,6 +509,11 @@ function screenSettings() {
         <button class="switch" role="switch" aria-checked="${s.launchAtLogin ? "true" : "false"}" aria-label="Launch at login" data-action="toggle-login"></button>
       </div>
       <div class="setting">
+        <div class="setting-text"><div class="setting-name">Notice seals in what I read</div>
+          <div class="setting-sub">Shows the certificate when an email or document in front carries an inkk code.</div></div>
+        <button class="switch" role="switch" aria-checked="${s.receive === false ? "false" : "true"}" aria-label="Notice seals" data-action="toggle-receive"></button>
+      </div>
+      <div class="setting">
         <div class="setting-text"><div class="setting-name">${paused ? `Paused until ${fmtClock(s.paused)}` : "Pause recording"}</div>
           <div class="setting-sub">${paused ? "Nothing is recorded until then." : "Take an hour off. Sessions resume on their own."}</div></div>
         ${paused
@@ -503,7 +534,7 @@ function screenSettings() {
     </div>
     <div class="section">
       <button class="disclosure" data-action="toggle-records" aria-expanded="${state.recordsOpen ? "true" : "false"}"><span>What inkk records</span>${ICON.chevron}</button>
-      ${state.recordsOpen ? `<div class="disclosure-body note">inkk records the timing of key presses — when a key goes down and comes up, and whether it was a letter, a space, a deletion or a paste — never which letter. Password fields use macOS secure input and never reach inkk. Sessions stay on this Mac. When you certify a piece, only that session's timing profile and a fingerprint of the text leave it.</div>` : ""}
+      ${state.recordsOpen ? `<div class="disclosure-body note">inkk records the timing of key presses — when a key goes down and comes up, and whether it was a letter, a space, a deletion or a paste — never which letter. Password fields use macOS secure input and never reach inkk. Sessions stay on this Mac. When you certify, inkk reads the text of the document in front once, fingerprints it here, and sends only the fingerprint with that session's timing. While you read, it looks at the text on screen for an inkk code, on this Mac; only a code it finds is looked up.</div>` : ""}
     </div>
     <div class="section">
       <div class="label">Account</div>
@@ -592,6 +623,7 @@ async function go(screen, id = null, opts = {}) {
     state.certify.forId = id;
     state.sessionId = id;
   }
+  if (screen === "result") state.copied = null;
   const hash = "#" + screen + (id && (screen === "session" || screen === "certify") ? "/" + id : "");
   setHash(hash);
   root.scrollTop = 0;
@@ -652,35 +684,25 @@ function stopWelcomePoll() { if (welcomeTimer) { clearInterval(welcomeTimer); we
 
 /* ═══ Actions ════════════════════════════════════════════════════════════ */
 
-async function runCertify() {
+async function runCertify(sessionId) {
   const c = state.certify;
-  const text = c.text.trim();
-  if (!text) { c.error = "Paste the finished text first."; render(); return; }
-  const sessionId = certifySession()?.id || null;
-  if (!sessionId) { c.error = "There is no session to certify."; render(); return; }
-  c.busy = true; c.error = null; render();
+  const id = sessionId || certifySession()?.id || null;
+  if (!id) return;
+  if (state.certifyingId) return;
+  state.certifyingId = id; c.forId = id; c.error = null; render();
   try {
-    const normalized = normalizePlainText(text);
-    const wordCount = normalized ? normalized.split(" ").filter(Boolean).length : 0;
-    const contentHash = await hashContent(text);
-    if (!contentHash) throw new Error("Couldn't fingerprint the text on this Mac.");
-    // Keep one code across an auth retry so the ledger never sees two.
-    const code = c.code || (c.code = makeVerifyCode());
     const auth = await getAccessToken();
     if (!auth.token && auth.reason === "offline") {
       c.error = "inkk.site can't be reached right now — check your connection and try again.";
+      go("certify", id, { prev: { screen: state.screen, id: state.sessionId } });
       return;
     }
-    const accessToken = auth.token;
-    const charCount = normalized.length;
     const authorName = await getAuthorName();
-    const res = await window.inkk.certify({
-      sessionId, text, title: c.title.trim() || null, accessToken, authorName, code, contentHash, wordCount, charCount,
-    });
+    const res = await window.inkk.certify({ sessionId: id, accessToken: auth.token, authorName });
     if (res?.ok) {
       state.result = res.cert;
-      resetCertify();
-      go("result", null, { prev: { screen: "session", id: sessionId } });
+      state.sessionId = id;
+      go("result", null, { prev: { screen: "session", id } });
       return;
     }
     if (res?.needsAuth) {
@@ -689,11 +711,13 @@ async function runCertify() {
     } else {
       c.error = res?.error || "Certification failed.";
     }
+    go("certify", id, { prev: { screen: state.screen === "certify" ? "home" : state.screen, id: state.sessionId } });
   } catch (e) {
     c.error = e?.message || "Certification failed.";
+    go("certify", id, { prev: { screen: "home", id: null } });
   } finally {
-    c.busy = false;
-    if (state.screen === "certify") render();
+    state.certifyingId = null;
+    render();
   }
 }
 
@@ -740,6 +764,8 @@ const ACTIONS = {
   resume: () => window.inkk.setPaused(null),
   pause: () => window.inkk.setPaused(Date.now() + 60 * MIN),
   "toggle-login": () => window.inkk.setLaunchAtLogin(!state.app?.launchAtLogin),
+  "toggle-receive": () => window.inkk.setReceive(state.app?.receive === false),
+  "certify": (el) => runCertify(el.dataset.id),
   "ignore-front": () => {
     const f = state.app?.frontApp; if (!f) return;
     const list = state.app.ignoredApps || [];
