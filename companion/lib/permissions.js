@@ -1,6 +1,9 @@
-// inkk companion — the two macOS grants the global hook needs.
+// inkk companion — the macOS grants.
 //
-// uiohook's CGEventTap needs Accessibility AND Input Monitoring. Status comes
+// uiohook's CGEventTap needs Accessibility AND Input Monitoring; those two are
+// required. Screen Recording is optional: with it, inkk can also read a seal
+// that arrives as a picture (the signed name at the end of an email, a
+// screenshot of a code) by looking at the window in front, on this Mac. Status comes
 // from node-mac-permissions (AXIsProcessTrusted / IOHIDCheckAccess), cross-
 // checked for accessibility with Electron's own systemPreferences. The native
 // module is optional at runtime: if it fails to load we report "not determined"
@@ -23,6 +26,7 @@ try { ({ systemPreferences, shell } = require("electron")); } catch { /* plain N
 const SETTINGS_URL = {
   accessibility: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
   inputMonitoring: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent",
+  screen: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
 };
 
 const mapStatus = (s) => (s === "authorized" ? "granted" : (s || "not determined"));
@@ -40,8 +44,13 @@ function inputMonitoringStatus() {
   try { return mapStatus(nmp.getAuthStatus("input-monitoring")); } catch { return "not determined"; }
 }
 
+function screenStatus() {
+  if (!nmp) return "not determined";
+  try { return mapStatus(nmp.getAuthStatus("screen")); } catch { return "not determined"; }
+}
+
 function status() {
-  return { accessibility: accessibilityStatus(), inputMonitoring: inputMonitoringStatus() };
+  return { accessibility: accessibilityStatus(), inputMonitoring: inputMonitoringStatus(), screen: screenStatus() };
 }
 
 const bothGranted = (p) => p.accessibility === "granted" && p.inputMonitoring === "granted";
@@ -58,6 +67,9 @@ async function request(kind) {
     if (!asked) { try { nmp?.askForAccessibilityAccess(); } catch { /* ignore */ } }
   } else if (kind === "inputMonitoring") {
     try { await nmp?.askForInputMonitoringAccess("listen"); } catch { /* ignore */ }
+  } else if (kind === "screen") {
+    // macOS shows its prompt once; after that the switch lives in System Settings.
+    try { nmp?.askForScreenCaptureAccess(false); } catch { /* ignore */ }
   }
   return status()[kind] || "not determined";
 }

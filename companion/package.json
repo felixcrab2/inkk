@@ -2,13 +2,13 @@
   "name": "inkk-companion",
   "version": "0.1.0",
   "private": true,
-  "description": "inkk desktop companion \u2014 records writing rhythm system-wide and issues a verification code.",
+  "description": "inkk desktop companion: certifies what you write anywhere on your Mac, and checks the inkk codes in what you read.",
   "main": "main.js",
   "scripts": {
     "build": "node build.js",
     "start": "npm run build && electron .",
     "dev": "npm run build && electron . --inspect",
-    "test": "node --test capture.test.js lib/sessions.test.js lib/codes.test.js",
+    "test": "node --test capture.test.js lib/sessions.test.js lib/codes.test.js lib/api.test.js lib/auth.test.js lib/lookup.test.js lib/docmeta.test.js lib/receiver.test.js lib/stamp.test.js lib/mark.test.js",
     "dist": "npm run build && electron-builder --mac dmg",
     "release": "./scripts/release.sh",
     "install-cert": "./scripts/install-cert.sh"
@@ -36,6 +36,8 @@
       "renderer/index.html",
       "renderer/styles.css",
       "renderer/bundle.js",
+      "renderer/sign.html",
+      "renderer/sign.bundle.js",
       "renderer/mock.js",
       "renderer/fonts/**",
       "assets/**"
@@ -56,12 +58,19 @@
       "entitlementsInherit": "build/entitlements.mac.plist",
       "extendInfo": {
         "LSUIElement": true,
-        "NSAppleEventsUsageDescription": "inkk reads the text of the document in front only to fingerprint it when you certify, and to notice inkk codes in what you're reading. The text never leaves your Mac."
+        "NSAppleEventsUsageDescription": "inkk reads the text in front, on this Mac, to fingerprint what you certify and to notice inkk codes in what you read. The text never leaves your Mac.",
+        "NSScreenCaptureUsageDescription": "Only if you switch it on: inkk looks at the window in front, on this Mac, to read the inkk code in a signed name or a screenshot. Nothing is recorded or sent."
       },
       "notarize": false
     },
     "dmg": {
       "title": "inkk"
-    }
+    },
+    "extraResources": [
+      {
+        "from": "build/inkk-helper",
+        "to": "inkk-helper"
+      }
+    ]
   }
 }

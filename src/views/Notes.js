@@ -1,34 +1,33 @@
 // Notes — an index of your writing.
 //
-// One serif for the words, one sans for the furniture, and as little furniture
-// as possible: a heading, the list, and a quiet footer. Notes live on this
-// device; an account only adds sync, certification and the research controls.
+// The writer's face for the titles, the system face for everything else, and
+// as little else as possible: a heading, the list, a quiet footer. Notes live
+// on this device; an account adds sync, certification and the study controls.
 
 import { useEffect, useState } from "react";
-import { DropCapAvatar } from "../components/DropCapAvatar";
 import { PrivacyModal, TermsModal } from "../components/Legal";
 import { stripHtml, docTitle, wordCount } from "../lib/docs";
 import { fetchMyContribution, upsertProfile, generateUniqueUsername } from "../lib/profile";
 import { flushNow as syncFlushNow } from "../telemetry/sync";
 import { countForUser as countLocalEvents } from "../telemetry/store";
 
-// "Today", "Yesterday", "12 March", "12 March 2025".
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// "Today, 14:32", "Yesterday", "21 Sep", "21 Sep 2025".
 function whenLabel(ms) {
   const d = new Date(ms), now = new Date();
   const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const diff = Math.round((day(now) - day(d)) / 86400000);
-  if (diff <= 0) return "Today";
+  if (diff <= 0) return `Today, ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   if (diff === 1) return "Yesterday";
-  const opts = { day: "numeric", month: "long" };
-  if (d.getFullYear() !== now.getFullYear()) opts.year = "numeric";
-  return d.toLocaleDateString(undefined, opts);
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}${d.getFullYear() !== now.getFullYear() ? ` ${d.getFullYear()}` : ""}`;
 }
 
 export function NotesView({
-  user, profile, docs, activeId, dropCapImages,
+  user, profile, docs,
   onSignIn, onCreateAccount, onSignOut,
-  onOpenDoc, onNewDoc, onDeleteDoc, onDownloadDoc, onCertifyDoc, onOpenVerify,
-  researchOptIn, onToggleOptIn, onDownloadData, onDeleteData,
+  onOpenDoc, onNewDoc, onDeleteDoc, onDownloadDoc, onCertifyDoc, onToast,
+  researchOptIn, onToggleOptIn, onDownloadData, onDeleteData, onAboutResearch,
   onChangePassword, onProfileUpdate,
 }) {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
@@ -66,7 +65,6 @@ export function NotesView({
     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 
   const name = profile?.display_name || profile?.username || user?.email?.split("@")[0] || "";
-  const initial = (profile?.username?.[0] || user?.email?.[0] || "i");
 
   const startEdit = () => { setEditName(profile?.display_name || ""); setEditError(""); setEditing(true); };
   const saveEdit = async () => {
@@ -83,51 +81,41 @@ export function NotesView({
   const contributed = (Number(contribution?.event_count) || 0) + pendingLocal;
 
   return (
-    <div id="profile-container" className="nt">
-      <div className="nt-inner">
-        <header className="nt-head">
-          <div className="nt-headline">
-            <h1 className="nt-title">Notes</h1>
-            <button className="nt-new" onClick={onNewDoc}>New note</button>
-          </div>
-          {user && (
-            <button className="nt-who" onClick={startEdit} title="Change your name">
-              <DropCapAvatar letter={initial} dropCapImages={dropCapImages} size={30} />
-              <span className="nt-who-name">{name}</span>
-            </button>
-          )}
+    <div id="profile-container" className="page">
+      <div className="page-inner">
+        <header className="page-head">
+          <h1>Notes</h1>
+          <button className="text-btn" onClick={onNewDoc}>New note</button>
         </header>
 
         {notes.length === 0 ? (
-          <p className="nt-empty">Nothing here yet. <button className="nt-link" onClick={onNewDoc}>Start writing</button></p>
+          <p className="page-empty">No notes yet. <button className="text-btn is-ink" onClick={onNewDoc}>Start writing</button></p>
         ) : (
-          <ol className="nt-list">
+          <ol className="note-list">
             {notes.map((d) => {
               const title = stripHtml(d.title || "") || docTitle(d.content);
               const wc = wordCount(d.content);
               const confirming = confirmDeleteId === d.id;
               return (
-                <li key={d.id} className={`nt-row${d.id === activeId ? " is-open" : ""}`}>
-                  <button className="nt-open" onClick={() => onOpenDoc(d.id)}>
-                    <span className="nt-row-title">{title || "Untitled"}</span>
-                    <span className="nt-row-meta">
-                      {whenLabel(d.updatedAt)} · {wc.toLocaleString()} {wc === 1 ? "word" : "words"}
-                      {d.verifyCode && <> · <span className="nt-certified">certified</span></>}
-                    </span>
+                <li key={d.id} className={`note-row${confirming ? " is-confirming" : ""}`}>
+                  <button className="note-open" onClick={() => onOpenDoc(d.id)}>
+                    <span className="note-title">{title || "Untitled"}</span>
+                    <span className="note-meta">{wc.toLocaleString()} {wc === 1 ? "word" : "words"}{d.verifyCode ? <span className="note-cert">Certified</span> : null}</span>
                   </button>
+                  <span className="note-when">{whenLabel(d.updatedAt)}</span>
                   {!confirming ? (
-                    <span className="nt-row-actions">
+                    <span className="note-actions">
                       {d.verifyCode
-                        ? <button className="nt-act" onClick={() => onOpenVerify?.(d.verifyCode)}>Code</button>
-                        : (wc > 0 && <button className="nt-act" onClick={() => onCertifyDoc(d.id)}>Certify</button>)}
-                      {wc > 0 && <button className="nt-act" onClick={() => onDownloadDoc(d.id)}>Download</button>}
-                      <button className="nt-act" onClick={() => setConfirmDeleteId(d.id)}>Delete</button>
+                        ? <button className="text-btn" onClick={() => { navigator.clipboard?.writeText(d.verifyCode); onToast?.("Code copied"); }}>Copy code</button>
+                        : (wc > 0 && <button className="text-btn" onClick={() => onCertifyDoc(d.id)}>Certify</button>)}
+                      {wc > 0 && <button className="text-btn" onClick={() => onDownloadDoc(d.id)}>Download</button>}
+                      <button className="text-btn" onClick={() => setConfirmDeleteId(d.id)}>Delete</button>
                     </span>
                   ) : (
-                    <span className="nt-row-actions is-confirm">
-                      <span className="nt-confirm-q">Delete this note?</span>
-                      <button className="nt-act" onClick={() => setConfirmDeleteId(null)}>Keep</button>
-                      <button className="nt-act is-danger" onClick={() => { onDeleteDoc(d.id); setConfirmDeleteId(null); }}>Delete</button>
+                    <span className="note-actions is-shown">
+                      <span className="note-confirm">Delete this note?</span>
+                      <button className="text-btn" onClick={() => setConfirmDeleteId(null)}>Keep</button>
+                      <button className="text-btn is-ink" onClick={() => { onDeleteDoc(d.id); setConfirmDeleteId(null); }}>Delete</button>
                     </span>
                   )}
                 </li>
@@ -136,84 +124,76 @@ export function NotesView({
           </ol>
         )}
 
-        <footer className="nt-foot">
+        <footer className="page-foot">
           {!user ? (
-            <p className="nt-foot-line">
-              Notes stay on this device. <button className="nt-link" onClick={onSignIn}>Sign in</button> to keep them across devices and to certify them,
-              or <button className="nt-link" onClick={onCreateAccount || onSignIn}>create an account</button>.
-            </p>
+            <div className="foot-row">
+              <button className="text-btn" onClick={onSignIn}>Sign in to keep notes on every device</button>
+            </div>
           ) : (
             <>
-              <div className="nt-research">
-                <label className="nt-switch">
+              <div className="foot-row">
+                <button className="text-btn is-ink" onClick={startEdit}>{name}</button>
+                <button className="text-btn" onClick={onChangePassword}>Change password</button>
+                <button className="text-btn" onClick={onSignOut}>Sign out</button>
+              </div>
+              <div className="foot-row">
+                <label className="switch">
                   <input
                     type="checkbox"
                     checked={!!researchOptIn}
                     disabled={optBusy}
                     onChange={async (e) => { setOptBusy(true); await onToggleOptIn(e.target.checked); setOptBusy(false); }}
                   />
-                  <span className="nt-switch-track" aria-hidden="true"><span className="nt-switch-thumb" /></span>
-                  <span className="nt-switch-label">
-                    {researchOptIn ? "Sharing your writing rhythm with the study" : "Not sharing your writing rhythm with the study"}
-                  </span>
+                  <span className="switch-track" aria-hidden="true" />
+                  <span>Share my writing rhythm with the study</span>
                 </label>
-                {researchOptIn && contributed > 0 && (
-                  <p className="nt-foot-line nt-research-count">
-                    {contributed.toLocaleString()} events contributed{pendingLocal > 0 ? ", uploading" : ""}.
-                    {" "}<button className="nt-link" onClick={onDownloadData}>Download my data</button>
-                    {" · "}
-                    {!confirmData
-                      ? <button className="nt-link" onClick={() => setConfirmData(true)}>Delete my data</button>
-                      : <>
-                          <span>Delete everything captured?</span>{" "}
-                          <button className="nt-link" onClick={() => setConfirmData(false)}>Keep</button>{" · "}
-                          <button className="nt-link is-danger" disabled={dataBusy} onClick={async () => { setDataBusy(true); await onDeleteData(); setDataBusy(false); setConfirmData(false); }}>
-                            {dataBusy ? "Deleting…" : "Delete"}
-                          </button>
-                        </>}
-                  </p>
-                )}
+                <button className="text-btn" onClick={onAboutResearch}>About the study</button>
               </div>
-              <p className="nt-foot-line nt-account">
-                <button className="nt-link" onClick={onChangePassword}>Change password</button>
-                {" · "}
-                <button className="nt-link" onClick={onSignOut}>Sign out</button>
-              </p>
+              {researchOptIn && contributed > 0 && (
+                <div className="foot-row">
+                  <span className="foot-quiet">{contributed.toLocaleString()} events shared{pendingLocal > 0 ? ", uploading" : ""}</span>
+                  <button className="text-btn" onClick={onDownloadData}>Download my data</button>
+                  {!confirmData
+                    ? <button className="text-btn" onClick={() => setConfirmData(true)}>Delete my data</button>
+                    : <>
+                        <span className="foot-quiet">Delete everything shared?</span>
+                        <button className="text-btn" onClick={() => setConfirmData(false)}>Keep</button>
+                        <button className="text-btn is-ink" disabled={dataBusy} onClick={async () => { setDataBusy(true); await onDeleteData(); setDataBusy(false); setConfirmData(false); }}>
+                          {dataBusy ? "Deleting" : "Delete"}
+                        </button>
+                      </>}
+                </div>
+              )}
             </>
           )}
-          <p className="nt-foot-line nt-legal">
-            <button className="nt-link" onClick={() => setShowPrivacy(true)}>Privacy</button>
-            {" · "}
-            <button className="nt-link" onClick={() => setShowTerms(true)}>Terms</button>
-            {" · "}
-            <a className="nt-link" href="mailto:hello@inkk.site?subject=Hello%20inkk">hello@inkk.site</a>
-          </p>
+          <div className="foot-row">
+            <button className="text-btn" onClick={() => setShowPrivacy(true)}>Privacy</button>
+            <button className="text-btn" onClick={() => setShowTerms(true)}>Terms</button>
+            <a className="text-btn" href="mailto:hello@inkk.site?subject=Hello%20inkk">hello@inkk.site</a>
+          </div>
         </footer>
       </div>
 
       {editing && (
-        <div className="pe-overlay" onClick={() => { if (!saving) setEditing(false); }}>
-          <div className="pe-modal" onClick={e => e.stopPropagation()}>
-            <h2 className="pe-title">Your name</h2>
-            <p className="pe-body">The byline on downloaded pages and the author on certificates.</p>
-            <label className="pe-field">
-              <input
-                className="pe-input"
-                type="text"
-                value={editName}
-                onChange={e => setEditName(e.target.value)}
-                placeholder="How you'd like to be credited"
-                maxLength={50}
-                autoFocus
-              />
-            </label>
-            {profile?.username && <p className="pe-body">Your handle stays @{profile.username}.</p>}
-            {editError && <p className="pe-error">{editError}</p>}
-            <div className="pe-actions">
-              <button className="pe-btn" onClick={() => setEditing(false)} disabled={saving}>Cancel</button>
-              <button className="pe-btn pe-btn-primary" onClick={saveEdit} disabled={saving}>{saving ? "Saving…" : "Save"}</button>
+        <div className="modal-overlay" onClick={() => { if (!saving) setEditing(false); }}>
+          <form className="modal" onClick={e => e.stopPropagation()} onSubmit={e => { e.preventDefault(); saveEdit(); }}>
+            <div className="modal-head"><h2>Your name</h2></div>
+            <input
+              className="field"
+              type="text"
+              value={editName}
+              onChange={e => setEditName(e.target.value)}
+              placeholder="Name"
+              maxLength={50}
+              autoFocus
+            />
+            <p className="modal-note">Shown on your downloads and certificates.</p>
+            {editError && <p className="modal-error">{editError}</p>}
+            <div className="modal-actions">
+              <button type="button" className="btn" onClick={() => setEditing(false)} disabled={saving}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? "Saving" : "Save"}</button>
             </div>
-          </div>
+          </form>
         </div>
       )}
 

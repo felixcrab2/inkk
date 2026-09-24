@@ -1,3 +1,4 @@
+/* global globalThis */
 // Verification codes + content hashing for inkk's human-signal certificates.
 //
 // A certificate is a *handle*: paste the code into inkk and it looks the piece
@@ -98,16 +99,42 @@ export function normalizePlainText(htmlOrText) {
   return text.normalize("NFC").replace(/\s+/g, " ").trim();
 }
 
-// SHA-256 of the normalised plain text, hex. Returns null where Web Crypto's
-// subtle digest is unavailable (e.g. insecure http context) so callers can
+// The canonical home of a certificate: every seal, export stamp and QR-like
+// mark points here. Always the www host: the apex redirects, and a redirect
+// across origins drops the Authorization header on the way.
+export const SEAL_BASE = "https://www.inkk.site/v/";
+export function sealUrl(code) {
+  return code ? SEAL_BASE + code : null;
+}
+
+// Web Crypto, from the page or (in tests and the desktop companion's renderer)
+// from the global scope.
+function subtleCrypto() {
+  const c = (typeof window !== "undefined" && window.crypto) || globalThis.crypto;
+  return c && c.subtle && typeof TextEncoder !== "undefined" ? c.subtle : null;
+}
+
+export function canHash() {
+  return !!subtleCrypto();
+}
+
+// SHA-256 of a string (UTF-8), hex. The injected hash for src/verify/sketch.js.
+// Throws where Web Crypto is unavailable (an insecure http context), so a
+// fingerprint is never silently computed from nothing.
+export async function sha256hex(text) {
+  const subtle = subtleCrypto();
+  if (!subtle) throw new Error("no_crypto");
+  const buf = await subtle.digest("SHA-256", new TextEncoder().encode(String(text)));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+// SHA-256 of the normalised plain text, hex: the fingerprint certificates
+// carried before src/verify/sketch.js. Kept so older certificates still match
+// their text. Returns null where Web Crypto is unavailable so callers can
 // degrade gracefully rather than throw.
 export async function hashContent(htmlOrText) {
-  const text = normalizePlainText(htmlOrText);
-  const c = typeof window !== "undefined" ? window.crypto : undefined;
-  if (!c?.subtle || typeof TextEncoder === "undefined") return null;
   try {
-    const buf = await c.subtle.digest("SHA-256", new TextEncoder().encode(text));
-    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+    return await sha256hex(normalizePlainText(htmlOrText));
   } catch {
     return null;
   }

@@ -1,31 +1,58 @@
-/* ─── Reset ───────────────────────────────────────────────────────────────── */
+/* ─── Base ──────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
+button, input, optgroup, select, textarea { font: inherit; color: inherit; }
+button { background: none; border: 0; padding: 0; cursor: pointer; }
+button:disabled { cursor: default; }
+a { color: inherit; }
 
-/* Form controls don't inherit font-family by default — without this, every
-   <button>/<input>/<select>/<textarea> (nav tabs, Drafts, Preview, Download,
-   New document, etc.) renders in the browser's system font and ignores
-   --font-ui. This makes the whole interface follow the UI font. */
-button, input, optgroup, select, textarea { font-family: inherit; }
-
-html, body, #root {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  overflow: hidden;
-}
-
-/* The page colour lives on <html> so the engraving backdrop (z-index: -1)
-   can sit between it and the app's content. body must stay transparent. */
-html { background: var(--bg); }
-
+html, body, #root { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+/* The page colour lives on <html> so the engraving (z-index -1) can sit
+   between it and the app; body stays transparent. */
+html { background: var(--paper); }
 body {
   background: transparent;
-  font-family: var(--font-ui);
+  color: var(--ink);
+  font: 14px/1.45 var(--font-ui);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior: none;
 }
+:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
+.mono { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
 
-/* ─── Shared visibility ───────────────────────────────────────────────────── */
+/* The chrome steps back while someone writes, and returns when they stop. */
 .menu-visible { opacity: 1; pointer-events: auto; transition: opacity 0.5s ease; }
 .menu-hidden  { opacity: 0; pointer-events: none; transition: opacity 0.5s ease; }
+
+/* ─── Controls ──────────────────────────────────────────────────────────── */
+.text-btn { color: var(--ink-2); font-size: var(--t-sm); text-decoration: none; }
+.text-btn:hover, .text-btn.is-ink { color: var(--ink); }
+.btn {
+  height: 32px; padding: 0 14px; border-radius: 6px; font-size: var(--t-sm); font-weight: 500;
+  display: inline-flex; align-items: center; justify-content: center; white-space: nowrap;
+  border: 1px solid var(--edge); background: var(--paper); color: var(--ink);
+}
+.btn:hover:not(:disabled) { background: var(--hover); }
+.btn-primary { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.btn-primary:hover:not(:disabled) { background: #222; }
+.btn:disabled { opacity: 0.45; }
+.field {
+  width: 100%; height: 36px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--edge);
+  background: var(--paper); font-size: 14px; color: var(--ink);
+}
+textarea.field { height: auto; padding: 10px 12px; resize: vertical; line-height: 1.5; }
+.field::placeholder { color: var(--ink-3); }
+.field:focus { border-color: var(--ink); }
+.seg { display: inline-flex; border: 1px solid var(--edge); border-radius: 6px; padding: 2px; gap: 2px; }
+.seg button { height: 28px; padding: 0 12px; border-radius: 4px; font-size: var(--t-sm); color: var(--ink-2); }
+.seg button.is-on { background: var(--ink); color: var(--paper); }
+.check { display: flex; align-items: center; gap: 8px; font-size: var(--t-sm); color: var(--ink); cursor: pointer; }
+.check input { accent-color: var(--ink); width: 14px; height: 14px; margin: 0; }
+.switch { display: inline-flex; align-items: center; gap: 10px; font-size: var(--t-sm); color: var(--ink-2); cursor: pointer; }
+.switch input { position: absolute; opacity: 0; pointer-events: none; }
+.switch-track { width: 28px; height: 16px; border-radius: 8px; background: var(--ink-4); position: relative; flex: none; transition: background 120ms; }
+.switch-track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; transition: transform 120ms; }
+.switch input:checked + .switch-track { background: var(--ink); }
+.switch input:checked + .switch-track::after { transform: translateX(12px); }
+.switch input:focus-visible + .switch-track { outline: 2px solid var(--ink); outline-offset: 2px; }

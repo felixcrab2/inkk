@@ -28,7 +28,14 @@ contextBridge.exposeInMainWorld("inkk", {
   // sessions
   endSession: (id) => invoke("endSession", id ?? null),
   deleteSession: (id) => invoke("deleteSession", id),
-  certify: (input) => invoke("certify", input),
+  certify: (sessionId) => invoke("certify", sessionId),
+  sign: () => invoke("sign"),
+  previewSignature: () => invoke("previewSignature"),
+
+  // account (held by main; see lib/auth.js)
+  signIn: (email, password) => invoke("signIn", String(email ?? ""), String(password ?? "")),
+  signOut: () => invoke("signOut"),
+  importSession: (tokens) => invoke("importSession", tokens),
 
   // permissions
   requestPermission: (kind) => invoke("requestPermission", kind),
@@ -40,6 +47,7 @@ contextBridge.exposeInMainWorld("inkk", {
   setLaunchAtLogin: (v) => invoke("setLaunchAtLogin", !!v),
   setIgnoredApps: (list) => invoke("setIgnoredApps", Array.isArray(list) ? list : []),
   setReceive: (v) => invoke("setReceive", !!v),
+  setSetting: (key, value) => invoke("setSetting", String(key), value),
 
   // app
   relaunch: () => { ipcRenderer.send("inkk:relaunch"); },
@@ -47,6 +55,8 @@ contextBridge.exposeInMainWorld("inkk", {
   hide: () => { ipcRenderer.send("inkk:hide"); },
   copyText: (t) => invoke("copyText", String(t ?? "")),
   openExternal: (url) => invoke("openExternal", String(url ?? "")),
+  revealFile: (p) => invoke("revealFile", String(p ?? "")),
+  resize: (h) => { ipcRenderer.send("inkk:resize", Number(h) || 0); },
 
   // pushes from main
   onState: (cb) => on("state", cb),

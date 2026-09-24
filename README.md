@@ -67,7 +67,7 @@ cd companion
 npm install
 cp .env.local.example .env.local      # Supabase URL + publishable key
 npm start                             # builds the renderer + scoring bundle, launches Electron
-npm test                              # node --test: capture.js and lib/sessions.js
+npm test                              # every companion unit test
 ./scripts/dev-install.sh              # signed dev build into /Applications
 ```
 
@@ -87,7 +87,7 @@ Server (`api/certify.mjs`; set in Vercel → Settings → Environment Variables)
 | --- | --- |
 | `SUPABASE_URL` | falls back to `REACT_APP_SUPABASE_URL` |
 | `SUPABASE_ANON_KEY` | validates the caller's access token; falls back to `REACT_APP_SUPABASE_ANON_KEY` |
-| `SUPABASE_SERVICE_ROLE_KEY` | writes the ledger row and the locked score columns. Server-only. |
+| `SUPABASE_SERVICE_ROLE_KEY` | writes the ledger row and the locked score columns, and reads one certificate for `/api/verify`. Server-only (`SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_KEY` also work). Without it certifying says "Certification not configured". |
 
 Companion (`companion/.env.local`, injected at build time): the two Supabase
 values above plus `INKK_API_BASE` (default `https://inkk.site`). Release

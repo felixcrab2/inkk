@@ -1,0 +1,58 @@
+/* ─── Notes and Certify ─────────────────────────────────────────────────── */
+.page {
+  position: fixed; top: var(--top-bar); bottom: var(--bottom-nav); left: 0; right: 0;
+  overflow-y: auto; padding: 0 24px 96px; background: var(--paper);
+}
+.page-inner { width: 100%; max-width: 640px; margin: 88px auto 0; }
+.page-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 28px; }
+.page-head h1 { font-size: var(--t-3xl); font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+.page-empty { font-size: 14px; color: var(--ink-2); margin: 0; }
+
+/* One outlined panel, rows divided by hairlines: anchored without turning
+   every note into a card of its own. */
+.note-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.note-row {
+  display: grid; grid-template-columns: 1fr auto; column-gap: 24px; align-items: center;
+  padding: 0 18px; min-height: 64px;
+}
+.note-row + .note-row { border-top: 1px solid var(--line-2); }
+.note-row:hover { background: #fafafa; }
+.note-open { text-align: left; padding: 13px 0; min-width: 0; }
+.note-title { display: block; font-family: var(--font-serif); font-size: 17px; line-height: 1.3; letter-spacing: -0.01em; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root[data-face="sans"] .note-title { font-size: 15px; font-weight: 500; }
+.note-meta { display: flex; gap: 12px; margin-top: 3px; font-size: var(--t-xs); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.note-cert { color: var(--ink-2); }
+.note-when, .note-actions { grid-column: 2; grid-row: 1; font-size: var(--t-sm); color: var(--ink-2); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.note-actions { display: none; gap: 18px; justify-content: flex-end; }
+.note-row:hover .note-when, .note-row.is-confirming .note-when { display: none; }
+.note-row:hover .note-actions, .note-actions.is-shown { display: flex; }
+.note-confirm { color: var(--ink); }
+
+.page-foot { margin-top: 48px; display: flex; flex-direction: column; gap: 14px; }
+.foot-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; font-size: var(--t-sm); }
+.foot-row .text-btn { font-size: var(--t-sm); }
+.foot-quiet { color: var(--ink-3); }
+
+/* Certify */
+.facts { display: grid; grid-template-columns: 120px 1fr; row-gap: 10px; margin: 0; font-size: 14px; align-items: baseline; }
+.facts dt { font-size: var(--t-sm); color: var(--ink-3); }
+.facts dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+.facts dd.writer { font-family: var(--font-serif); font-size: 18px; letter-spacing: -0.01em; }
+.facts dd.code { font-size: 22px; font-weight: 500; letter-spacing: 0.03em; font-variant-numeric: tabular-nums; }
+.facts dd.strong { font-weight: 600; }
+.facts dd.mono { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.actions { display: flex; gap: 8px; margin-top: 22px; flex-wrap: wrap; }
+.lookup { margin-top: 44px; }
+.lookup h2, .cert h2 { font-size: var(--t-md); font-weight: 600; margin: 0 0 14px; }
+.lookup-form { display: flex; gap: 8px; max-width: 440px; }
+.lookup-form .field { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.lookup-hint { font-size: var(--t-sm); color: var(--ink-3); margin: 10px 0 0; }
+.msg { font-size: 14px; color: var(--ink); margin: 16px 0 0; }
+.cert { margin-top: 36px; padding-top: 28px; border-top: 1px solid var(--line); }
+.cert-about { font-size: 14px; color: var(--ink-2); margin: 20px 0 0; max-width: 520px; }
+.check-text { margin-top: 28px; max-width: 520px; }
+.check-text .label { display: block; font-size: var(--t-sm); color: var(--ink-3); margin-bottom: 8px; }
+.check-result { font-size: 14px; margin: 10px 0 0; color: var(--ink-2); }
+.check-result.strong { color: var(--ink); font-weight: 500; }
+.page.is-dropping { background: var(--hover); }
+.page.is-dropping .page-inner { pointer-events: none; }

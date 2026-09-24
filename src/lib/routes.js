@@ -10,7 +10,7 @@ export function viewToPath(view, code) {
 
 export function pathToView(path) {
   if (path.startsWith("/v/") || path === "/verify" || path === "/certify") return "certify";
-  if (path === "/profile" || path === "/notes" || path === "/privacy" || path === "/terms") return "notes";
+  if (path === "/profile" || path === "/notes" || path === "/privacy" || path === "/terms" || path === "/signin") return "notes";
   return "editor";
 }
 

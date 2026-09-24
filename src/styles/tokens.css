@@ -1,61 +1,42 @@
-@font-face{font-family:"Switzer";src:url("../assets/fonts/Switzer-400.woff2") format("woff2");font-weight:400;font-style:normal;font-display:swap;}
-@font-face{font-family:"Switzer";src:url("../assets/fonts/Switzer-500.woff2") format("woff2");font-weight:500;font-style:normal;font-display:swap;}
-@font-face{font-family:"Switzer";src:url("../assets/fonts/Switzer-600.woff2") format("woff2");font-weight:600;font-style:normal;font-display:swap;}
-@font-face{font-family:"Switzer";src:url("../assets/fonts/Switzer-700.woff2") format("woff2");font-weight:700;font-style:normal;font-display:swap;}
-
-/* ─── Design tokens ───────────────────────────────────────────────────────── */
+/* ─── Design tokens ─────────────────────────────────────────────────────────
+   White paper, black ink, two greys and a hairline. No accent colour: state
+   is carried by words and weight. The writer's face (Fell, Garamond or Sans,
+   chosen in the editor) sets only the writer's own words; the wordmark is EB
+   Garamond; everything else is the system face. */
 :root {
-  /* Paper and ink, never neutral screen-grey. This warm ramp began on the
-     phone and now carries the whole site; hierarchy comes from weight and
-     size, with greyness doing far less than it used to. */
-  --paper:   #faf8f4;
-  --paper-2: #f3efe7;
-  --ink:     #1a1613;
-  --ink-2:   #4c443b;
-  --ink-3:   #857a6b;
-  --ink-4:   #b5aa9a;
-  --line:    rgba(62, 50, 36, 0.12);
-  /* the one accent — red lead, reserved for what is verified or new */
-  --rubric:  #9e3b28;
+  --paper:  #ffffff;
+  --ink:    #000000;
+  --ink-2:  #6e6e6e;
+  --ink-3:  #a3a3a3;
+  --ink-4:  #d0d0d0;
+  --line:   #e6e6e6;
+  --line-2: #efefef;
+  --hover:  #f5f5f5;
+  --edge:   #d6d6d6;
+  --menu-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 
-  /* Desktop keeps its original ground — the palette change was asked for on
-     the phone, not here. The phone re-declares warm paper in its own block. */
-  /* The type scale. Seven sizes for the whole product; nothing else.
-     297 font-size declarations across ~40 ad-hoc values were snapped to
-     these steps — the crowding was never spacing, it was sizes. */
-  --t-xs:      0.78rem;
-  --t-sm:      0.92rem;
-  --t-md:      1.06rem;
-  --t-lg:      1.22rem;
-  --t-xl:      1.4rem;
-  --t-2xl:     1.62rem;
-  --t-3xl:     2.15rem;
-  --t-display: 2.35rem;
-
-  --bg:          #f6f6f6;
-  --card: #fbfbf9;               /* a sheet of paper laid on the desk — near-neutral, a breath of warmth */
-  --card-shadow: 0 1px 2px rgba(45, 36, 24, 0.045), 0 7px 22px rgba(45, 36, 24, 0.055);
-  --card-shadow-hover: 0 2px 4px rgba(45, 36, 24, 0.05), 0 16px 38px rgba(45, 36, 24, 0.09);
-  --surface:     #f0f0f0;
-  --text:        var(--ink);
-  --muted:       var(--ink-2);
-  --subtle:      var(--ink-3);
-  --gold:        #9a7b3f;
-  --border:      var(--line);
-  --top-bar:     52px;
-  --bottom-nav:  58px;
-  /* Garamond is reserved for the brand wordmark and the authored writing itself
-     (the editor's title + prose, the landing headline, drop caps). Everything
-     else — the entire interface (nav, lists, panels, modals, stats, verify,
-     profile, admin) — uses --font-ui. Swap --font-ui to restyle the whole UI. */
-  --font-ui:     "Switzer", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, sans-serif;
+  --font-ui:       -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mark:     "EB Garamond", Georgia, serif;
   --font-fell:     "IM Fell English", Georgia, serif;
   --font-garamond: "EB Garamond", Georgia, serif;
-  --font-plain:    "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --font-serif:    var(--font-fell);   /* the writing face; switched by data-face on <html> */
-}
+  --font-plain:    -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-serif:    var(--font-fell);   /* the writer's face; switched by data-face on <html> */
 
-/* The writer's face, chosen from the editor's Aa menu. Everything set in the
-   writing face (editor, Notes index, Certify headings, the PDF) follows. */
+  --top-bar:    56px;
+  --bottom-nav: 52px;
+
+  /* The type scale: 12 / 13 / 15 / 20 / 28. */
+  --t-xs:  12px;
+  --t-sm:  13px;
+  --t-md:  15px;
+  --t-lg:  17px;
+  --t-xl:  20px;
+  --t-2xl: 24px;
+  --t-3xl: 28px;
+
+  /* Names older stylesheets (the signal panel, the landing) still use. */
+  --bg: var(--paper); --text: var(--ink); --muted: var(--ink-2); --subtle: var(--ink-3);
+  --border: var(--line); --gold: var(--ink-3); --rubric: var(--ink); --paper-2: var(--hover); --card: var(--paper);
+}
 :root[data-face="garamond"] { --font-serif: var(--font-garamond); }
 :root[data-face="sans"]     { --font-serif: var(--font-plain); }

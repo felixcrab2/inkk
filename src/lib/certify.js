@@ -1,5 +1,6 @@
 import { supabase } from "../supabase";
-import { makeVerifyCode, hashContent, isVerifiedTier } from "../verify/code";
+import { makeVerifyCode, hashContent, isVerifiedTier, sha256hex } from "../verify/code";
+import { textFingerprint, textSketch, canonicalText } from "../verify/sketch";
 import { wordCount } from "../lib/docs";
 
 // Ask the server-side /api/certify endpoint to recompute the human-signal score
@@ -8,7 +9,7 @@ import { wordCount } from "../lib/docs";
 // this is the only path that yields a *verified* certificate. Returns the
 // server's verdict, or null when the route is unavailable — the caller then
 // falls back to the legacy direct write (unverified once the lock is applied).
-export async function certifyViaServer({ docId, code, events, contentHash, wordCount: wc, charCount, title, authorName, authorUsername }) {
+export async function certifyViaServer({ docId, code, events, contentHash, sketch, wordCount: wc, charCount, title, authorName, authorUsername }) {
   if (!supabase) return null;
   try {
     const { data: s } = await supabase.auth.getSession();
@@ -17,7 +18,10 @@ export async function certifyViaServer({ docId, code, events, contentHash, wordC
     const res = await fetch("/api/certify", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ docId, code, events: events || [], contentHash, wordCount: wc, charCount, title, authorName, authorUsername }),
+      body: JSON.stringify({
+        docId, code, events: events || [], contentHash, sketch, binding: "text", source: "web",
+        wordCount: wc, charCount, title, authorName, authorUsername,
+      }),
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -52,11 +56,11 @@ export async function writeCertFallback({ code, doc, user, title, authorName, au
 // keystroke trace and write the ledger row + stamp the live publication, with the
 // legacy client write as the offline fallback. The caller passes the already-
 // resolved code (reused or freshly minted) and content hash.
-export async function issueCert({ doc, user, code, reuse, events, contentHash, title, authorName, authorUsername }) {
-  // The server recomputes the score and writes the ledger row — the browser never
+export async function issueCert({ doc, user, code, reuse, events, contentHash, sketch, charCount, title, authorName, authorUsername }) {
+  // The server recomputes the score and writes the ledger row: the browser never
   // gets to assert its own number.
   const server = await certifyViaServer({
-    docId: doc.id, code, events, contentHash,
+    docId: doc.id, code, events, contentHash, sketch, charCount,
     wordCount: wordCount(doc.content), title, authorName, authorUsername,
   });
   if (server) {
@@ -72,17 +76,33 @@ export async function issueCert({ doc, user, code, reuse, events, contentHash, t
   return { code, verified, contentHash, isNew: true };
 }
 
-export async function ensureCertificate(doc, user, { title, authorName, authorUsername }, events) {
-  const contentHash = await hashContent(doc.content);
-  if (!contentHash) {
-    // No Web Crypto (e.g. insecure context) — can't bind a certificate.
-    return { code: doc.verifyCode || null, verified: isVerifiedTier(doc.scoreTier), contentHash: doc.contentHash || null, isNew: false };
+// The fingerprint of a note's text now, and whether a stored certificate is
+// still about it. Certificates issued before September 2026 carry the older
+// fingerprint (normalised text, seals included), so both are tried.
+export async function fingerprintOf(content) {
+  try {
+    const [hash, sketch, legacy] = await Promise.all([
+      textFingerprint(content, sha256hex), textSketch(content, sha256hex), hashContent(content),
+    ]);
+    return { hash, sketch, legacy, chars: canonicalText(content).length };
+  } catch {
+    return null;   // no Web Crypto (an insecure context): nothing can be bound
   }
-  // Unchanged text reuses its existing code; new/changed text mints a fresh one.
-  const reuse = !!(doc.verifyCode && doc.contentHash && doc.contentHash === contentHash);
-  const code = reuse ? doc.verifyCode : makeVerifyCode();
-  return issueCert({ doc, user, code, reuse, events, contentHash, title, authorName, authorUsername });
 }
 
+export function certMatches(doc, fp) {
+  if (!doc?.contentHash || !fp) return false;
+  return doc.contentHash === fp.hash || doc.contentHash === fp.legacy;
+}
 
-// ─── Profiles ─────────────────────────────────────────────────────────────────
+export async function ensureCertificate(doc, user, { title, authorName, authorUsername }, events) {
+  const fp = await fingerprintOf(doc.content);
+  if (!fp || !fp.hash) {
+    return { code: doc.verifyCode || null, verified: isVerifiedTier(doc.scoreTier), contentHash: doc.contentHash || null, isNew: false };
+  }
+  // Unchanged text keeps its code; new or changed text gets a fresh one.
+  const reuse = !!(doc.verifyCode && certMatches(doc, fp));
+  const code = reuse ? doc.verifyCode : makeVerifyCode();
+  const contentHash = reuse ? doc.contentHash : fp.hash;
+  return issueCert({ doc, user, code, reuse, events, contentHash, sketch: fp.sketch, charCount: fp.chars, title, authorName, authorUsername });
+}

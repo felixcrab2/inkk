@@ -239,9 +239,9 @@ the packed-storage migration.
 - **Certify from the web.** Sign in, write a few lines, certify. The new row
   appears in `verifications` with `verified` set by the server.
 - **Certify from the companion, no account.** On a Mac with the companion
-  installed and signed out, type a paragraph anywhere, open the popover,
-  *Certify this piece*, paste the text, *Get my code*. There should be no
-  sign-in prompt. Afterwards:
+  installed and signed out, type a paragraph anywhere, open the popover and
+  press *Certify*. There should be no sign-in prompt, and the seal lands on the
+  clipboard. Afterwards:
 
   ```sql
   select u.id, u.is_anonymous, p.username, v.code, v.verified
@@ -256,3 +256,82 @@ the packed-storage migration.
 - **Anonymous sign-ins disabled** (to check the fallback): turn the toggle
   from step 3 off, repeat the companion flow; it should show the inline
   email/password sign-in instead of failing silently. Turn it back on.
+
+## 8. The service-role key on Vercel
+
+`/api/certify` writes the ledger with the service-role key, and `/api/verify`
+reads it with the same key. Without it both answer "Certification not
+configured" (and the website quietly falls back to writing an *unverified*
+certificate from the browser, which is why it could look as if certifying
+worked). The routes read the first of these that is set:
+
+```
+SUPABASE_SERVICE_ROLE_KEY   (preferred)
+SUPABASE_SECRET_KEY
+SUPABASE_SERVICE_KEY
+```
+
+Supabase → **Project Settings → API Keys** → copy the `service_role` secret
+(or a secret key, `sb_secret_…`). Vercel → the inkk project → **Settings →
+Environment Variables** → add it for **Production** and **Preview** → then
+**Redeploy** (a variable only reaches deployments made after it was added).
+Never give it a `REACT_APP_` name: those are bundled into the website.
+
+Check it from a terminal: an empty signed-in request must fail on the body,
+not on configuration.
+
+```sh
+curl -s -X POST https://www.inkk.site/api/certify -H 'Content-Type: application/json' -d '{}'
+# {"ok":false,"error":"Sign in required"}  ← expected without a token
+```
+
+The desktop companion's "Certify" shows the server's message verbatim, so
+"Certification not configured" there means this step.
+
+## 9. Sentence fingerprints and binding
+
+Certificates now carry one short fingerprint per sentence (`text_sketch`) and
+what they are bound to (`binding`). Readers' apps use the sketch to say "82% of
+the certified sentences are here unchanged" instead of only "matches / doesn't".
+
+```sql
+alter table public.verifications add column if not exists text_sketch text[];
+alter table public.verifications add column if not exists binding text;
+```
+
+Until this runs, `/api/certify` writes certificates without them (nothing
+fails), and readers fall back to the whole-text fingerprint.
+
+Optionally, let the logged-out lookup RPC return them too (the `/api/verify`
+route already does; this is only for the fallback path):
+
+```sql
+drop function if exists public.verify_by_code(text);
+create function public.verify_by_code(p_code text)
+returns table (
+  code text, publication_id uuid, title text, author_name text,
+  author_username text, content_hash text, word_count integer,
+  human_score smallint, score_tier text, verified boolean, issued_at timestamptz,
+  text_sketch text[], binding text
+)
+language sql
+security definer
+set search_path = public
+as $$
+  select v.code, null::uuid, v.title, v.author_name, v.author_username,
+         v.content_hash, v.word_count, v.human_score, v.score_tier, v.verified, v.issued_at,
+         v.text_sketch, v.binding
+  from public.verifications v
+  where v.code = upper(btrim(p_code))
+  limit 1;
+$$;
+grant execute on function public.verify_by_code(text) to anon, authenticated;
+```
+
+## 10. The API lives on www
+
+`https://inkk.site` redirects to `https://www.inkk.site`, and a redirect to
+another host drops the `Authorization` header. Everything that calls the API
+from outside the website (the companion) uses `https://www.inkk.site`
+directly; keep the domain setup that way round, or add the apex as the
+primary domain and update `companion/.env.local`.

@@ -293,3 +293,20 @@ test("a corrupt index is set aside and sessions are rebuilt from their event fil
   assert.strictEqual(s[0].keystrokes, KEEP.length);
   assert.ok(fs.readdirSync(path.join(dir, "sessions")).some(n => n.startsWith("index.json.corrupt-")));
 });
+
+test("certifying again after writing on issues a new code and keeps the earlier certificate", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "inkk-sess-ver-"));
+  let n = 0, c = 0;
+  const store = createStore({ dir, genId: () => `id-${++n}`, genCode: () => `INKK-0000-0000-${String(++c).padStart(4, "0")}` });
+  const id = store.openFor("com.apple.TextEdit", "TextEdit");
+  const first = store.get(id).code;
+  assert.strictEqual(store.codeFor(id, "h1"), first, "the session's own code until certified");
+  store.setCert(id, { code: first, contentHash: "h1" });
+  assert.strictEqual(store.codeFor(id, "h1"), first, "same text, same certificate");
+  const next = store.codeFor(id, "h2");
+  assert.notStrictEqual(next, first, "new text, new code");
+  store.setCert(id, { code: next, contentHash: "h2" });
+  const s = store.get(id);
+  assert.strictEqual(s.code, next);
+  assert.deepStrictEqual(s.certs.map(c => c.code), [first]);
+});

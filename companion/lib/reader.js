@@ -1,40 +1,52 @@
-// inkk companion — reading the document in front, through macOS Accessibility.
+// inkk companion — reading what is on screen, through macOS Accessibility.
 //
-// Two jobs, both on-device and both discarding the text as soon as they are
-// done with it:
+// Three jobs, all on this Mac, and the text is dropped as soon as each is done:
 //
-//   readFocusedText(bundleId)  the text of the focused editor in an app, read
-//                              ONCE at certify time so the certificate can be
-//                              bound to a fingerprint of the piece. Nothing is
-//                              stored; only the SHA-256 leaves the Mac.
-//   readVisibleText(bundleId)  the text a window is showing, so the receiver
-//                              can notice an inkk code or seal link in an
-//                              email or document the user has open. Only the
-//                              code itself is looked up.
+//   readFocusedText(bundleId)  the piece being written, read once at certify
+//                              time so the certificate can hold a fingerprint
+//                              of it. Only the fingerprint leaves the Mac.
+//   readWindow(front)          everything the front window shows: its text, its
+//                              link addresses and its image descriptions, so an
+//                              inkk code or seal is noticed wherever it appears
+//                              (an email, a message, a web page, a signature).
+//   readDocumentPath(front)    the file behind the front window, so the code in
+//                              its metadata can be read and its text checked.
 //
-// Both go through osascript → System Events, which needs the Accessibility
-// grant the keyboard hook already requires, plus a one-time Automation
-// prompt for System Events. Failures return "" and the caller degrades.
+// The native helper does the reading when it is built (fast, and it sees links
+// and images); otherwise osascript and System Events do what they can.
 
 "use strict";
 
 const { execFile } = require("node:child_process");
+const fs = require("node:fs");
+const path = require("node:path");
+const helper = require("./helper");
 
 const OPTS = { timeout: 3500, maxBuffer: 8 * 1024 * 1024, windowsHide: true };
 const MAX_CHARS = 400000;
+const clip = (s) => (s.length > MAX_CHARS ? s.slice(0, MAX_CHARS) : s);
 
-function osa(script) {
+function exec(cmd, args, opts = OPTS) {
   return new Promise((resolve) => {
-    execFile("osascript", ["-e", script], OPTS, (err, out) => resolve(err ? "" : String(out || "")));
+    execFile(cmd, args, opts, (err, out) => resolve(err ? "" : String(out || "")));
   });
 }
-
+const osa = (script) => exec("osascript", ["-e", script]);
 const q = (s) => `"${String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 
-// The focused element's value in the given process; falls back to the first
-// text area of its front window (Pages, TextEdit, Notes expose either).
+async function pidOf(bundleId) {
+  const out = await exec("lsappinfo", ["info", "-only", "pid", bundleId], { timeout: 1200 });
+  const m = /"pid"=(\d+)/.exec(out);
+  return m ? +m[1] : null;
+}
+
 async function readFocusedText(bundleId) {
   if (!bundleId) return "";
+  if (helper.available()) {
+    const pid = await pidOf(bundleId);
+    const r = pid ? await helper.run(["ax-focused", String(pid)], { timeout: 4000 }) : null;
+    if (r && typeof r.text === "string" && r.text.trim()) return clip(r.text);
+  }
   const script = `
     tell application "System Events"
       set p to first process whose bundle identifier is ${q(bundleId)}
@@ -53,18 +65,23 @@ async function readFocusedText(bundleId) {
       end tell
     end tell
     return ""`;
-  const out = await osa(script);
-  return out.length > MAX_CHARS ? out.slice(0, MAX_CHARS) : out;
+  return clip(await osa(script));
 }
 
-// Whatever text the front window shows: the focused element, the window
-// title, and every static text in the window (message bodies in Mail and
-// Outlook, most document views). Bounded by the osascript timeout.
-async function readVisibleText(bundleId) {
-  if (!bundleId) return "";
+// → { title, document, text, links: [], images: [] }
+async function readWindow(front) {
+  const empty = { title: "", document: "", text: "", links: [], images: [] };
+  if (!front || !front.bundleId) return empty;
+  if (helper.available()) {
+    const pid = front.pid || (await pidOf(front.bundleId));
+    const r = pid ? await helper.run(["ax-window", String(pid)], { timeout: 4000 }) : null;
+    if (r && !r.error) {
+      return { title: r.title || "", document: r.document || "", text: clip(r.text || ""), links: r.links || [], images: r.images || [] };
+    }
+  }
   const script = `
     tell application "System Events"
-      set p to first process whose bundle identifier is ${q(bundleId)}
+      set p to first process whose bundle identifier is ${q(front.bundleId)}
       set out to ""
       tell p
         try
@@ -84,8 +101,38 @@ async function readVisibleText(bundleId) {
       end tell
       return out
     end tell`;
-  const out = await osa(script);
-  return out.length > MAX_CHARS ? out.slice(0, MAX_CHARS) : out;
+  return { ...empty, text: clip(await osa(script)) };
 }
 
-module.exports = { readFocusedText, readVisibleText };
+// The legacy entry point: the window's text only.
+async function readVisibleText(bundleId) {
+  const w = await readWindow({ bundleId });
+  return [w.title, w.text, ...w.links, ...w.images].join("\n");
+}
+
+const DOC_EXT = /\.(docx|pdf|pages|rtf|rtfd|doc|odt|txt|md|markdown|html?)$/i;
+
+// A window's document: its AXDocument when the app publishes one, else a file
+// whose name matches the window title that was changed in the last two days.
+async function readDocumentPath(front, win) {
+  const doc = win && win.document;
+  if (doc && doc.startsWith("file://")) {
+    try {
+      const p = decodeURIComponent(new URL(doc).pathname);
+      if (fs.existsSync(p)) return p;
+    } catch { /* not a file URL */ }
+  }
+  const title = String((win && win.title) || (front && front.title) || "").replace(/\s+[-—–]\s+(Edited|Locked|Saved|Word|Pages|Preview)$/i, "").trim();
+  if (!title || title.length < 3 || /^(Untitled|Document\d*|Inbox|New Message)\b/i.test(title)) return null;
+  const base = title.replace(/["\\*]/g, "");
+  const query = DOC_EXT.test(base)
+    ? `kMDItemFSName == "${base}"c && kMDItemContentModificationDate >= $time.today(-2)`
+    : `kMDItemFSName == "${base}.*"c && kMDItemContentModificationDate >= $time.today(-2)`;
+  const out = await exec("mdfind", ["-onlyin", require("node:os").homedir(), query], { timeout: 2500, maxBuffer: 1024 * 1024 });
+  const hits = out.split("\n").filter((p) => p && DOC_EXT.test(p) && !path.basename(p).startsWith("~$"));
+  if (!hits.length) return null;
+  hits.sort((a, b) => { try { return fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs; } catch { return 0; } });
+  return hits[0];
+}
+
+module.exports = { readFocusedText, readVisibleText, readWindow, readDocumentPath, pidOf };

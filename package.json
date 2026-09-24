@@ -31,7 +31,8 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "test:token": "node --test src/verify/token.test.mjs"
+    "test:token": "node --test src/verify/token.test.mjs",
+    "test:verify": "node --test src/verify/token.test.mjs src/verify/sketch.test.mjs"
   },
   "eslintConfig": {
     "extends": [

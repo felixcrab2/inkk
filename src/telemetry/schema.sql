@@ -185,6 +185,14 @@ create table if not exists public.verifications (
 );
 create index if not exists verifications_doc_idx on public.verifications(doc_id, issued_at desc);
 
+-- September 2026: one short fingerprint per sentence (src/verify/sketch.js), so
+-- a reader's copy can be checked sentence by sentence without the text being
+-- stored, and what the certificate is bound to ('text' | 'session' | 'file').
+-- Written only by /api/certify, which writes without them on a database that
+-- doesn't have them yet.
+alter table public.verifications add column if not exists text_sketch text[];
+alter table public.verifications add column if not exists binding text;
+
 alter table public.verifications enable row level security;
 
 -- Owners can see/insert/delete their own certificate rows. Public verification

@@ -1,13 +1,15 @@
-// inkk companion — build step (`npm run build`). Three outputs:
+// inkk companion — build step (`npm run build`). Its outputs:
 //
 //   lib/config.cjs       INKK_API_BASE (+ Supabase URL/key) from companion/.env.local,
 //                        so the main process knows where /api/certify lives.
 //   lib/scoring.cjs      esbuild CJS bundle of src/telemetry/{features,score}.js
 //                        (entry lib/scoring-entry.js) — the main process scores with
 //                        the SAME code the website and api/certify.mjs use.
-//   renderer/bundle.js   esbuild IIFE bundle of renderer/app.js, with __SUPA_URL__,
-//                        __SUPA_KEY__ and __API_BASE__ inlined (the renderer imports
-//                        @supabase/supabase-js and ../../src/verify/code.js).
+//   renderer/bundle.js   esbuild IIFE bundle of renderer/app.js (the popover; it
+//                        talks only to main, through preload.js).
+//   renderer/sign.bundle.js  the page that draws a signed name (renderer/sign.js
+//                        + lib/mark.js).
+//   build/inkk-helper    the native helper, compiled from helper/InkkHelper.swift.
 //
 // The two generated .cjs files and bundle.js are gitignored; the app cannot
 // run without them, which is why every script that launches or packages the
@@ -40,7 +42,8 @@ function loadEnvLocal() {
 
 function readConfig() {
   return {
-    INKK_API_BASE: process.env.INKK_API_BASE || "https://inkk.site",
+    // Always the www host: the apex redirects, and a redirect drops the sign-in.
+    INKK_API_BASE: (process.env.INKK_API_BASE || "https://www.inkk.site").replace("://inkk.site", "://www.inkk.site"),
     REACT_APP_SUPABASE_URL: process.env.REACT_APP_SUPABASE_URL || process.env.SUPABASE_URL || "",
     REACT_APP_SUPABASE_ANON_KEY: process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "",
   };
@@ -80,18 +83,41 @@ async function bundleRenderer(cfg) {
     platform: "browser",
     target: "chrome130",
     outfile: path.join(HERE, "renderer", "bundle.js"),
-    // The renderer reads TOS_VERSION from src/components/Legal.js, a React
-    // file; the JSX loader lets esbuild parse it (the component itself is
-    // tree-shaken away).
-    loader: { ".js": "jsx" },
-    define: {
-      __SUPA_URL__: JSON.stringify(cfg.REACT_APP_SUPABASE_URL),
-      __SUPA_KEY__: JSON.stringify(cfg.REACT_APP_SUPABASE_ANON_KEY),
-      __API_BASE__: JSON.stringify(cfg.INKK_API_BASE),
-    },
     logLevel: "warning",
   });
   console.log("[build] renderer/bundle.js");
+}
+
+async function bundleSign() {
+  const entry = path.join(HERE, "renderer", "sign.js");
+  if (!fs.existsSync(entry)) return;
+  await esbuild.build({
+    entryPoints: [entry], bundle: true, format: "iife", platform: "browser", target: "chrome130",
+    outfile: path.join(HERE, "renderer", "sign.bundle.js"), logLevel: "warning",
+  });
+  console.log("[build] renderer/sign.bundle.js");
+}
+
+// The native helper (helper/InkkHelper.swift): front window, Accessibility
+// reading, OCR and PDF metadata. Rebuilt only when the source is newer.
+function buildHelper() {
+  const src = path.join(HERE, "helper", "InkkHelper.swift");
+  const out = path.join(HERE, "build", "inkk-helper");
+  if (!fs.existsSync(src)) return;
+  try {
+    if (fs.existsSync(out) && fs.statSync(out).mtimeMs >= fs.statSync(src).mtimeMs) { console.log("[build] build/inkk-helper (up to date)"); return; }
+  } catch { /* rebuild */ }
+  const { execFileSync } = require("node:child_process");
+  try {
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    execFileSync("xcrun", ["swiftc", "-O", "-target", "arm64-apple-macos13", "-o", `${out}-arm64`, src], { stdio: "inherit" });
+    execFileSync("xcrun", ["swiftc", "-O", "-target", "x86_64-apple-macos13", "-o", `${out}-x86_64`, src], { stdio: "inherit" });
+    execFileSync("lipo", ["-create", "-output", out, `${out}-arm64`, `${out}-x86_64`]);
+    fs.rmSync(`${out}-arm64`); fs.rmSync(`${out}-x86_64`);
+    console.log("[build] build/inkk-helper");
+  } catch (e) {
+    console.warn(`[build] inkk-helper not built (${e.message.split("\n")[0]}); pictures, PDFs and fast reading are off in this build`);
+  }
 }
 
 (async () => {
@@ -100,6 +126,8 @@ async function bundleRenderer(cfg) {
   writeConfig(cfg);
   await bundleScoring();
   await bundleRenderer(cfg);
+  await bundleSign();
+  buildHelper();
   if (!cfg.REACT_APP_SUPABASE_URL || !cfg.REACT_APP_SUPABASE_ANON_KEY) {
     console.warn("[build] No Supabase config in .env.local — certification will offer sign-in but cannot complete it. See companion/README.md.");
   }

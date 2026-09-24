@@ -2,26 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <!-- The renderer runs with contextIsolation on and no Node; the only network
-       it may touch is Supabase (auth) and inkk.site (opened externally, and the
-       certify POST goes through main). Styles are local; inline style attributes
-       are allowed for the signal bars' widths. -->
+  <!-- No Node, no network: everything this page knows comes through
+       window.inkk (preload.js). Styles and fonts are local. -->
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src https://*.supabase.co https://inkk.site https://www.inkk.site;" />
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'none';" />
   <title>inkk</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <!-- The popover is a transparent 364×600 window; .sheet is the visible card,
-       .arrow the little tab that points up at the tray icon. -->
-  <div class="arrow" aria-hidden="true"></div>
-  <div class="sheet">
-    <div id="root" class="sheet-inner"></div>
-  </div>
-
-  <!-- mock.js only defines window.inkk when it is missing — i.e. when this file
-       is opened in a plain browser or a bare Electron window with no preload.
-       Inside the real app the preload runs first and this is a no-op. -->
+  <main id="root"></main>
+  <!-- mock.js defines window.inkk only when it is missing (a plain browser);
+       inside the app the preload has already run and it does nothing. -->
   <script src="mock.js"></script>
   <script src="bundle.js"></script>
 </body>

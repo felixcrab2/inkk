@@ -6,8 +6,7 @@ import "@fontsource/eb-garamond/400-italic.css";
 import "@fontsource/eb-garamond/500.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { Menu, Check, Download, Maximize2, Minimize2, Plus, Trash2, MoreHorizontal, X, Eye, EyeOff } from "lucide-react";
-import { PenNib as PPen, Notebook as PNotes, SealCheck as PSeal } from "@phosphor-icons/react";
+import { Menu, Check, Minimize2, MoreHorizontal, X } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { supabase } from "./supabase";
 import { renderBookPdfPages, PAGE_PRESETS } from "./pdf/bookPage";
@@ -18,14 +17,15 @@ import { startSync, stopSync, setResearchOptIn as remoteSetResearchOptIn, delete
 import { claimAnonymous as claimAnonymousEvents, clearForUser as clearLocalForUser, dumpForUser as dumpLocalForUser } from "./telemetry/store";
 import { HumanSignalPanel } from "./components/HumanSignal";
 import { TOS_VERSION, PrivacyModal, TermsModal } from "./components/Legal";
-import { hashContent, isVerifiedTier } from "./verify/code";
+import { isVerifiedTier, sealUrl } from "./verify/code";
 import { NotesView } from "./views/Notes";
 import { CertifyView } from "./views/Certify";
 import { createDoc, normaliseDoc, saveState, loadOwner, saveOwner, initState, stripHtml, setEditorHtml, setTitleHtml, docTitle, wordCount, loadStreak, touchStreak } from "./lib/docs";
 import { applySmartTypography, caretRangeAt, compressImage, titleCase, liveTitleCase, titleCaretOffset, setTitleCaret, isMobile } from "./lib/text";
-import { formatWritingTime } from "./lib/format";
 import { fetchCloudDocs, fetchCloudDoc, pushDocToCloud, deleteDocFromCloud, mergeDocs } from "./lib/cloud";
-import { ensureCertificate } from "./lib/certify";
+import { ensureCertificate, fingerprintOf, certMatches } from "./lib/certify";
+import { docxOf } from "./lib/docx";
+import { withTextChunks } from "./lib/png";
 import { fetchProfile, upsertProfile, generateUniqueUsername } from "./lib/profile";
 import { viewToPath, pathToView, pathToLegal } from "./lib/routes";
 import { enterBrowserFullscreen, exitBrowserFullscreen } from "./lib/fullscreen";
@@ -36,6 +36,17 @@ import { HumanSignalModal } from "./components/HumanSignalModal";
 import { AuthModal, UpdatePasswordModal } from "./components/AuthModal";
 import { DownloadModal } from "./components/DownloadModal";
 import { ImageToolbar } from "./components/ImageToolbar";
+
+function saveBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 export default function App() {
   const { docs: initDocs, activeId: initActiveId } = initState();
@@ -58,11 +69,19 @@ export default function App() {
   const viewRef = useRef(pathToView(window.location.pathname));
   useEffect(() => { viewRef.current = view; }, [view]);
   useEffect(() => { if (view !== "editor") setToolsOpen(false); }, [view]);
+  // inkk.site/signin (linked from the desktop companion) opens sign-in over
+  // the Notes page; ?reset=1 opens the password reset.
+  useEffect(() => {
+    if (window.location.pathname !== "/signin") return;
+    const reset = new URLSearchParams(window.location.search).get("reset") === "1";
+    setAuthMode(reset ? "reset" : "signin");
+    setAuthOpen(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const explicitSignOutRef = useRef(false);   // only a deliberate Sign out wipes local notes
   const inAppDepthRef = useRef(0);            // history entries this app pushed; Escape only goes back over those
   const [certMenuOpen, setCertMenuOpen] = useState(false);
   const [certStale, setCertStale]       = useState(false);
-  const [certConfirmOpen, setCertConfirmOpen] = useState(false); // mobile: explain Certify before acting
   const [certifying, setCertifying]   = useState(false);
   const [verifyCode, setVerifyCode]   = useState(() =>
     window.location.pathname.startsWith("/v/") ? window.location.pathname.slice(3) : "");
@@ -85,7 +104,6 @@ export default function App() {
   const [dropCapImages, setDropCapImages] = useState({});
   const [updatePasswordOpen, setUpdatePasswordOpen] = useState(false);
   const [researchOptIn, setResearchOptIn] = useState(false);
-  const [liveStats, setLiveStats] = useState({ events: 0, sessionStartedAt: null });
   const [panelConfirmDeleteId, setPanelConfirmDeleteId] = useState(null);
   const [formatActive, setFormatActive] = useState({ bold: false, italic: false });
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
@@ -440,15 +458,7 @@ export default function App() {
     if (!docId) return;
     const rec = recorderRef.current;
     if (!rec) return;
-    const { events, startedAt } = rec.snapshot(docId);
-    // Always update the visible live counter — even on tiny sample sizes,
-    // so the research indicator ticks up in real time.
-    const lastT = events.length ? events[events.length - 1].t : null;
-    setLiveStats({
-      events: events.length,
-      sessionStartedAt: startedAt || null,
-      lastEventAt: lastT,
-    });
+    const { events } = rec.snapshot(docId);
     if (events.length < 8) return;        // very early — don't touch existing score
     const words = wordCount(contentRef.current || "");
     const features = extractFeatures(events, { words });
@@ -884,14 +894,15 @@ export default function App() {
     setCertifying(false);
     if (!cert.code) { addToast(cert.error ? "Could not certify." : "Certification needs a secure connection."); return; }
     setDocs(prev => {
-      const next = prev.map(d => d.id === docId ? { ...d, verifyCode: cert.code, contentHash: cert.contentHash } : d);
+      const next = prev.map(d => d.id === docId ? { ...d, verifyCode: cert.code, contentHash: cert.contentHash, certVerified: !!cert.verified } : d);
       const updated = next.find(d => d.id === docId);
       if (updated) pushDocToCloud(updated, userRef.current.id);
       saveState(next, docId);
       return next;
     });
     if (viewRef.current === "editor") setCertMenuOpen(true);   // the popover belongs to the editor's top bar
-    if (cert.isNew) addToast(cert.verified ? "Certified · human-verified." : "Certified.");
+    if (cert.isNew) addToast(cert.verified ? "Certified and verified" : "Certified");
+    return cert;
   }, [profile, addToast, gatherDocEvents]);
 
   // Open the auth modal on a specific tab. Mode is set before the modal mounts,
@@ -1229,56 +1240,47 @@ export default function App() {
     if (!stripHtml(text).trim()) return;
     const titleStr = stripHtml(titleRef.current).trim();
     const safeName = titleStr.replace(/[^a-zA-Z0-9\s\-_]/g, "").trim() || "inkk";
-    const preset = PAGE_PRESETS[
-      format === "png-square"   ? "square"   :
-      format === "png-portrait" ? "portrait" :
-      "book"
-    ];
-    // PDF keeps the paper look; PNG exports on the clean inkk background.
-    const paperTexture = (format === "pdf");
-    // Verification certificate for this piece, if it's certified. Written into
-    // the PDF's (invisible) document metadata only — the code is surfaced in
-    // the app (Notes, Certify tab), not stamped on the page.
-    const activeDoc = docsRef.current.find(d => d.id === activeIdRef.current);
-    let certCode = activeDoc?.verifyCode || null;
-    let certTier = activeDoc?.scoreTier || null;
-    // Fallback: if the code isn't hydrated into local state yet (certified in
-    // another session), look it up so the PDF still reliably carries it.
-    if (!certCode && supabase && userRef.current) {
-      const { data } = await supabase
-        .from("documents")
-        .select("verify_code, score_tier")
-        .eq("id", activeIdRef.current)
-        .maybeSingle();
-      if (data?.verify_code) { certCode = data.verify_code; certTier = data.score_tier; }
+    const byline = profile?.display_name || profile?.username || "";
+
+    // Whatever leaves inkk carries its certificate: a signed-in writer's
+    // download certifies the text as it is now (reusing the code when the
+    // words haven't changed) and the code goes into the file's metadata,
+    // where the desktop companion and the Certify page read it back.
+    let certCode = null;
+    if (userRef.current && supabase) {
+      const doc = docsRef.current.find(d => d.id === activeIdRef.current);
+      const fp = await fingerprintOf(text);
+      if (doc?.verifyCode && fp && certMatches(doc, fp)) certCode = doc.verifyCode;
+      else {
+        const cert = await certifyActiveDoc();
+        certCode = cert?.code || null;
+      }
     }
-    const verify = certCode
-      ? { code: certCode, verified: isVerifiedTier(certTier), host: window.location.host }
-      : null;
-    const renderOptions = {
-      pageW: preset.w,
-      pageH: preset.h,
-      justify:         style.justify         ?? false,
-      paragraphIndent: style.paragraphIndent ?? false,
-      paperTexture,
-    };
+    const seal = certCode ? sealUrl(certCode) : null;
 
     try {
+      if (format === "docx") {
+        const blob = docxOf({ title: titleStr, html: text, author: byline, face: font, code: certCode, seal });
+        saveBlob(blob, `${safeName}.docx`);
+        return;
+      }
+      const preset = PAGE_PRESETS[format === "png-square" ? "square" : format === "png-portrait" ? "portrait" : "book"];
+      const renderOptions = {
+        pageW: preset.w,
+        pageH: preset.h,
+        justify:         style.justify         ?? false,
+        paragraphIndent: style.paragraphIndent ?? false,
+        paperTexture:    format === "pdf",        // PDF keeps the paper; images export on clean white
+      };
       if (format === "pdf") {
         const pdf = new jsPDF({ unit: "pt", format: [preset.w, preset.h], compress: true });
-        const byline = profile?.display_name || profile?.username || "";
-        if (pdf.setProperties) {
-          pdf.setProperties({
-            title:   titleStr || "inkk",
-            author:  byline || "inkk",
-            creator: "inkk",
-            subject: verify
-              ? `${verify.verified ? "Human-signal verified on inkk" : "Written in inkk"}. Verify at ${verify.host}/verify. ${verify.code}`
-              : "Written in inkk",
-            keywords: ["inkk", verify ? (verify.verified ? "human-verified" : "written-in-inkk") : null, verify?.code]
-              .filter(Boolean).join(", "),
-          });
-        }
+        pdf.setProperties?.({
+          title:    titleStr || "inkk",
+          author:   byline || "",
+          creator:  "inkk",
+          subject:  seal ? `Certified with inkk. ${seal}` : "Written with inkk",
+          keywords: certCode ? `inkk:${certCode}, ${seal}` : "inkk",
+        });
         await renderBookPdfPages({
           title: titleStr,
           byline,
@@ -1286,41 +1288,33 @@ export default function App() {
           options: renderOptions,
           async onPage(canvas, pageIndex) {
             if (pageIndex > 0) pdf.addPage([preset.w, preset.h]);
-            const dataUrl = canvas.toDataURL("image/jpeg", 0.96);
-            pdf.addImage(dataUrl, "JPEG", 0, 0, preset.w, preset.h, undefined, "MEDIUM");
+            pdf.addImage(canvas.toDataURL("image/jpeg", 0.96), "JPEG", 0, 0, preset.w, preset.h, undefined, "MEDIUM");
           },
         });
         pdf.save(`${safeName}.pdf`);
-      } else {
-        // PNG — only the first page becomes the image.
-        const byline = profile?.display_name || profile?.username || "";
-        let pngBlob = null;
-        await renderBookPdfPages({
-          title: titleStr,
-          byline,
-          html: text,
-          options: renderOptions,
-          async onPage(canvas, pageIndex) {
-            if (pageIndex > 0 || pngBlob) return;
-            pngBlob = await new Promise(res => canvas.toBlob(res, "image/png"));
-          },
-        });
-        if (!pngBlob) { addToast("Nothing to export."); return; }
-        const url = URL.createObjectURL(pngBlob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${safeName}.png`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
+        return;
       }
+      // An image: the first page only.
+      let pngBlob = null;
+      await renderBookPdfPages({
+        title: titleStr,
+        byline,
+        html: text,
+        options: renderOptions,
+        async onPage(canvas, pageIndex) {
+          if (pageIndex > 0 || pngBlob) return;
+          pngBlob = await new Promise(res => canvas.toBlob(res, "image/png"));
+        },
+      });
+      if (!pngBlob) { addToast("Nothing to export"); return; }
+      if (certCode) pngBlob = await withTextChunks(pngBlob, { Title: titleStr, Author: byline, Keywords: `inkk:${certCode}`, "inkk-code": certCode, "inkk-seal": seal });
+      saveBlob(pngBlob, `${safeName}.png`);
     } catch (err) {
       console.error("Download failed:", err);
-      addToast("Download failed.");
+      addToast("The download didn't work. Try again.");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [addToast, profile?.display_name, profile?.username]);
+  }, [addToast, profile?.display_name, profile?.username, font, certifyActiveDoc]);
 
   const openDownloadModal = useCallback(() => {
     if (!stripHtml(contentRef.current || "").trim()) return;
@@ -1497,7 +1491,8 @@ export default function App() {
   const hasContent   = words > 0;
   const activeDoc      = docs.find(d => d.id === activeId);
   const activeCert     = activeDoc?.verifyCode || null;
-  const activeCertOk   = isVerifiedTier(activeDoc?.scoreTier);
+  // What the ledger said when the code was issued; older notes only have the live tier.
+  const activeCertOk   = activeDoc?.certVerified ?? isVerifiedTier(activeDoc?.scoreTier);
 
   // A certificate binds one exact text. When the words move on, the button
   // stops claiming "Certified" and offers to recertify instead — quietly,
@@ -1508,8 +1503,8 @@ export default function App() {
     if (!doc?.verifyCode || !doc?.contentHash) { setCertStale(false); return; }
     let live = true;
     const t = setTimeout(async () => {
-      const h = await hashContent(contentRef.current || doc.content);
-      if (live) setCertStale(!!h && h !== doc.contentHash);
+      const fp = await fingerprintOf(contentRef.current || doc.content);
+      if (live) setCertStale(!!fp && !certMatches(doc, fp));
     }, 600);
     return () => { live = false; clearTimeout(t); };
   }, [words, activeId, docs]);
@@ -1545,7 +1540,7 @@ export default function App() {
           document brings a fresh plate. */}
       <Backdrop
         view={view}
-        hidden={showLanding || (isEditor && !previewMode && (hasContent || !menuVisible))}
+        hidden={showLanding || !isEditor || (!previewMode && (hasContent || !menuVisible))}
         override={isEditor && previewMode ? { img: imgForPub(activeId), pos: "center 30%" } : null}
         ringed={view === "certify" && verifyStatus !== "found"}
       />
@@ -1562,7 +1557,7 @@ export default function App() {
       {/* ── offline banner ── */}
       {!online && (
         <div id="offline-banner" role="status">
-          Offline. Changes are saved locally on this device and will sync when you reconnect.
+          Offline. Your writing is kept on this device until you reconnect.
         </div>
       )}
 
@@ -1589,123 +1584,58 @@ export default function App() {
             <div id="tools" className={`${menuClass}${toolsOpen ? " is-open" : ""}`}>
               {toolsOpen && (
                 <div id="tools-row">
-          {isEditor && supabase && hasContent && (
-            <div id="cert-menu-wrap">
-              <button
-                id="cert-btn"
-                className={`${menuClass}${activeCert && !certStale ? " is-certified" : ""}`}
-                title={activeCert
-                  ? (certStale ? "The text has changed since certification. Click to recertify." : "Verification code")
-                  : "Get a human verification code for this note."}
-                disabled={certifying}
-                onClick={() => {
-                  if (activeCert && certStale) certifyActiveDoc();
-                  else if (activeCert) setCertMenuOpen(v => !v);
-                  else if (isMobileRef.current) setCertConfirmOpen(v => !v);
-                  else certifyActiveDoc();
-                }}
-              >
-                <span className="btn-label">{certifying ? "Certifying…" : activeCert ? (certStale ? "Recertify" : "Certified") : "Certify"}</span>
-              </button>
-              {!activeCert && certConfirmOpen && (
-                <div id="cert-menu">
-                  <span className="cert-menu-label">Certify</span>
-                  <p className="cert-menu-note">
-                    Mint a verification code that proves this piece was written by hand.
-                    It stays private to you until you share it.
-                  </p>
-                  <button
-                    className="cert-menu-link"
-                    onClick={() => { setCertConfirmOpen(false); certifyActiveDoc(); }}
-                  >Certify this piece →</button>
-                </div>
-              )}
-              {activeCert && certMenuOpen && (
-                <div id="cert-menu">
-                  <span className="cert-menu-label">{activeCertOk ? "Human-verified" : "Verification code"}</span>
-                  <button
-                    className="cert-menu-code"
-                    title="Copy code"
-                    onClick={() => navigator.clipboard?.writeText(activeCert).then(() => addToast("Code copied."))}
-                  >{activeCert}</button>
-                  <p className="cert-menu-note">
-                    Proof this piece displays human signal. Share the code and the recipient can check it.
-                    It stays private to you until you share it.
-                  </p>
-                  <button
-                    className="cert-menu-link"
-                    onClick={() => { setCertMenuOpen(false); openVerify(activeCert); }}
-                  >Open verification →</button>
-                  <button
-                    className="cert-menu-link cert-menu-recertify"
-                    onClick={() => { setCertMenuOpen(false); certifyActiveDoc(); }}
-                  >Re-certify current text</button>
-                </div>
-              )}
-            </div>
-          )}
-          {isEditor && (
-            <div id="face-menu-wrap">
-              <button
-                className={`icon-btn title-caps-btn ${menuClass}${faceMenuOpen ? " active" : ""}`}
-                onClick={() => setFaceMenuOpen(v => !v)}
-                title="Typeface"
-                aria-expanded={faceMenuOpen}
-              >
-                <span className="title-caps-glyph">Aa</span>
-              </button>
-              {faceMenuOpen && (
-                <div id="cert-menu" className="face-menu">
-                  <span className="cert-menu-label">Typeface</span>
-                  {[["fell", "Fell"], ["garamond", "Garamond"], ["sans", "Sans"]].map(([k, label]) => (
-                    <button key={k} className={`face-option${font === k ? " is-on" : ""}`} onClick={() => setFont(k)}>
-                      <span className={`face-sample face-${k}`} aria-hidden="true">Aa</span>
-                      <span>{label}</span>
-                    </button>
-                  ))}
-                  <label className="face-caps">
-                    <input type="checkbox" checked={titleCapsOn} onChange={e => setTitleCapsOn(e.target.checked)} />
-                    <span>Capitalise titles</span>
-                  </label>
-                </div>
-              )}
-            </div>
-          )}
-          {isEditor && hasContent && (
-            <button
-              className={`icon-btn icon-btn-preview${previewMode ? " active" : ""}`}
-              onClick={() => setPreviewMode(v => !v)}
-              title={previewMode ? "Back to editing" : "Preview the rendered pages"}
-            >
-              {previewMode ? <EyeOff size={14} /> : <Eye size={14} />}
-              <span className="btn-label">{previewMode ? "Edit" : "Preview"}</span>
-            </button>
-          )}
-          {isEditor && hasContent && (
-            <button id="pdf-btn" className={menuClass} onClick={openDownloadModal} title="Download  ⌘S">
-              <Download size={13} />
-              <span className="btn-label">Download</span>
-            </button>
-          )}
-          {isEditor && (
-            <button
-              className={`icon-btn focus-btn ${menuClass}`}
-              onClick={toggleFocusMode}
-              title={focusMode ? "Exit fullscreen  ⌘." : "Fullscreen  ⌘."}
-            >
-              {focusMode ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-            </button>
-          )}
+                  {supabase && hasContent && (
+                    <div className="tool-wrap">
+                      <button
+                        className="tool"
+                        disabled={certifying}
+                        onClick={() => {
+                          if (activeCert && !certStale) setCertMenuOpen(v => !v);
+                          else certifyActiveDoc();
+                        }}
+                      >{certifying ? "Certifying" : activeCert ? (certStale ? "Certify again" : "Certified") : "Certify"}</button>
+                      {activeCert && !certStale && certMenuOpen && (
+                        <div className="menu">
+                          <div className="menu-head">{activeCertOk ? "Verified" : "Recorded"}</div>
+                          <button className="menu-code" title="Copy code" onClick={() => { navigator.clipboard?.writeText(activeCert).then(() => addToast("Code copied")); setCertMenuOpen(false); }}>{activeCert}</button>
+                          <button className="menu-item" onClick={() => { navigator.clipboard?.writeText(`inkk. ${sealUrl(activeCert).replace("https://", "")}`).then(() => addToast("Seal copied")); setCertMenuOpen(false); }}>Copy seal</button>
+                          <button className="menu-item" onClick={() => { setCertMenuOpen(false); openVerify(activeCert); }}>Open certificate</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <div className="tool-wrap">
+                    <button className={`tool${faceMenuOpen ? " is-on" : ""}`} onClick={() => setFaceMenuOpen(v => !v)} aria-expanded={faceMenuOpen}>Type</button>
+                    {faceMenuOpen && (
+                      <div className="menu">
+                        {[["fell", "Fell"], ["garamond", "Garamond"], ["sans", "Sans"]].map(([k, label]) => (
+                          <button key={k} className={`menu-item face-${k}${font === k ? " is-on" : ""}`} onClick={() => setFont(k)}>
+                            <span>{label}</span>{font === k && <Check size={14} strokeWidth={1.75} />}
+                          </button>
+                        ))}
+                        <div className="menu-sep" />
+                        <button className="menu-item" onClick={() => setTitleCapsOn(v => !v)}>
+                          <span>Capitalise titles</span>{titleCapsOn && <Check size={14} strokeWidth={1.75} />}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  {hasContent && (
+                    <button className={`tool${previewMode ? " is-on" : ""}`} onClick={() => setPreviewMode(v => !v)}>{previewMode ? "Edit" : "Preview"}</button>
+                  )}
+                  {hasContent && (
+                    <button className="tool" onClick={openDownloadModal} title="⌘S">Download</button>
+                  )}
+                  <button className="tool" onClick={toggleFocusMode} title="⌘.">{focusMode ? "Exit full screen" : "Full screen"}</button>
                 </div>
               )}
               <button
-                className="icon-btn tools-toggle"
-                onClick={() => setToolsOpen(v => !v)}
+                className="icon-btn"
+                onClick={() => { setToolsOpen(v => !v); setCertMenuOpen(false); setFaceMenuOpen(false); }}
                 aria-expanded={toolsOpen}
-                aria-label={toolsOpen ? "Hide tools" : "Tools"}
-                title={toolsOpen ? "Hide tools" : "Certify, preview, download…"}
+                aria-label={toolsOpen ? "Close" : "More"}
               >
-                {toolsOpen ? <X size={15} /> : <MoreHorizontal size={16} />}
+                {toolsOpen ? <X size={18} strokeWidth={1.5} /> : <MoreHorizontal size={18} strokeWidth={1.5} />}
               </button>
             </div>
           )}
@@ -1715,101 +1645,59 @@ export default function App() {
       {/* ── doc panel ── */}
       {isEditor && panelOpen && <div id="panel-backdrop" onClick={() => setPanelOpen(false)} />}
       {isEditor && (
-        <div id="doc-panel" className={panelOpen ? "open" : ""}>
-          <button className="new-doc-btn" onClick={newDoc}>
-            <Plus size={13} /> New note
-          </button>
+        <aside id="doc-panel" className={panelOpen ? "open" : ""} aria-hidden={!panelOpen}>
+          <div className="panel-head">
+            <span>Notes</span>
+            <button className="text-btn" onClick={newDoc}>New note</button>
+          </div>
           <div id="doc-list">
-            {sortedDocs.map(d => (
-              <div key={d.id} className={`doc-item${d.id === activeId ? " active" : ""}`} onClick={() => switchDoc(d.id)}>
-                <div className="doc-item-body">
-                  <span className="doc-item-title">{stripHtml(d.title || "") || docTitle(d.content)}</span>
-                  <span className="doc-item-meta">
-                    {wordCount(d.content)}w
-                    {d.writingTimeSecs > 60 && ` · ${formatWritingTime(d.writingTimeSecs)}`}
-                  </span>
-                </div>
-                <div className="doc-item-actions">
-                  <button className="doc-pdf" onClick={openDownloadModal} title="Download  ⌘S">
-                    <Download size={11} />
-                  </button>
-                  {docs.length > 1 && (
-                    panelConfirmDeleteId === d.id ? (
-                      <span className="doc-confirm" onClick={e => e.stopPropagation()}>
-                        <span className="doc-confirm-text">Delete?</span>
-                        <button
-                          className="doc-confirm-cancel"
-                          onClick={e => { e.stopPropagation(); setPanelConfirmDeleteId(null); }}
-                        >Cancel</button>
-                        <button
-                          className="doc-confirm-yes"
-                          onClick={e => { deleteDoc(d.id, e); setPanelConfirmDeleteId(null); }}
-                        >Delete</button>
-                      </span>
-                    ) : (
-                      <button
-                        className="doc-delete"
-                        title="Delete document"
-                        onClick={e => { e.stopPropagation(); setPanelConfirmDeleteId(d.id); }}
-                      >
-                        <Trash2 size={11} />
-                      </button>
-                    )
+            {sortedDocs.map(d => {
+              const wc = wordCount(d.content);
+              return (
+                <div key={d.id} className={`doc-item${d.id === activeId ? " active" : ""}`} onClick={() => switchDoc(d.id)}>
+                  <span className="doc-item-title">{stripHtml(d.title || "") || docTitle(d.content) || "Untitled"}</span>
+                  {panelConfirmDeleteId === d.id ? (
+                    <span className="doc-item-meta" onClick={e => e.stopPropagation()}>
+                      <button className="text-btn" onClick={e => { e.stopPropagation(); setPanelConfirmDeleteId(null); }}>Keep</button>
+                      <button className="text-btn" onClick={e => { deleteDoc(d.id, e); setPanelConfirmDeleteId(null); }}>Delete</button>
+                    </span>
+                  ) : (
+                    <span className="doc-item-meta">
+                      <span>{wc.toLocaleString()} {wc === 1 ? "word" : "words"}</span>
+                      {docs.length > 1 && (
+                        <button className="text-btn doc-delete" onClick={e => { e.stopPropagation(); setPanelConfirmDeleteId(d.id); }}>Delete</button>
+                      )}
+                    </span>
                   )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
-        </div>
+        </aside>
       )}
 
-      {/* ── writing stats (editor) ── data about the piece, no score ── */}
+      {/* ── the line under the page: the length of the piece, and its signal ── */}
       {isEditor && (
         <div id="hs-editor-status" className={menuClass}>
           {(() => {
             const doc = docs.find(d => d.id === activeId);
-            const wtSecs = doc?.writingTimeSecs || 0;
-            const saving = saveStatus === "saving";
-            const statusText = saving ? "saving…" : (user && !online ? "offline · saved here" : "saved");
             const sf = doc?.scoreFeatures;
             const hasScore = doc?.humanScore != null && doc?.scoreTier && (sf?.confidence || 0) > 0.08;
             const tierList = ["Faint", "Developing", "Strong", "Distinct"];
             const filled = hasScore ? tierList.indexOf(doc.scoreTier) + 1 : 0;
-            void wtSecs;
             return (
               <div className="writing-stats">
-                <span className="ws-stat">{words.toLocaleString()} {words === 1 ? "word" : "words"}</span>
-                {hasScore && (<>
-                  <span className="ws-sep">·</span>
-                  <button className="ws-process-btn" onClick={() => setHsScoreOpen(true)} title={`${doc.scoreTier} human signal — view the writing process`} aria-label={`${doc.scoreTier} human signal`}>
-                    {tierList.map((_, i) => (
-                      <span key={i} className={`hs-dot-xs ${i < filled ? "on" : "off"}`} />
-                    ))}
+                <span>{words.toLocaleString()} {words === 1 ? "word" : "words"}</span>
+                {hasScore && (
+                  <button className="ws-signal" onClick={() => setHsScoreOpen(true)} aria-label={`Writing signal: ${doc.scoreTier}`} title={doc.scoreTier}>
+                    {tierList.map((_, i) => <span key={i} className={i < filled ? "on" : ""} />)}
                   </button>
-                </>)}
-                <span className="ws-sep">·</span>
-                <span className={`ws-status ${saving ? "saving" : (online ? "ok" : "off")}`}>{statusText}</span>
+                )}
+                {(!online || saveStatus === "saving") && <span className="ws-note">{!online ? "Offline" : "Saving"}</span>}
               </div>
             );
           })()}
         </div>
-      )}
-
-      {/* ── Research participation indicator (only when opted in) ── */}
-      {isEditor && user && researchOptIn && (
-        <button
-          id="research-strip"
-          className={menuClass}
-          onClick={() => setHsModalOpen(true)}
-          aria-label="About inkk research"
-          title="Click for info. Your writing signatures contribute to a study of human writing."
-        >
-          <span className="research-pulse" aria-hidden="true" />
-          <span className="research-strip-text">
-            studying · {liveStats.events.toLocaleString()} {liveStats.events === 1 ? "event" : "events"}
-            {liveStats.sessionStartedAt && ` · ${Math.max(1, Math.round((Date.now() - liveStats.sessionStartedAt) / 60000))}m`}
-          </span>
-        </button>
       )}
 
       {/* ── editor (always mounted) ── */}
@@ -1922,7 +1810,7 @@ export default function App() {
         <div id="editor-preview-container">
           <div id="reading-pages">
             {previewLoading && previewPages.length === 0 && (
-              <p className="reading-pages-loading">rendering…</p>
+              <p className="reading-pages-loading">Rendering</p>
             )}
             {previewPages.map((url, i) => (
               <img key={i} className="reading-page-img" src={url} alt="" />
@@ -1948,9 +1836,9 @@ export default function App() {
           onDeleteDoc={(id) => deleteDoc(id, { stopPropagation: () => {} })}
           onDownloadDoc={async (id) => { await openDocFromNotes(id); setDownloadModalOpen(true); }}
           onCertifyDoc={async (id) => { await openDocFromNotes(id, { view: "certify" }); }}
-          onOpenVerify={(code) => openVerify(code)}
           researchOptIn={researchOptIn}
           onToggleOptIn={toggleResearchOptIn}
+          onAboutResearch={() => setHsModalOpen(true)}
           onDownloadData={downloadResearchData}
           onDeleteData={deleteResearchData}
           onChangePassword={() => setUpdatePasswordOpen(true)}
@@ -1987,23 +1875,14 @@ export default function App() {
           tab do nothing for ~1.2s after typing. keyboard-open still hides it
           while the writer is actually composing. */}
       <nav id="bottom-nav">
-        <button className={`nav-tab ${isEditor ? "active" : ""}`} {...tabTouch(() => navigate("editor"))}>
-          <PPen size={19} weight="light" />
-          <span className="nav-label">Write</span>
-        </button>
-        <button className={`nav-tab ${view === "notes" ? "active" : ""}`} {...tabTouch(() => navigate("notes"))}>
-          <PNotes size={19} weight="light" />
-          <span className="nav-label">Notes</span>
-        </button>
-        <button className={`nav-tab ${view === "certify" ? "active" : ""}${activeCert && !certStale ? " has-cert" : ""}`} {...tabTouch(() => navigate("certify"))}>
-          <PSeal size={19} weight="light" />
-          <span className="nav-label">Certify</span>
-        </button>
+        <button className={`nav-tab${isEditor ? " active" : ""}`} {...tabTouch(() => navigate("editor"))}>Write</button>
+        <button className={`nav-tab${view === "notes" ? " active" : ""}`} {...tabTouch(() => navigate("notes"))}>Notes</button>
+        <button className={`nav-tab${view === "certify" ? " active" : ""}`} {...tabTouch(() => navigate("certify"))}>Certify</button>
       </nav>
 
       {/* ── modals ── */}
       {downloadModalOpen && (
-        <DownloadModal onConfirm={downloadDoc} onClose={() => setDownloadModalOpen(false)} />
+        <DownloadModal onConfirm={downloadDoc} onClose={() => setDownloadModalOpen(false)} certifies={!!(user && supabase)} />
       )}
       {authOpen && supabase && <AuthModal onClose={() => setAuthOpen(false)} initialMode={authMode} />}
       {hsModalOpen && <HumanSignalModal onClose={() => setHsModalOpen(false)} />}
@@ -2031,7 +1910,6 @@ export default function App() {
 
       {/* ── popover backdrop ── */}
       {isEditor && certMenuOpen && <div id="publish-menu-backdrop" onClick={() => setCertMenuOpen(false)} />}
-      {isEditor && certConfirmOpen && <div id="publish-menu-backdrop" onClick={() => setCertConfirmOpen(false)} />}
       {isEditor && faceMenuOpen && <div id="publish-menu-backdrop" onClick={() => setFaceMenuOpen(false)} />}
 
       {/* ── toasts ── */}

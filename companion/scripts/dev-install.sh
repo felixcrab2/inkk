@@ -25,6 +25,10 @@ CSC_IDENTITY_AUTODISCOVERY=false npx electron-builder --dir --mac > dist/electro
   || { echo "✗ electron-builder failed — see dist/electron-builder.log"; tail -20 dist/electron-builder.log; exit 1; }
 
 APP="dist/mac-arm64/inkk.app"
+# The native helper lives in Resources, where --deep doesn't reach: sign it
+# first, with the same identity, so macOS attributes its reads to inkk.
+HELPER="$APP/Contents/Resources/inkk-helper"
+[ -f "$HELPER" ] && codesign --force --options runtime --sign "$IDENTITY" "$HELPER"
 codesign --force --deep --sign "$IDENTITY" \
   --entitlements build/entitlements.mac.plist "$APP"
 codesign -v "$APP" && echo "✓ signed (stable identity)"

@@ -1,84 +1,104 @@
 # inkk companion (macOS)
 
-A menu-bar app that sits in the background and records the **rhythm** of your
-typing in any app — Word, Apple Notes, a browser, wherever you write — so that a
-finished piece can carry an `INKK-XXXX-XXXX-XXXX` code, exactly as if it had
-been written in the inkk editor. It never records the letters. It keeps a local
-log of writing sessions with a live Human Signal score, and can certify any
-session on demand. **No account is needed to start.**
+A menu-bar app that works in the background on both sides of a piece of writing.
 
-It reuses the website's backend wholesale: the same pure scorer
-(`src/telemetry/features.js` + `score.js`, bundled into `lib/scoring.cjs`), the
-same code and hash functions (`src/verify/code.js`), the same server-side
-certifier (`api/certify.mjs`), and the same verify page at `inkk.site/v/<code>`.
+**Writing.** It records the **rhythm** of your typing in any app (Word, Pages,
+Mail, a browser, wherever you write), never the letters. Every writing session
+has its `INKK-XXXX-XXXX-XXXX` code from the first keystroke. One click
+certifies it; saving or exporting a document certifies it and writes the code
+into the file; ⌃⌥S signs an email with your name, whose link, description and
+ink all carry the code.
+
+**Reading.** Whatever is in front is looked at, on your Mac, for an inkk code:
+in its words, its links, its pictures' descriptions and its file's metadata.
+A code that turns up is looked up in the ledger and checked against the text in
+front, sentence by sentence, and the popover (and a quiet notification) says
+what it found. **No account is needed to start.**
+
+It reuses the website's backend wholesale: the same pure scorer and
+fingerprints (`src/telemetry/*`, `src/verify/sketch.js`, bundled into
+`lib/scoring.cjs`), the same certifier (`api/certify.mjs`), the same lookup
+(`api/verify.mjs`) and the same certificate page at `www.inkk.site/v/<code>`.
 
 ## How it works
 
 ```
-uiohook keydown/keyup ─▶ capture.js (physical keys → inkk telemetry events, key_char = null)
-                          ├─▶ lib/sessions.js   one open session per front app, persisted locally
-                          ├─▶ lib/scoring.cjs   live score, recomputed while you type
-                          └─▶ /api/certify      on "Certify this piece" ─▶ INKK code
+uiohook keys ─▶ capture.js ─▶ lib/sessions.js (one session per app, code from the first key)
+                                   │
+   Certify / save / ⌃⌥S ─▶ read the text (lib/reader.js, helper) ─▶ fingerprint + sentence sketch
+                                   └─▶ lib/api.js ─▶ /api/certify ─▶ code in the ledger
+                                          ├─▶ lib/stamp.js     code into the saved or exported file
+                                          └─▶ lib/signature.js name picture + seal at the caret
+
+front window ─▶ lib/receiver.js: text, links, image descriptions (helper ax-window)
+                                 file metadata (lib/docmeta.js), pixels (lib/mark.js, optional)
+             ─▶ lib/lookup.js (/api/verify) ─▶ compare with the text in front ─▶ popover + notification
 ```
 
-- The global hook starts once Accessibility and Input Monitoring are granted
-  and runs for the app's life. Every key is attributed to the frontmost app
-  (`lsappinfo`, no extra permission), and a session opens on the first key in
-  an app and closes after eight minutes of silence, on *End session*, on quit,
-  or at midnight.
-- `capture.js` reconstructs the semantic `input` / `delete` / `paste` events the
-  browser gives the web recorder for free, so the server scorer treats a
-  companion session identically to a web session. It is pure and unit-tested.
-- Certifying: you paste the finished text into the popover. It is hashed **on
-  your Mac** and only the hash, the title, the word count and that session's
-  rhythm events are sent. The server recomputes the score, writes one ledger
-  row, and hands back the code.
+- The global hook starts once Accessibility and Input Monitoring are granted.
+  Every key is attributed to the frontmost app (`lsappinfo`), and a session
+  opens on the first key in an app and closes after eight minutes of silence,
+  on *End*, on quit, or at midnight.
+- `capture.js` reconstructs the `input` / `delete` / `paste` events the browser
+  gives the web recorder, so the server scores a companion session exactly like
+  a web session.
+- **Certify** reads the piece from the app it was written in, once, through
+  Accessibility, fingerprints it on the Mac (a SHA-256 of the whole text and a
+  short hash per sentence), discards it, and sends only those with the
+  session's rhythm. The seal goes on the clipboard. A certificate is final:
+  writing on and certifying again issues a new code for the new version.
+- **Documents** (`lib/stamp.js`): while you write in an app, the document its
+  front window has open is followed. When it is saved and stays still for four
+  seconds, its text is read from the file; new words are certified (at most one
+  new version every three minutes, however often the app autosaves) and the
+  code is written into the file: extended attributes for any file, custom
+  document properties for Word, keywords for PDF. New PDF and Word files in
+  your home folder, found through Spotlight, that copy a text certified in the
+  last two hours get its code too, so exports are covered. Word files are
+  rewritten only after the new file is checked to hold every original part
+  byte for byte; a copy of the original is kept for seven days.
+- **Signing an email** (`lib/signature.js`, ⌃⌥S or *Sign an email*): certifies
+  what you have written in the front app, draws your name (Settings,
+  *Signature*) in Garamond, Fell or Sans, recolours its ink to carry the code,
+  and pastes it at the caret as a picture linked to the certificate, with the
+  code in its description and a plain-text fallback.
+- **Receiving** (`lib/receiver.js`): on every change of window and then every
+  few seconds for a minute (every 30 s after that), the front window is read
+  through the native helper. A code found in it, or in the metadata of the
+  file it has open, is looked up, and the certificate's sentence fingerprints
+  are compared with the text in front. With *Read codes in pictures* on (off by
+  default; needs Screen Recording), the window is also photographed, the
+  picture is searched for a signed name's code and for codes in its words
+  (Vision OCR), and deleted at once.
 
 ## Privacy model
 
-- **Rhythm only.** `key_char` is always `null`; only the key *class* (letter,
-  digit, punctuation, space, edit, nav, modifier) and the timing are recorded.
-  The scorer never reads letters, so the companion cannot reconstruct your text.
-- **Paste** is recorded as an event with no length: the clipboard is never read
-  (a background app reading it would trip macOS's pasteboard privacy alert).
-  How much text arrived by pasting is inferred at certify time from the length
-  of the finished text versus what was typed.
-- **Certify is one click.** Every session has its INKK code from the first
-  keystroke. Certifying reads the front document's text once through macOS
-  Accessibility (`lib/reader.js`, via System Events), fingerprints it on the
-  Mac, discards it, and binds the code in the ledger. Apps that don't expose
-  their text (some web editors) get a certificate bound to the session instead,
-  and the popover says so.
-- **It also receives.** Every few seconds the text the front window shows is
-  scanned on-device for an INKK code or seal link (`lib/codes.js` findCodes);
-  a code found is looked up with the public `verify_by_code` RPC and shown as
-  the seal of what you are reading. Off switch in Settings ("Notice seals").
-  Both reads need the Accessibility grant plus a one-time Automation prompt for
-  System Events (the `com.apple.security.automation.apple-events` entitlement).
-- **Password fields** are never seen: macOS enables secure input for them, which
-  blocks the hook entirely.
-- **Ignored apps** (Terminal, iTerm, 1Password, Keychain Access, the login
-  window and the companion itself by default; add your own in Settings) are
-  never recorded. *Pause for an hour* stops everything.
-- **Local first.** Sessions, events and certificates live in
-  `~/Library/Application Support/inkk-companion/inkk/` (`settings.json`,
-  `sessions/index.json`, `sessions/events/<id>.jsonl`, `sessions/certs/<id>.json`).
-  Nothing leaves the Mac until you certify, and then only that one session.
-  Sessions older than 60 days (or beyond the most recent 400) are pruned on
-  launch.
-- **No account needed.** Certification signs in to Supabase anonymously and
-  silently — a random id, no email. Certificates need an owner in the ledger,
-  so this is the smallest possible identity. If the project has anonymous
-  sign-ins disabled, the popover offers an email/password sign-in at that step
-  and only there. The full policy is in `src/components/Legal.js`.
+- **Rhythm only.** `key_char` is always `null`; only the key class and the
+  timing are recorded. The companion cannot reconstruct your text from it.
+- **Paste** is an event with no length: the clipboard is never read. How much
+  arrived by pasting is inferred at certify time from the finished text.
+- **Text is read, fingerprinted and dropped**, on the Mac, at the moments
+  above. Only fingerprints and codes leave it.
+- **Password fields** are never seen (macOS secure input blocks the hook), and
+  ignored apps (Terminal, iTerm, 1Password, Keychain Access, the login window by
+  default) are neither recorded nor read. *Pause* stops everything.
+- **Local first.** Sessions, events, certificates, the account and settings live
+  in `~/Library/Application Support/inkk-companion/inkk/`.
+- **No account needed.** The account lives in the main process
+  (`lib/auth.js`, stored in `auth.json`, readable only by you). With no session
+  it signs in anonymously, a random id with no email. If the project has
+  anonymous sign-ins off, the popover asks for an inkk.site email and password
+  once. The full policy is in `src/components/Legal.js`.
 
 ## Permissions
 
 macOS asks for two things the first time; both are under *System Settings →
 Privacy & Security*:
 
-- **Accessibility** — required by the event hook to observe key events.
-- **Input Monitoring** — required to receive keyboard events from other apps.
+- **Accessibility**: the event hook, and reading the text in front.
+- **Input Monitoring**: receiving keyboard events from other apps.
+- **Screen Recording** (optional, only if you switch on *Read codes in
+  pictures*): photographing the front window to read a code in a picture.
 
 The Welcome screen walks through them and re-checks every 1.5 s; after
 granting Input Monitoring macOS usually needs the app relaunched, and the
@@ -155,17 +175,33 @@ account-free certification flow — see `docs/backend-changes-2026-09.md`.
 ## Files
 
 ```
-main.js               main process: hook, tray, popover window, sessions, certify (HTTPS POST)
-preload.js            exposes window.inkk to the renderer (the contract in the spec)
+main.js               main process: hook, tray, popover, sessions, certify, receiver, stamper, signature
+preload.js            window.inkk, the popover's only door to main
 capture.js            physical keys → telemetry events (pure, tested)
-lib/sessions.js       session model + persistence
+helper/InkkHelper.swift  native helper: front window, Accessibility reading, OCR, PDF text/metadata
+lib/api.js            requests to www.inkk.site; follows redirects only within inkk, keeping the sign-in
+lib/auth.js           the account, held by main (anonymous first)
+lib/sessions.js       session model, persistence, certificate versions
+lib/reader.js         the text, links and document of the window in front
+lib/receiver.js       noticing codes in what you read and checking them against the text
+lib/lookup.js         the ledger lookup, cached
+lib/docmeta.js        codes inside documents (xattr, Word, PDF, PNG) and their text
+lib/zip.js            just enough ZIP to edit a Word file without touching the rest
+lib/stamp.js          stamping saved and exported documents
+lib/signature.js      signing an email; renderer/sign.html + sign.js draw the name
+lib/mark.js           the code in a signed name's ink, and reading it back from a screenshot
+lib/codes.js          codes, and finding them in text
 lib/context.js        front-app detection via lsappinfo
 lib/keymap.js         uiohook keycodes → DOM-style key names
-lib/permissions.js    node-mac-permissions + systemPreferences wrappers
-lib/scoring.cjs       generated: CJS bundle of the shared scorer (do not edit)
+lib/permissions.js    macOS permission status and prompts
+lib/scoring.cjs       generated: CJS bundle of the shared scorer and fingerprints (do not edit)
 lib/config.cjs        generated from .env.local (gitignored)
-build.js              esbuild: renderer bundle + lib/scoring.cjs + lib/config.cjs
-renderer/             the popover UI: index.html, styles.css, app.js, fonts/
-assets/               tray icons (idle + active), app icon
-scripts/              dev-install.sh, install-cert.sh, release.sh
+build.js              esbuild bundles + lib/*.cjs + the native helper
+renderer/             the popover: index.html, styles.css, app.js
+assets/               tray icons, app icon
+scripts/              dev-install.sh, install-cert.sh, release.sh, mark-e2e.js
 ```
+
+`npm test` runs every unit test. `npx electron scripts/mark-e2e.js` draws real
+signed names, shows them at several sizes in an email-like page, photographs
+the page and reads the codes back.

@@ -33,7 +33,7 @@ function sessionHash(sessionId) {
 // Codes and seal links as they appear in the wild: "INKK-7F3A-9K2D-XQ4M",
 // "inkk.site/v/INKK-…", with the usual typing slips (o→0, i/l→1) tolerated
 // the same way the website's parseVerifyCode tolerates them.
-const CODE_RE = /\bINKK[-‐-―\s]?([0-9A-Za-z]{4})[-‐-―\s]?([0-9A-Za-z]{4})[-‐-―\s]?([0-9A-Za-z]{4})\b/g;
+const CODE_RE = /\b[Ii][Nn][Kk][Kk][-‐-―\s]?([0-9A-Za-z]{4})[-‐-―\s]?([0-9A-Za-z]{4})[-‐-―\s]?([0-9A-Za-z]{4})\b/g;
 function normaliseCode(a, b, c) {
   const fix = (s) => s.toUpperCase().replace(/O/g, "0").replace(/[IL]/g, "1").replace(/U/g, "V");
   const body = fix(a + b + c);

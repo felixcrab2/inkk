@@ -37,7 +37,8 @@ const RETENTION_DAYS = 60;
 const RETENTION_MAX = 400;
 const MAX_EVENTS_IN_MEMORY = 60000;    // /api/certify caps events at 60000 too
 const TRIM_CHUNK = 2000;               // …kept as a ring: drop the oldest chunk when full
-const MIN_KEEP_KEYSTROKES = 40;        // shorter sessions (Spotlight, a filename) are noise and are dropped on close
+const MIN_KEEP_KEYSTROKES = 40;
+const MAX_VERSIONS = 20;               // earlier certificates kept per session        // shorter sessions (Spotlight, a filename) are noise and are dropped on close
 
 // A keydown that would put text on the page: printable keys, Enter,
 // Backspace/Delete, without a ⌘/Ctrl chord. Only these OPEN a session; a lone
@@ -274,14 +275,31 @@ function createStore({ dir, now = Date.now, hrnow = null, genId, genCode = null,
     return { ...s, full };
   }
 
+  // A certificate is final once the ledger holds it. Writing on after
+  // certifying and certifying again issues a new code for the new version; the
+  // session keeps its earlier certificates (newest first) so a file stamped
+  // with an older version still reads as this writer's.
   function setCert(id, cert) {
     const s = summaries.get(id);
     if (!s) return false;
+    const earlier = s.cert && s.cert.code !== cert.code ? [s.cert, ...(s.certs || [])] : (s.certs || []);
     s.cert = cert;
-    writeJsonAtomic(certFile(id), cert);
+    s.certs = earlier.slice(0, MAX_VERSIONS);
+    s.code = cert.code;
+    writeJsonAtomic(certFile(id), { ...cert, earlier: s.certs });
     markIndex();
     emit("sessions");
     return true;
+  }
+
+  // The code the next certificate of this session will carry: the session's own
+  // until it is certified, then a fresh one whenever the text has moved on.
+  function codeFor(id, contentHash) {
+    const s = summaries.get(id);
+    if (!s) return null;
+    if (!s.cert) return s.code || (genCode ? genCode() : null);
+    if (contentHash && s.cert.contentHash === contentHash) return s.cert.code;
+    return genCode ? genCode() : null;
   }
 
   // ── time-driven housekeeping (main calls this every second) ───────────────
@@ -366,7 +384,8 @@ function createStore({ dir, now = Date.now, hrnow = null, genId, genCode = null,
         code: cert?.code || (genCode ? genCode() : null),
         startedAt: first.t, endedAt: last.t, lastKeyAt: last.t,
         keystrokes: 0, deletions: 0, pastes: 0, wordsEst: 0, activeMs: 0, score: null,
-        cert,
+        cert: cert ? (({ earlier, ...c }) => c)(cert) : null,
+        certs: Array.isArray(cert?.earlier) ? cert.earlier : [],
       };
       for (const e of evs) {
         if (e.kind === "input") s.keystrokes++;
@@ -401,7 +420,7 @@ function createStore({ dir, now = Date.now, hrnow = null, genId, genCode = null,
 
   return {
     openFor, keyEvent, closeIdle, end, closeAll, delete: remove,
-    list, get, active, eventsOf, setCert,
+    list, get, active, eventsOf, setCert, codeFor,
     tick, flush, load, prune,
     get openCount() { return live.size; },
   };

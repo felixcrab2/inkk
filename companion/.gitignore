@@ -8,3 +8,6 @@ lib/config.cjs
 .env.local
 .env.signing
 .smoke.js
+build/inkk-helper
+build/inkk-helper-*
+renderer/sign.bundle.js

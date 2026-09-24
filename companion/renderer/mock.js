@@ -56,7 +56,7 @@
   const state = {
     version: "0.2.0",
     onboarded: true,
-    permissions: { accessibility: "granted", inputMonitoring: "granted" },
+    permissions: { accessibility: "granted", inputMonitoring: "granted", screen: "not determined" },
     hookActive: true,
     needsRelaunch: false,
     paused: null,
@@ -64,7 +64,16 @@
     ignoredApps: ["site.inkk.companion", "com.apple.Terminal", "com.googlecode.iterm2", "com.1password.1password"],
     frontApp: { name: "Safari", bundleId: "com.apple.Safari" },
     active: live,
-    supabaseConfigured: false,
+    supabaseConfigured: true,
+    auth: { signedIn: true, anonymous: true, email: null, needed: false },
+    settings: { receive: true, notify: true, stampDocuments: true, readPictures: false, signatureName: "Ada Writer", signatureFace: "garamond", signShortcut: "Control+Alt+S" },
+    shortcutOk: true,
+    helper: true,
+    seal: { code: "INKK-7F3A-9K2D-XQ4M", source: "link", app: "Mail", bundleId: "com.apple.mail", mine: false,
+      cert: { code: "INKK-7F3A-9K2D-XQ4M", verified: true, score_tier: "Distinct", human_score: 84, author_name: "Felix Crabtree", issued_at: new Date(now - 4 * 86400000).toISOString() },
+      match: { state: "match", ratio: 1 }, seenAt: now },
+    lastStamp: { path: "/Users/ada/Documents/On slow mornings.docx", name: "On slow mornings.docx", code: "INKK-7F3A-9K2D-XQ4M", ok: true, at: now - 3 * MIN },
+    signing: false,
   };
   let sessions = [live, ...past];
 
@@ -101,10 +110,10 @@
       pushState(); pushSessions();
     },
     deleteSession: async (id) => { sessions = sessions.filter((x) => x.id !== id); pushSessions(); },
-    certify: async (input) => {
+    certify: async (id) => {
       await wait(600);
-      const s = sessions.find((x) => x.id === input.sessionId);
-      if (!input.accessToken && state.__requireAuth) return { ok: false, error: "Sign in to certify", needsAuth: true };
+      const s = sessions.find((x) => x.id === id);
+      if (state.__requireAuth) return { ok: false, error: "Sign in to certify.", needsAuth: true };
       const cert = { code: s?.code || "INKK-4B7N-R2XE-8KMT", verified: true, tier: s?.score?.tier || "Strong", score: s?.score?.score || 70,
         issuedAt: Date.now(), title: null, wordCount: 641, binding: "text", contentHash: "mock" };
       if (s) s.cert = cert;
@@ -114,7 +123,15 @@
     requestPermission: async (kind) => { await wait(300); state.permissions[kind] = "granted"; pushState(); return "granted"; },
     openPermissionSettings: async () => {},
     setOnboarded: async (v) => { state.onboarded = !!v; pushState(); },
-    setReceive: async (v) => { state.receive = !!v; pushState(); },
+    setReceive: async (v) => { state.settings.receive = !!v; pushState(); },
+    setSetting: async (k, v) => { state.settings[k] = v; pushState(); },
+    sign: async () => console.log("[mock] sign"),
+    previewSignature: async () => null,
+    signIn: async () => { await wait(400); state.auth = { signedIn: true, anonymous: false, email: "ada@example.com", needed: false }; state.__requireAuth = false; pushState(); return { ok: true }; },
+    signOut: async () => { state.auth = { signedIn: false, anonymous: false, email: null, needed: false }; pushState(); },
+    importSession: async () => false,
+    revealFile: async () => {},
+    resize: (h) => { document.documentElement.dataset.height = h; },
     setPaused: async (until) => { state.paused = until; pushState(); },
     setLaunchAtLogin: async (v) => { state.launchAtLogin = !!v; pushState(); },
     setIgnoredApps: async (list) => { state.ignoredApps = list.slice(); pushState(); },
