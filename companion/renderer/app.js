@@ -251,9 +251,15 @@ function screenSetup() {
     <footer class="foot"><span>No account needed</span><span><button data-action="open" data-url="${SITE}/terms">Terms</button>&nbsp;&nbsp;&nbsp;<button data-action="open" data-url="${SITE}/privacy">Privacy</button></span></footer>`;
 }
 
+function signErrorSection(s) {
+  if (!s || !s.signError) return "";
+  return `<section class="sec"><div class="big">Not signed</div><div class="meta gap">${esc(s.signError)}</div></section><div class="sep"></div>`;
+}
+
 function screenHome() {
   const s = state.app;
   return header()
+    + signErrorSection(s)
     + (s?.active ? activeSection(s.active) : idleSection(s))
     + signInSection()
     + sealSection(s?.seal)

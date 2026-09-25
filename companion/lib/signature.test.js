@@ -69,3 +69,14 @@ test("browsers and Outlook get the hosted picture; Apple Mail and the rest embed
     assert.strictEqual(usesHostedImage(id), false, String(id));
   }
 });
+
+test("the clipboard gets one item carrying the picture, the HTML and the text (Electron 44's API)", async () => {
+  const { writeToClipboard } = require("./signature");
+  const written = [];
+  class ClipboardItem { constructor(items) { this.items = items; this.types = Object.keys(items); } }
+  const clipboard = { write: async (items) => { written.push(...items); } };
+  await writeToClipboard({ clipboard, ClipboardItem }, { text: "Ada", html: "<img>", png: Buffer.from([0x89, 0x50, 0x4e, 0x47]) });
+  assert.strictEqual(written.length, 1);
+  assert.deepStrictEqual(written[0].types.sort(), ["image/png", "text/html", "text/plain"]);
+  assert.strictEqual(await written[0].items["image/png"].text().then((t) => t.length), 4);
+});

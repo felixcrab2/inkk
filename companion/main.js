@@ -20,7 +20,7 @@
 
 "use strict";
 
-const { app, Tray, Menu, BrowserWindow, ipcMain, clipboard, nativeImage, screen, shell, globalShortcut, Notification, nativeTheme, safeStorage } = require("electron");
+const { app, Tray, Menu, BrowserWindow, ipcMain, clipboard, ClipboardItem, nativeImage, screen, shell, globalShortcut, Notification, nativeTheme, safeStorage } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
 const crypto = require("node:crypto");
@@ -189,6 +189,7 @@ function getState() {
     seal: seal && { ...seal, mine: isMine(seal.code) },
     lastStamp,
     signing,
+    signError: signError && Date.now() - signError.at < 5 * 60 * 1000 ? signError.message : null,
     ...(startupErrors.length ? { error: startupErrors.join("; ") } : {}),
   };
 }
@@ -743,6 +744,25 @@ function notify(title, body, { subtitle, onClick } = {}) {
   n.show();
 }
 
+// What each signing did, step by step, in <userData>/inkk/sign.log: app,
+// codes, sizes and outcomes only, never the email or the name. A signature
+// that fails says so in the popover as well.
+let signError = null;                  // { message, at } shown in the popover for a while
+function signLog(step, detail = {}) {
+  try {
+    const line = JSON.stringify({ at: new Date().toISOString(), step, ...detail }) + "\n";
+    const file = path.join(DATA_DIR, "sign.log");
+    try { if (fs.statSync(file).size > 256 * 1024) fs.renameSync(file, file + ".1"); } catch { /* first line */ }
+    fs.appendFileSync(file, line, { mode: 0o600 });
+  } catch { /* logging never blocks signing */ }
+}
+function signFailed(message, detail) {
+  signError = { message, at: Date.now() };
+  signLog("failed", { message, ...(detail || {}) });
+  notify("Not signed", message);
+  showWindow();
+}
+
 // ⌃⌥S where the name goes: certify what has been written, then put the signed
 // name at the caret. `target` is the app to sign in (the popover passes the
 // app that was in front before it opened).
@@ -753,25 +773,29 @@ async function signHere(target) {
   push("state");
   try {
     const front = target || (await context.pollNow()) || context.current();
-    if (!front || !front.bundleId || front.bundleId === OWN_BUNDLE_ID) return;
+    if (!front || !front.bundleId || front.bundleId === OWN_BUNDLE_ID) { signLog("no-target"); return; }
+    signError = null;
+    signLog("start", { app: front.bundleId });
     const sess = sessionFor(front.bundleId, front.docKey || "");
-    if (!sess) { notify("Nothing to sign yet", `Write in ${front.name || "this app"} first, then sign.`); return; }
+    if (!sess) { signFailed(`Write in ${front.name || "this app"} first, then sign.`); return; }
     const name = (settings.signatureName || accountName || "").trim();
-    if (!name) { notify("Add your name", "Set the name you sign with in inkk's settings."); showWindow(); return; }
+    if (!name) { signFailed("Set the name you sign with in inkk's settings."); return; }
     const text = await reader.readFocusedText(front.bundleId);
     const draw = async (code) => ({ code, ...(await signature.renderName({ BrowserWindow, dir: __dirname, name, code, face: settings.signatureFace })) });
     const r = await issue({ sessionId: sess.id, text, source: "signature", binding: "text", authorName: name, signatureFor: draw });
     if (!r.ok) {
-      if (r.needsAuth) showWindow();
-      else notify("Not signed", r.error || "The certificate couldn't be issued.");
+      if (r.needsAuth) { signLog("needs-auth"); showWindow(); }
+      else signFailed(r.error || "The certificate couldn't be issued.");
       return;
     }
+    signLog("certified", { code: r.cert.code, binding: r.cert.binding, hosted: !!r.signatureUrl });
     const rendered = r.rendered || (await draw(r.cert.code));
     // Web mail keeps pictures that live at an https address and drops pasted
     // ones; Mail and other native apps keep the picture inside the email.
     const imageUrl = signature.usesHostedImage(front.bundleId) && r.signatureUrl ? r.signatureUrl : null;
     const p = signature.clipboardPayload({ nativeImage, rendered, name, code: r.cert.code, seal: sealUrl(r.cert.code), imageUrl });
-    clipboard.write({ text: p.text, html: p.html, image: p.image });
+    await signature.writeToClipboard({ clipboard, ClipboardItem }, p);
+    signLog("clipboard", { picture: imageUrl ? "hosted" : "embedded", width: rendered.width, height: rendered.height, bytes: p.png.length });
     // Paste where the caret is, once the shortcut's keys are up (⌃⌥ held
     // down would turn ⌘V into another command). The keys we send are not the
     // writer's.
@@ -780,9 +804,10 @@ async function signHere(target) {
     ignoreKeysUntil = Date.now() + PASTE_GUARD_MS;
     await new Promise((res) => setTimeout(res, 40));
     uIOhook.keyTap(UiohookKey.V, [UiohookKey.Meta]);
+    signLog("pasted");
   } catch (e) {
     console.warn("[inkk] sign:", e.message);
-    notify("Not signed", "Something went wrong drawing the name. Try again.");
+    signFailed("Signing didn't work. Try again.", { error: e.message });
   } finally {
     signing = false;
     push("state");
@@ -908,7 +933,7 @@ function registerIpc() {
     settings.ignoredApps = [...new Set(list.filter(x => typeof x === "string" && x))];
     saveSettings(); push("state");
   });
-  h("copyText", (t) => { clipboard.writeText(t); });
+  h("copyText", (t) => clipboard.writeText(String(t)));
   h("openExternal", (url) => (/^https:\/\//.test(url) ? shell.openExternal(url) : undefined));
   h("revealFile", (p) => { if (typeof p === "string" && fs.existsSync(p)) shell.showItemInFolder(p); });
   h("previewSignature", async () => {

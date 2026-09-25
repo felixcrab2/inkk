@@ -74,8 +74,22 @@ function clipboardPayload({ nativeImage, rendered, name, code, seal, imageUrl })
   const alt = `${name}${zw.encode(code)}`;
   const src = typeof imageUrl === "string" && /^https:\/\//.test(imageUrl) ? imageUrl : rendered.dataUrl;
   const html = `<a href="${escapeHtml(seal)}" style="text-decoration:none;border:0"><img src="${escapeHtml(src)}" width="${rendered.width}" height="${rendered.height}" alt="${escapeAttr(alt)}" style="border:0;display:inline-block;vertical-align:baseline"></a>`;
-  const image = nativeImage.createFromDataURL(rendered.dataUrl);
-  return { html, text: alt, image, alt };
+  const image = nativeImage ? nativeImage.createFromDataURL(rendered.dataUrl) : null;
+  const png = Buffer.from(String(rendered.dataUrl).replace(/^data:image\/png;base64,/, ""), "base64");
+  return { html, text: alt, image, png, alt };
+}
+
+// Electron 44's clipboard takes W3C-style ClipboardItems: one item carrying
+// every format, so each app pastes the richest one it understands (the linked
+// picture in mail, the name with its hidden code in plain-text fields, the
+// bare picture in image editors). Resolves once the system clipboard holds it.
+function writeToClipboard({ clipboard, ClipboardItem }, payload) {
+  const item = new ClipboardItem({
+    "text/plain": payload.text,
+    "text/html": payload.html,
+    "image/png": new Blob([payload.png], { type: "image/png" }),
+  });
+  return clipboard.write([item]);
 }
 
 function dispose() {
@@ -84,4 +98,4 @@ function dispose() {
   rendererReady = null;
 }
 
-module.exports = { fullName, renderName, clipboardPayload, usesHostedImage, dispose };
+module.exports = { fullName, renderName, clipboardPayload, writeToClipboard, usesHostedImage, dispose };
